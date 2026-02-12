@@ -27,31 +27,41 @@ graph TD
 ```
 
 ## 2. Technology Description
--   **Frontend**: React@18 + TailwindCSS + Vite
--   **Backend**: Express.js (Node.js)
--   **Database**: Supabase (PostgreSQL)
--   **Storage**: Supabase Storage (Birth Certificates)
--   **Authentication**: Supabase Auth
--   **Payments**: Stripe (Recurring Subscription)
+
+* **Frontend**: React\@18 + TailwindCSS + Vite
+
+* **Backend**: Express.js (Node.js)
+
+* **Database**: Supabase (PostgreSQL)
+
+* **Storage**: Supabase Storage (Birth Certificates)
+
+* **Authentication**: Supabase Auth
+
+* **Payments**: Stripe (Recurring Subscription)
 
 ## 3. Route Definitions
-| Route | Purpose |
-|-------|---------|
-| `/` | Landing page |
-| `/login` | User authentication |
-| `/dashboard` | Parent Dashboard (List children) |
-| `/register/new` | Multi-step registration wizard |
-| `/admin` | Admin Dashboard (Roster & Exports) |
+
+| Route           | Purpose                            |
+| --------------- | ---------------------------------- |
+| `/`             | Landing page                       |
+| `/login`        | User authentication                |
+| `/dashboard`    | Parent Dashboard (List children)   |
+| `/register/new` | Multi-step registration wizard     |
+| `/admin`        | Admin Dashboard (Roster & Exports) |
 
 ## 4. API Definitions
+
 ### 4.1 Express API Endpoints
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/create-checkout-session` | Receives player data & waiver; creates Stripe Session. |
-| POST | `/webhook/stripe` | Listens for `checkout.session.completed`; saves player to DB. |
-| POST | `/api/upload-url` | Generates signed URL for secure file upload to Supabase. |
+
+| Method | Endpoint                       | Description                                                   |
+| ------ | ------------------------------ | ------------------------------------------------------------- |
+| POST   | `/api/create-checkout-session` | Receives player data & waiver; creates Stripe Session.        |
+| POST   | `/webhook/stripe`              | Listens for `checkout.session.completed`; saves player to DB. |
+| POST   | `/api/upload-url`              | Generates signed URL for secure file upload to Supabase.      |
 
 ### 4.2 Core Types
+
 ```typescript
 interface PlayerRegistration {
   parent_id: string; // UUID
@@ -68,6 +78,7 @@ interface PlayerRegistration {
 ## 5. Data Model
 
 ### 5.1 Entity Relationship Diagram
+
 ```mermaid
 erDiagram
   PROFILES ||--o{ REGISTRATIONS : "has"
@@ -96,6 +107,7 @@ erDiagram
 ```
 
 ### 5.2 Data Definition Language (DDL)
+
 ```sql
 -- Profiles table (extends auth.users)
 create table public.profiles (
@@ -129,3 +141,4 @@ alter table public.registrations enable row level security;
 create policy "Parents can view their own children" on public.registrations
   for select using (auth.uid() = parent_id);
 ```
+
