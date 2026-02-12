@@ -42,16 +42,24 @@ interface Game {
   team_group: string;
 }
 
+interface User {
+  id: string;
+  full_name: string;
+  role: string;
+  email?: string;
+}
+
 export default function AdminDashboard() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGroup, setFilterGroup] = useState('All Groups');
   const [filterCoach, setFilterCoach] = useState('All Coaches');
   const [filterPayment, setFilterPayment] = useState('All');
-  const [activeTab, setActiveTab] = useState<'players' | 'schedule'>('players');
+  const [activeTab, setActiveTab] = useState<'players' | 'schedule' | 'users'>('players');
   const navigate = useNavigate();
 
   // Modal State
@@ -162,6 +170,23 @@ export default function AdminDashboard() {
         console.error('Error fetching games:', gameErr);
       }
 
+      // 4. Fetch Users (All Profiles)
+      try {
+        const { data: usersData, error: usersError } = await supabase
+          .from('profiles')
+          .select('id, full_name, role');
+          
+        if (usersData) {
+          setUsers(usersData.map((u: any) => ({
+            id: u.id,
+            full_name: u.full_name || 'Unknown User',
+            role: u.role || 'user'
+          })));
+        }
+      } catch (userErr) {
+        console.error('Error fetching users:', userErr);
+      }
+
       if (data) {
         const formattedData = data.map((p: any) => {
           try {
@@ -231,18 +256,127 @@ export default function AdminDashboard() {
 
   const handleMakeCoach = async (userId: string) => {
     try {
-      const { error } = await supabase
+      console.log('Attempting to promote user to coach:', userId);
+
+      // 0. Verify Auth
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('You must be logged in to perform this action.');
+      }
+      console.log('Current user performing action:', user.id);
+
+      // 1. Direct Update with Verification
+      const { data, error } = await supabase
         .from('profiles')
         .update({ role: 'coach' })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database update failed:', error);
+        throw error;
+      }
 
-      alert('User promoted to Coach!');
-      fetchData(); // Refresh list
+      // Check if array is empty
+      if (!data || data.length === 0) {
+        console.error('Update operation returned no data. Possible RLS issue even after fix.');
+        // Check if the user exists
+        const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('id', userId);
+        if (count === 0) {
+            throw new Error(`User with ID ${userId} does not exist in profiles table.`);
+        }
+        throw new Error('Database update failed - no rows affected (RLS might still be blocking).');
+      }
+
+      console.log('User successfully promoted:', data);
+
+      // 2. Sync to coaches table
+      try {
+        const userProfile = data[0];
+        // Use upsert to handle potential duplicates
+        const { error: syncError } = await supabase.from('coaches').upsert({
+          id: userProfile.id,
+          full_name: userProfile.full_name,
+          email: userProfile.email
+        }, { onConflict: 'id' });
+
+        if (syncError) console.error('Coach sync error:', syncError);
+      } catch (syncErr) {
+        console.log('Note: Coaches table sync skipped or failed', syncErr);
+      }
+
+      // 3. Session Refresh
+      const { error: sessionError } = await supabase.auth.refreshSession();
+      if (sessionError) console.error('Session refresh warning:', sessionError);
+
+      alert('User promoted to Coach successfully!');
+      
+      // 4. Refresh UI Data cleanly
+      await fetchData();
+      
     } catch (err: any) {
       console.error('Error promoting user:', err);
       alert('Failed to promote user: ' + err.message);
+    }
+  };
+
+  const handleUnassignCoach = async (userId: string) => {
+    if (!confirm('Are you sure you want to remove this coach? This will demote them to a regular user and unassign all their players.')) {
+      return;
+    }
+
+    try {
+      console.log('Attempting to unassign coach:', userId);
+
+      // 1. Unassign players first
+      const { error: playersError } = await supabase
+        .from('registrations')
+        .update({ coach_id: null })
+        .eq('coach_id', userId);
+
+      if (playersError) {
+        console.error('Failed to unassign players:', playersError);
+      }
+
+      // 2. Demote Role in profiles
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ role: 'user' })
+        .eq('id', userId)
+        .select();
+
+      if (error) {
+        console.error('Database update failed:', error);
+        throw error;
+      }
+
+      // Check if array is empty
+      if (!data || data.length === 0) {
+        console.error('Update operation returned no data. Check RLS policies.');
+        throw new Error('Database update failed - no rows affected.');
+      }
+
+      console.log('Coach successfully demoted:', data);
+
+      // Sync removal from coaches table
+      try {
+        await supabase.from('coaches').delete().eq('id', userId);
+      } catch (syncErr) {
+        console.log('Note: Coaches table sync skipped', syncErr);
+      }
+
+      // 3. Session Refresh
+      const { error: sessionError } = await supabase.auth.refreshSession();
+      if (sessionError) console.error('Session refresh warning:', sessionError);
+
+      alert('Coach removed and demoted successfully!');
+      
+      // 4. Refresh UI Data cleanly
+      await fetchData();
+      
+    } catch (err: any) {
+      console.error('Error removing coach:', err);
+      alert('Failed to remove coach: ' + err.message);
     }
   };
 
@@ -590,6 +724,12 @@ export default function AdminDashboard() {
         >
           Game Schedule
         </button>
+        <button
+          className={`px-6 py-3 font-bold text-sm ${activeTab === 'users' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
+          onClick={() => setActiveTab('users')}
+        >
+          All Users
+        </button>
       </div>
 
       {/* PLAYERS & COACHES TAB */}
@@ -855,6 +995,71 @@ export default function AdminDashboard() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* USERS TAB */}
+      {activeTab === 'users' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">All Users Management</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {users.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 mr-3">
+                          {user.full_name.charAt(0)}
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-bold uppercase rounded-full ${
+                        user.role === 'admin' ? 'bg-red-100 text-red-800' :
+                        user.role === 'coach' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {user.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      {user.role === 'user' && (
+                        <button
+                          onClick={() => handleMakeCoach(user.id)}
+                          className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs font-bold"
+                        >
+                          Make Coach
+                        </button>
+                      )}
+                      {user.role === 'coach' && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 text-xs italic">Coach</span>
+                          <button
+                            onClick={() => handleUnassignCoach(user.id)}
+                            className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs font-bold"
+                          >
+                            Unassign
+                          </button>
+                        </div>
+                      )}
+                      {user.role === 'admin' && (
+                        <span className="text-gray-400 text-xs italic">Admin Access</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
