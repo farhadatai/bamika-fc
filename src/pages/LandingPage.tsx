@@ -187,6 +187,71 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* COACHING STAFF SECTION */}
+      <section id="coaches" className="py-24 bg-neutral-900">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-extrabold text-white uppercase tracking-tight mb-4">
+              Meet Our <span className="text-[#EF4444]">Coaches</span>
+            </h2>
+            <div className="h-1 w-24 bg-[#EF4444] mx-auto"></div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-10">
+            {/* Coach 1 */}
+            <div className="bg-black border border-gray-800 rounded-2xl p-8 text-center hover:border-[#EF4444] transition-all group">
+              <div className="relative w-32 h-32 mx-auto mb-6">
+                <div className="absolute inset-0 bg-[#EF4444] rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                <img 
+                  src="https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=400" 
+                  alt="Coach Name" 
+                  className="relative w-full h-full object-cover rounded-full border-4 border-gray-800 group-hover:border-[#EF4444] transition-colors"
+                />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-1">Ahmad Zai</h3>
+              <p className="text-[#EF4444] font-bold uppercase text-sm tracking-wider mb-4">Technical Director</p>
+              <p className="text-gray-400 leading-relaxed">
+                Former national team player with over 15 years of coaching experience. Specializes in youth development and tactical strategy.
+              </p>
+            </div>
+
+            {/* Coach 2 */}
+            <div className="bg-black border border-gray-800 rounded-2xl p-8 text-center hover:border-[#EF4444] transition-all group">
+              <div className="relative w-32 h-32 mx-auto mb-6">
+                <div className="absolute inset-0 bg-[#EF4444] rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                <img 
+                  src="https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=400" 
+                  alt="Coach Name" 
+                  className="relative w-full h-full object-cover rounded-full border-4 border-gray-800 group-hover:border-[#EF4444] transition-colors"
+                />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-1">Sarah Karim</h3>
+              <p className="text-[#EF4444] font-bold uppercase text-sm tracking-wider mb-4">Head Coach (U12-U16)</p>
+              <p className="text-gray-400 leading-relaxed">
+                Licensed UEFA B coach dedicated to building competitive spirit and technical excellence in our developing athletes.
+              </p>
+            </div>
+
+            {/* Coach 3 */}
+            <div className="bg-black border border-gray-800 rounded-2xl p-8 text-center hover:border-[#EF4444] transition-all group">
+              <div className="relative w-32 h-32 mx-auto mb-6">
+                <div className="absolute inset-0 bg-[#EF4444] rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                <img 
+                  src="https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=400" 
+                  alt="Coach Name" 
+                  className="relative w-full h-full object-cover rounded-full border-4 border-gray-800 group-hover:border-[#EF4444] transition-colors"
+                />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-1">Omar Khan</h3>
+              <p className="text-[#EF4444] font-bold uppercase text-sm tracking-wider mb-4">Junior Academy Lead</p>
+              <p className="text-gray-400 leading-relaxed">
+                Expert in early childhood development. Focuses on making soccer fun while instilling strong fundamentals in our youngest stars.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FOOTER */}
       <footer id="contact" className="bg-black text-white py-12 border-t border-gray-800">
         <div className="container mx-auto px-6">
