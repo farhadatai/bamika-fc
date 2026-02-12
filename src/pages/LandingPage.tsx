@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, LogIn, Menu, X, Facebook, Instagram, Shield, Award, Users, Star } from 'lucide-react';
+import { ArrowRight, LogIn, Menu, X, Facebook, Instagram, Shield, Award, Users, Star, Calendar, MapPin, Clock } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+
+interface Event {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+}
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
 
   // Handle scroll effect for navbar
   useEffect(() => {
@@ -15,6 +26,29 @@ export default function LandingPage() {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Fetch upcoming events
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .gte('date', new Date().toISOString().split('T')[0]) // Only future events
+          .order('date', { ascending: true })
+          .limit(3);
+
+        if (error) throw error;
+        setEvents(data || []);
+      } catch (error) {
+        console.error('Error fetching events:', error);
+      } finally {
+        setLoadingEvents(false);
+      }
+    };
+
+    fetchEvents();
   }, []);
 
   return (
@@ -204,7 +238,7 @@ export default function LandingPage() {
                 <div className="absolute inset-0 bg-[#EF4444] rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
                 <img 
                   src="https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=400" 
-                  alt="Coach Name" 
+                  alt="Ahmad Zai" 
                   className="relative w-full h-full object-cover rounded-full border-4 border-gray-800 group-hover:border-[#EF4444] transition-colors"
                 />
               </div>
@@ -221,7 +255,7 @@ export default function LandingPage() {
                 <div className="absolute inset-0 bg-[#EF4444] rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
                 <img 
                   src="https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=400" 
-                  alt="Coach Name" 
+                  alt="Sarah Karim" 
                   className="relative w-full h-full object-cover rounded-full border-4 border-gray-800 group-hover:border-[#EF4444] transition-colors"
                 />
               </div>
@@ -238,7 +272,7 @@ export default function LandingPage() {
                 <div className="absolute inset-0 bg-[#EF4444] rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
                 <img 
                   src="https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=400" 
-                  alt="Coach Name" 
+                  alt="Omar Khan" 
                   className="relative w-full h-full object-cover rounded-full border-4 border-gray-800 group-hover:border-[#EF4444] transition-colors"
                 />
               </div>
@@ -247,6 +281,61 @@ export default function LandingPage() {
               <p className="text-gray-400 leading-relaxed">
                 Expert in early childhood development. Focuses on making soccer fun while instilling strong fundamentals in our youngest stars.
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* UPCOMING EVENTS SECTION */}
+      <section id="events" className="py-24 bg-white">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-extrabold text-black uppercase tracking-tight mb-4">
+              Upcoming <span className="text-[#EF4444]">Events</span>
+            </h2>
+            <div className="h-1 w-24 bg-[#EF4444] mx-auto"></div>
+          </div>
+
+          <div className="max-w-4xl mx-auto">
+            {loadingEvents ? (
+              <div className="text-center text-gray-500">Loading events...</div>
+            ) : events.length > 0 ? (
+              <div className="grid gap-6">
+                {events.map((event) => (
+                  <div key={event.id} className="bg-gray-50 border border-gray-100 rounded-xl p-6 hover:shadow-lg transition-shadow flex flex-col md:flex-row items-start md:items-center justify-between gap-6 group">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-900 group-hover:text-[#EF4444] transition-colors mb-2">{event.title}</h3>
+                      <div className="flex flex-wrap gap-4 text-gray-600 text-sm">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4 text-[#EF4444]" />
+                          <span>{new Date(event.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4 text-[#EF4444]" />
+                          <span>{event.time.slice(0, 5)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-gray-500 bg-white px-4 py-2 rounded-lg border border-gray-200">
+                      <MapPin className="h-5 w-5 text-[#EF4444]" />
+                      <span className="font-medium">{event.location}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-gray-50 rounded-2xl border border-gray-100">
+                <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-xl font-medium text-gray-900 mb-2">No upcoming events</p>
+                <p className="text-gray-500">Check back soon for our latest schedule.</p>
+              </div>
+            )}
+            
+            <div className="mt-10 text-center">
+              <Link to="/login" className="inline-flex items-center gap-2 text-[#EF4444] font-bold hover:text-red-700 transition-colors">
+                View Full Calendar <ArrowRight size={18} />
+              </Link>
             </div>
           </div>
         </div>

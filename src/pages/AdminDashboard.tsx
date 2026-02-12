@@ -210,14 +210,14 @@ export default function AdminDashboard() {
         .insert({
           id: fakeId,
           full_name: newCoach.fullName,
-          role: 'coach',
+          role: 'user', // Default to user, "Make Coach" button promotes them
           // Store email in a metadata field or just ignore it for now if schema doesn't support it
           // Assuming we might add an email column later or just use it for display
         });
 
       if (error) throw error;
 
-      alert('Coach added successfully!');
+      alert('Coach added successfully! Use the "Make Coach" button to grant dashboard access.');
       setNewCoach({ fullName: '', email: '' });
       setIsCoachModalOpen(false);
       fetchData(); // Refresh list
@@ -226,6 +226,23 @@ export default function AdminDashboard() {
       alert('Failed to add coach: ' + err.message);
     } finally {
       setCoachLoading(false);
+    }
+  };
+
+  const handleMakeCoach = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: 'coach' })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      alert('User promoted to Coach!');
+      fetchData(); // Refresh list
+    } catch (err: any) {
+      console.error('Error promoting user:', err);
+      alert('Failed to promote user: ' + err.message);
     }
   };
 
@@ -580,20 +597,29 @@ export default function AdminDashboard() {
         <div className="space-y-6">
           {/* COACHES SECTION */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Coaches</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Coaches & Staff</h2>
             {coaches.length === 0 ? (
               <p className="text-gray-500">No coaches found.</p>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {coaches.map((coach) => (
-                  <div key={coach.id} className="flex items-center p-4 border rounded-lg hover:shadow-md transition-shadow">
-                    <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 mr-4">
-                      {coach.full_name.charAt(0)}
+                  <div key={coach.id} className="flex flex-col p-4 border rounded-lg hover:shadow-md transition-shadow gap-3">
+                    <div className="flex items-center">
+                      <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 mr-4">
+                        {coach.full_name.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900">{coach.full_name}</div>
+                        <div className="text-sm text-gray-500">{coach.email || 'No email'}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-bold text-gray-900">{coach.full_name}</div>
-                      <div className="text-sm text-gray-500">{coach.email || 'No email'}</div>
-                    </div>
+                    
+                    <button 
+                      onClick={() => handleMakeCoach(coach.id)}
+                      className="w-full py-1 text-xs font-bold bg-gray-100 hover:bg-green-100 text-gray-700 hover:text-green-700 rounded transition-colors border border-gray-200 hover:border-green-200"
+                    >
+                      Make Coach (Grant Access)
+                    </button>
                   </div>
                 ))}
               </div>
