@@ -11,6 +11,93 @@ interface Event {
   location: string;
 }
 
+interface Coach {
+  name: string;
+  role: string;
+  bio: string;
+  image: string;
+}
+
+const coachesData: Coach[] = [
+  {
+    name: "Farhad Atai",
+    role: "Coach",
+    image: "https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/FarhadA.png",
+    bio: "Farhad brings extensive experience and a passion for player development. Dedicated to fostering both technical skills and sportsmanship, he works tirelessly to ensure every athlete reaches their full potential on and off the field."
+  },
+  {
+    name: "Gharzay Ahmadzai",
+    role: "Coach",
+    image: "https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/Gharzay.png",
+    bio: "Gharzay specializes in tactical training and physical conditioning. With a deep understanding of the game's strategic elements, he mentors players to build game intelligence, resilience, and a competitive winning mentality."
+  },
+  {
+    name: "Qais Atai",
+    role: "Coach",
+    image: "https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/Qais.png",
+    bio: "Qais focuses on technical ball mastery and creative play. His energetic coaching style inspires young players to express themselves on the field while mastering the essential fundamentals of the game."
+  },
+  {
+    name: "Atiqullah Hamidi",
+    role: "Coach",
+    image: "https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/Atiqullah.png",
+    bio: "Atiqullah brings a wealth of knowledge in player discipline and team strategy. He is committed to developing well-rounded athletes who understand the importance of hard work, respect, and tactical awareness."
+  },
+  {
+    name: "Ahmadullah Azizi",
+    role: "Coach",
+    image: "https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/Ahmadullah.png",
+    bio: "Ahmadullah is dedicated to fostering a supportive and challenging environment. He emphasizes the development of core soccer skills while encouraging players to push their limits and achieve personal growth."
+  },
+  {
+    name: "Abobaker Sameer",
+    role: "Coach",
+    image: "https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/Abobaker.jpg",
+    bio: "Abobaker combines his passion for the sport with a focus on agility and speed training. He works with players to enhance their physical capabilities and reaction times, essential for the modern game."
+  },
+  // Generate 4 more placeholders to reach 10 total
+  ...Array(4).fill(null).map((_, i) => ({
+    name: `Coach Name ${i + 7}`,
+    role: i % 2 === 0 ? "Assistant Coach" : "Technical Staff",
+    image: "https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=400", // Generic soccer/coach placeholder
+    bio: "Passionate about youth soccer development. Focuses on building fundamental skills and team cohesion in a positive, encouraging environment."
+  }))
+];
+
+const CoachCard = ({ coach }: { coach: Coach }) => {
+  const [expanded, setExpanded] = useState(false);
+  const isLongBio = coach.bio.length > 100;
+
+  return (
+    <div className="bg-black border border-gray-800 rounded-2xl p-6 text-center hover:border-[#EF4444] hover:scale-105 transition-all duration-300 group flex flex-col items-center h-full shadow-lg hover:shadow-red-900/20">
+      <div className="relative w-32 h-32 mb-4">
+        <div className="absolute inset-0 bg-[#EF4444] rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
+        <img 
+          src={coach.image} 
+          alt={coach.name} 
+          className="relative w-full h-full object-cover rounded-full border-4 border-gray-800 group-hover:border-[#EF4444] transition-colors shadow-2xl"
+        />
+      </div>
+      <h3 className="text-xl font-bold text-white mb-1">{coach.name}</h3>
+      <p className="text-[#EF4444] font-bold uppercase text-xs tracking-wider mb-4">{coach.role}</p>
+      
+      <div className="text-gray-400 leading-relaxed text-sm">
+        <p className={`${expanded ? '' : 'line-clamp-3'}`}>
+          {coach.bio}
+        </p>
+        {isLongBio && (
+           <button 
+             onClick={() => setExpanded(!expanded)}
+             className="text-[#EF4444] font-bold mt-2 hover:text-red-400 transition-colors text-xs uppercase tracking-wide"
+           >
+             {expanded ? 'Show Less' : 'Read More'}
+           </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -231,57 +318,10 @@ export default function LandingPage() {
             <div className="h-1 w-24 bg-[#EF4444] mx-auto"></div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-10">
-            {/* Coach 1 */}
-            <div className="bg-black border border-gray-800 rounded-2xl p-8 text-center hover:border-[#EF4444] transition-all group">
-              <div className="relative w-32 h-32 mx-auto mb-6">
-                <div className="absolute inset-0 bg-[#EF4444] rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
-                <img 
-                  src="https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=400" 
-                  alt="Ahmad Zai" 
-                  className="relative w-full h-full object-cover rounded-full border-4 border-gray-800 group-hover:border-[#EF4444] transition-colors"
-                />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-1">Ahmad Zai</h3>
-              <p className="text-[#EF4444] font-bold uppercase text-sm tracking-wider mb-4">Technical Director</p>
-              <p className="text-gray-400 leading-relaxed">
-                Former national team player with over 15 years of coaching experience. Specializes in youth development and tactical strategy.
-              </p>
-            </div>
-
-            {/* Coach 2 */}
-            <div className="bg-black border border-gray-800 rounded-2xl p-8 text-center hover:border-[#EF4444] transition-all group">
-              <div className="relative w-32 h-32 mx-auto mb-6">
-                <div className="absolute inset-0 bg-[#EF4444] rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
-                <img 
-                  src="https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=400" 
-                  alt="Sarah Karim" 
-                  className="relative w-full h-full object-cover rounded-full border-4 border-gray-800 group-hover:border-[#EF4444] transition-colors"
-                />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-1">Sarah Karim</h3>
-              <p className="text-[#EF4444] font-bold uppercase text-sm tracking-wider mb-4">Head Coach (U12-U16)</p>
-              <p className="text-gray-400 leading-relaxed">
-                Licensed UEFA B coach dedicated to building competitive spirit and technical excellence in our developing athletes.
-              </p>
-            </div>
-
-            {/* Coach 3 */}
-            <div className="bg-black border border-gray-800 rounded-2xl p-8 text-center hover:border-[#EF4444] transition-all group">
-              <div className="relative w-32 h-32 mx-auto mb-6">
-                <div className="absolute inset-0 bg-[#EF4444] rounded-full blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
-                <img 
-                  src="https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=400" 
-                  alt="Omar Khan" 
-                  className="relative w-full h-full object-cover rounded-full border-4 border-gray-800 group-hover:border-[#EF4444] transition-colors"
-                />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-1">Omar Khan</h3>
-              <p className="text-[#EF4444] font-bold uppercase text-sm tracking-wider mb-4">Junior Academy Lead</p>
-              <p className="text-gray-400 leading-relaxed">
-                Expert in early childhood development. Focuses on making soccer fun while instilling strong fundamentals in our youngest stars.
-              </p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+            {coachesData.map((coach, index) => (
+              <CoachCard key={index} coach={coach} />
+            ))}
           </div>
         </div>
       </section>
