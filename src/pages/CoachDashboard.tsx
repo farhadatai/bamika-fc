@@ -170,7 +170,78 @@ export default function CoachDashboard() {
 
   return (
     <div className="space-y-6 pb-20">
-      <h1 className="text-3xl font-bold text-gray-900">Coach Dashboard</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900">Coach Dashboard</h1>
+        {profile && (
+          <button 
+            onClick={() => setShowEditProfile(!showEditProfile)}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-bold shadow-sm"
+          >
+            <User size={18} />
+            My Profile
+          </button>
+        )}
+      </div>
+
+      {/* MY PROFILE SECTION */}
+      {showEditProfile && profile && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 animate-in fade-in slide-in-from-top-4">
+          <h2 className="text-xl font-bold text-gray-900 mb-6">My Profile</h2>
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative group">
+                {profile.photo_url ? (
+                  <img 
+                    src={profile.photo_url} 
+                    alt={profile.full_name} 
+                    className="h-32 w-32 rounded-full object-cover border-4 border-gray-100 shadow-md"
+                  />
+                ) : (
+                  <div className="h-32 w-32 rounded-full bg-gray-100 flex items-center justify-center border-4 border-gray-200">
+                    <User className="h-16 w-16 text-gray-400" />
+                  </div>
+                )}
+                {uploadingPhoto && (
+                  <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                    <Loader className="h-8 w-8 text-white animate-spin" />
+                  </div>
+                )}
+              </div>
+              
+              <label className="cursor-pointer">
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleProfilePhotoUpload} 
+                  className="hidden"
+                  disabled={uploadingPhoto}
+                />
+                <div className="flex items-center gap-2 text-primary font-bold hover:text-red-700 transition-colors bg-red-50 px-4 py-2 rounded-full hover:bg-red-100">
+                  <Camera size={18} />
+                  Change Profile Photo
+                </div>
+              </label>
+            </div>
+            
+            <div className="flex-1 space-y-4 w-full text-center md:text-left">
+              <div>
+                <label className="text-sm font-bold text-gray-500 uppercase">Full Name</label>
+                <p className="text-xl font-bold text-gray-900">{profile.full_name}</p>
+              </div>
+              <div>
+                <label className="text-sm font-bold text-gray-500 uppercase">Email</label>
+                <p className="text-lg text-gray-700">{user?.email}</p>
+              </div>
+              <div>
+                <label className="text-sm font-bold text-gray-500 uppercase">Role</label>
+                <span className="inline-block mt-1 px-3 py-1 bg-blue-100 text-blue-800 font-bold rounded-full text-sm">
+                  Official Coach
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {players.length === 0 ? (
         <div className="bg-white p-6 rounded-xl shadow-sm text-center text-gray-500">

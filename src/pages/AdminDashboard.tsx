@@ -59,7 +59,7 @@ export default function AdminDashboard() {
   const [filterGroup, setFilterGroup] = useState('All Groups');
   const [filterCoach, setFilterCoach] = useState('All Coaches');
   const [filterPayment, setFilterPayment] = useState('All');
-  const [activeTab, setActiveTab] = useState<'players' | 'schedule' | 'users'>('players');
+  const [activeTab, setActiveTab] = useState<'users' | 'coaches' | 'schedule'>('users');
   const navigate = useNavigate();
 
   // Modal State
@@ -711,12 +711,18 @@ export default function AdminDashboard() {
       </div>
 
       {/* TABS */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-gray-200 bg-white rounded-t-xl overflow-hidden mb-6">
         <button
-          className={`px-6 py-3 font-bold text-sm ${activeTab === 'players' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
-          onClick={() => setActiveTab('players')}
+          className={`px-6 py-3 font-bold text-sm ${activeTab === 'users' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
+          onClick={() => setActiveTab('users')}
         >
-          Players & Coaches
+          Users
+        </button>
+        <button
+          className={`px-6 py-3 font-bold text-sm ${activeTab === 'coaches' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
+          onClick={() => setActiveTab('coaches')}
+        >
+          Coaches
         </button>
         <button
           className={`px-6 py-3 font-bold text-sm ${activeTab === 'schedule' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
@@ -724,197 +730,106 @@ export default function AdminDashboard() {
         >
           Game Schedule
         </button>
-        <button
-          className={`px-6 py-3 font-bold text-sm ${activeTab === 'users' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
-          onClick={() => setActiveTab('users')}
-        >
-          All Users
-        </button>
       </div>
 
-      {/* PLAYERS & COACHES TAB */}
-      {activeTab === 'players' && (
-        <div className="space-y-6">
-          {/* COACHES SECTION */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Coaches & Staff</h2>
-            {coaches.length === 0 ? (
-              <p className="text-gray-500">No coaches found.</p>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {coaches.map((coach) => (
-                  <div key={coach.id} className="flex flex-col p-4 border rounded-lg hover:shadow-md transition-shadow gap-3">
-                    <div className="flex items-center">
-                      <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 mr-4">
-                        {coach.full_name.charAt(0)}
+      {/* USERS TAB (Role: user) */}
+      {activeTab === 'users' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Registered Users</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {users.filter(u => u.role === 'user').map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 mr-3">
+                          {user.full_name.charAt(0)}
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
                       </div>
-                      <div>
-                        <div className="font-bold text-gray-900">{coach.full_name}</div>
-                        <div className="text-sm text-gray-500">{coach.email || 'No email'}</div>
-                      </div>
-                    </div>
-                    
-                    <button 
-                      onClick={() => handleMakeCoach(coach.id)}
-                      className="w-full py-1 text-xs font-bold bg-gray-100 hover:bg-green-100 text-gray-700 hover:text-green-700 rounded transition-colors border border-gray-200 hover:border-green-200"
-                    >
-                      Make Coach (Grant Access)
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          {/* PLAYER LIST */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <div className="mb-6 flex flex-col md:flex-row gap-4">
-              <input
-                type="text"
-                placeholder="Search players..."
-                className="w-full md:w-1/3 border rounded-md p-2"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <select
-                className="w-full md:w-1/4 border rounded-md p-2"
-                value={filterGroup}
-                onChange={(e) => setFilterGroup(e.target.value)}
-              >
-                <option value="All Groups">All Groups</option>
-                <option value="U6">U6</option>
-                <option value="U8">U8</option>
-                <option value="U10">U10</option>
-                <option value="U12">U12</option>
-                <option value="U14">U14</option>
-                <option value="U16">U16</option>
-                <option value="Open">Open</option>
-              </select>
-              <select
-                className="w-full md:w-1/4 border rounded-md p-2"
-                value={filterCoach}
-                onChange={(e) => setFilterCoach(e.target.value)}
-              >
-                <option value="All Coaches">All Coaches</option>
-                <option value="Unassigned">Unassigned (No Coach)</option>
-                {coaches.map(c => (
-                  <option key={c.id} value={c.id}>{c.full_name}</option>
-                ))}
-              </select>
-              <select
-                className="w-full md:w-1/4 border rounded-md p-2"
-                value={filterPayment}
-                onChange={(e) => setFilterPayment(e.target.value)}
-              >
-                <option value="All">All Payments</option>
-                <option value="Paid">Paid</option>
-                <option value="Unpaid">Unpaid</option>
-              </select>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Player</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Group</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">DOB</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Parent</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Contact</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Payment</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Coach</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {user.email || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => handleMakeCoach(user.id)}
+                        className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs font-bold transition-colors"
+                      >
+                        Make Coach
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredPlayers.length === 0 ? (
-                    <tr><td colSpan={8} className="text-center py-4 text-gray-500">No players found.</td></tr>
-                  ) : (
-                    filteredPlayers.map((player) => (
-                      <tr key={player.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10 mr-4">
-                              {player.photo_url ? (
-                                <img className="h-10 w-10 rounded-full object-cover border" src={player.photo_url} alt="" />
-                              ) : (
-                                <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500">
-                                  {player.first_name[0]}{player.last_name[0]}
-                                </div>
-                              )}
-                            </div>
-                            <div className="font-bold text-gray-900">{player.first_name} {player.last_name}</div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 py-1 text-xs font-bold uppercase rounded-full bg-blue-100 text-blue-800">
-                            {player.age_group || calculateAgeGroup(player.dob)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(player.dob).toLocaleDateString('en-US', { timeZone: 'UTC' })}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {player.profiles?.full_name !== 'N/A' ? player.profiles.full_name : (player.manual_parent_name || 'N/A')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {player.profiles?.phone !== 'N/A' ? player.profiles.phone : (player.manual_phone || 'N/A')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-bold uppercase rounded-full ${
-                            player.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {player.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <select
-                            className={`border rounded p-1 text-xs font-bold uppercase ${
-                              player.payment_status === 'paid' ? 'text-green-700 bg-green-50 border-green-200' : 'text-orange-700 bg-orange-50 border-orange-200'
-                            }`}
-                            value={player.payment_status || 'pending'}
-                            onChange={(e) => handleUpdatePaymentStatus(player.id, e.target.value)}
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="paid">Paid</option>
-                          </select>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <select
-                            className="border rounded p-1 text-sm max-w-[150px]"
-                            value={player.coach_id || ''}
-                            onChange={(e) => handleAssignCoach(player.id, e.target.value)}
-                          >
-                            <option value="">Unassigned</option>
-                            {coaches.map(c => (
-                              <option key={c.id} value={c.id}>{c.full_name}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex items-center gap-2">
-                          <button
-                            onClick={() => handleEditClick(player)}
-                            className="text-gray-600 hover:text-blue-600 p-1 rounded-full hover:bg-gray-100"
-                            title="Edit Player"
-                          >
-                            <Pencil size={18} />
-                          </button>
-                          {player.status !== 'active' && (
-                            <button
-                              onClick={() => handleApprove(player.id)}
-                              className="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded"
-                            >
-                              Approve
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                ))}
+                {users.filter(u => u.role === 'user').length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-6 py-4 text-center text-gray-500 italic">
+                      No regular users found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* COACHES TAB (Role: coach) */}
+      {activeTab === 'coaches' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Coaching Staff</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Profile</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {users.filter(u => u.role === 'coach').map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                       <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 overflow-hidden">
+                          {/* Placeholder or actual image logic if available in future */}
+                          <Users size={20} />
+                        </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      {user.full_name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {user.email || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => handleUnassignCoach(user.id)}
+                        className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1"
+                      >
+                        Remove Access
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {users.filter(u => u.role === 'coach').length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500 italic">
+                      No coaches found. Go to the Users tab to add one.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
