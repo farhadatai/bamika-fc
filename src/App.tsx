@@ -10,7 +10,7 @@ import LandingPage from './pages/LandingPage'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
-import PlayerRegistration from './pages/PlayerRegistration'
+import RegisterNewAthlete from './pages/RegisterNewAthlete'
 import AdminDashboard from './pages/AdminDashboard'
 import CoachDashboard from './pages/CoachDashboard'
 import Payment from './pages/Payment'
@@ -69,7 +69,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/home" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/register/new" element={<PlayerRegistration />} />
+          <Route path="/register/new" element={<RegisterNewAthlete />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/coach" element={<CoachDashboard />} />
           <Route path="/payment" element={<Payment />} />

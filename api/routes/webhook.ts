@@ -37,19 +37,45 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
       const subscriptionId = session.subscription as string
 
       if (registrationId) {
-        const { error } = await supabase
+        // 1. Update Registration Status
+        const { data: registration, error: regError } = await supabase
           .from('registrations')
           .update({
             status: 'active',
             stripe_subscription_id: subscriptionId,
-            payment_status: 'paid' // Adding this column to schema might be good, but we have status='active'
+            payment_status: 'paid'
           })
           .eq('id', registrationId)
+          .select()
+          .single();
 
-        if (error) {
-            console.error('Error updating registration:', error)
+        if (regError) {
+            console.error('Error updating registration:', regError);
         } else {
-            console.log(`Registration ${registrationId} activated.`)
+            console.log(`Registration ${registrationId} activated.`);
+
+            // 2. Create Player Record (Copy from Registration)
+            if (registration) {
+                const { error: playerError } = await supabase
+                  .from('players')
+                  .insert({
+                    parent_id: registration.parent_id,
+                    full_name: `${registration.first_name} ${registration.last_name}`,
+                    date_of_birth: registration.dob,
+                    gender: registration.gender,
+                    position: registration.position || 'TBD',
+                    jersey_size: registration.jersey_size,
+                    medical_conditions: registration.medical_conditions,
+                    team_assigned: 'Unassigned',
+                    jersey_number: '-'
+                  });
+                
+                if (playerError) {
+                    console.error('Error creating player record:', playerError);
+                } else {
+                    console.log('Player record created successfully from registration.');
+                }
+            }
         }
       }
       break

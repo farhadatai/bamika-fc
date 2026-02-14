@@ -101,6 +101,7 @@ export default function AdminDashboard() {
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
+        .eq('role', 'user')
         .order('created_at', { ascending: false });
       
       if (profilesData) {
@@ -452,7 +453,7 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {users.filter(u => u.role === 'user').map((user) => {
+                {users.map((user) => {
                   const parentPlayers = rosterPlayers.filter(p => p.parent_id === user.id);
                   const isExpanded = expandedParents.has(user.id);
 

@@ -37,7 +37,10 @@ export default function Dashboard() {
   const [newPlayer, setNewPlayer] = useState({
     fullName: '',
     dob: '',
-    gender: 'Male'
+    gender: 'Male',
+    position: 'TBD',
+    jerseySize: 'YM',
+    medicalConditions: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -133,6 +136,13 @@ export default function Dashboard() {
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    
+    // Basic validation
+    if (!newPlayer.fullName || !newPlayer.dob) {
+      alert('Please fill in all required fields (Name and Date of Birth).');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -143,7 +153,9 @@ export default function Dashboard() {
           full_name: newPlayer.fullName,
           date_of_birth: newPlayer.dob,
           gender: newPlayer.gender,
-          position: 'TBD',
+          position: newPlayer.position,
+          jersey_size: newPlayer.jerseySize,
+          medical_conditions: newPlayer.medicalConditions,
           team_assigned: 'Unassigned',
           jersey_number: '-'
         });
@@ -160,7 +172,14 @@ export default function Dashboard() {
         setPlayers(updatedPlayers);
       }
 
-      setNewPlayer({ fullName: '', dob: '', gender: 'Male' });
+      setNewPlayer({ 
+        fullName: '', 
+        dob: '', 
+        gender: 'Male',
+        position: 'TBD',
+        jerseySize: 'YM',
+        medicalConditions: ''
+      });
       setIsAddPlayerModalOpen(false);
       alert('Player registered successfully!');
 
@@ -195,12 +214,12 @@ export default function Dashboard() {
 
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">Parent Dashboard</h1>
-        <button 
-          onClick={() => setIsAddPlayerModalOpen(true)}
+        <Link 
+          to="/register/new"
           className="bg-primary text-white px-4 py-2 rounded-md font-bold hover:bg-red-700 transition-colors flex items-center gap-2"
         >
           <UserPlus size={20} /> Register New Player
-        </button>
+        </Link>
       </div>
 
       {/* MY ATHLETES SECTION */}
@@ -215,12 +234,12 @@ export default function Dashboard() {
           <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
             <Users className="mx-auto h-12 w-12 text-gray-400 mb-2" />
             <p className="mb-4">No athletes linked to your account yet.</p>
-            <button 
-              onClick={() => setIsAddPlayerModalOpen(true)}
+            <Link 
+              to="/register/new"
               className="text-primary font-bold hover:underline"
             >
               Register your first athlete now
-            </button>
+            </Link>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -283,7 +302,7 @@ export default function Dashboard() {
             </div>
             <form onSubmit={handleAddPlayer} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Full Name</label>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Full Name *</label>
                 <input 
                   type="text" 
                   required
@@ -293,26 +312,73 @@ export default function Dashboard() {
                   onChange={e => setNewPlayer({...newPlayer, fullName: e.target.value})}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Date of Birth</label>
-                <input 
-                  type="date" 
-                  required
-                  className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                  value={newPlayer.dob}
-                  onChange={e => setNewPlayer({...newPlayer, dob: e.target.value})}
-                />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Date of Birth *</label>
+                  <input 
+                    type="date" 
+                    required
+                    className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                    value={newPlayer.dob}
+                    onChange={e => setNewPlayer({...newPlayer, dob: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Gender *</label>
+                  <select
+                    className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                    value={newPlayer.gender}
+                    onChange={e => setNewPlayer({...newPlayer, gender: e.target.value})}
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Preferred Position</label>
+                  <select
+                    className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                    value={newPlayer.position}
+                    onChange={e => setNewPlayer({...newPlayer, position: e.target.value})}
+                  >
+                    <option value="TBD">TBD</option>
+                    <option value="Forward">Forward</option>
+                    <option value="Midfielder">Midfielder</option>
+                    <option value="Defender">Defender</option>
+                    <option value="Goalkeeper">Goalkeeper</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Jersey Size</label>
+                  <select
+                    className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                    value={newPlayer.jerseySize}
+                    onChange={e => setNewPlayer({...newPlayer, jerseySize: e.target.value})}
+                  >
+                    <option value="YS">Youth Small (YS)</option>
+                    <option value="YM">Youth Medium (YM)</option>
+                    <option value="YL">Youth Large (YL)</option>
+                    <option value="S">Small (S)</option>
+                    <option value="M">Medium (M)</option>
+                    <option value="L">Large (L)</option>
+                    <option value="XL">Extra Large (XL)</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Gender</label>
-                <select
+                <label className="block text-sm font-bold text-gray-700 mb-1">Medical Conditions (Optional)</label>
+                <textarea
                   className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                  value={newPlayer.gender}
-                  onChange={e => setNewPlayer({...newPlayer, gender: e.target.value})}
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                </select>
+                  rows={2}
+                  placeholder="Allergies, asthma, etc."
+                  value={newPlayer.medicalConditions}
+                  onChange={e => setNewPlayer({...newPlayer, medicalConditions: e.target.value})}
+                />
               </div>
               
               <button 
