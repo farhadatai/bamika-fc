@@ -20,6 +20,7 @@ interface Player {
   team_assigned: string;
   jersey_number: string;
   parent_id: string;
+  photo_url?: string;
 }
 
 export default function Dashboard() {
@@ -146,12 +147,14 @@ export default function Dashboard() {
     setIsSubmitting(true);
 
     try {
+      const safeDob = newPlayer.dob ? new Date(`${newPlayer.dob}T12:00:00`).toISOString() : null;
+
       const { error } = await supabase
         .from('players')
         .insert({
           parent_id: user.id,
           full_name: newPlayer.fullName,
-          date_of_birth: newPlayer.dob,
+          date_of_birth: safeDob,
           gender: newPlayer.gender,
           position: newPlayer.position,
           jersey_size: newPlayer.jerseySize,
@@ -249,13 +252,25 @@ export default function Dashboard() {
                   {player.team_assigned}
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-xl">
-                    {player.full_name.charAt(0)}
+                  <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-xl overflow-hidden border border-gray-200">
+                    {player.photo_url ? (
+                      <img 
+                        src={player.photo_url} 
+                        alt={player.full_name} 
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          console.error('Error loading image:', player.photo_url);
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      player.full_name.charAt(0)
+                    )}
                   </div>
                   <div>
                     <h3 className="font-bold text-lg text-gray-900">{player.full_name}</h3>
                     <div className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                      <Calendar size={14} /> {player.date_of_birth || 'N/A'}
+                      <Calendar size={14} /> {player.date_of_birth ? new Date(player.date_of_birth).toLocaleDateString() : 'N/A'}
                     </div>
                     <div className="text-xs text-gray-400 mt-2">
                       Jersey: <span className="font-mono text-gray-600">{player.jersey_number}</span>

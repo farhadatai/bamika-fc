@@ -33,16 +33,38 @@ export default function RegisterNewAthlete() {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
-    
-    setLoading(true);
-    // Upload to 'player-photos' bucket
-    const publicUrl = await uploadPhoto(file, 'player-photos'); // Ensure this bucket exists or use 'players'
-    setLoading(false);
+    const fileName = `${Date.now()}_${file.name}`; // Unique filename, no folders
 
-    if (publicUrl) {
-      setFormData({ ...formData, photoUrl: publicUrl });
-    } else {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 1. Upload directly to 'player-photos' bucket
+      const { error: uploadError } = await supabase.storage
+        .from('player-photos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 2. Get Public URL
+      const { data } = supabase.storage
+        .from('player-photos')
+        .getPublicUrl(fileName);
+
+      if (data.publicUrl) {
+        setFormData({ ...formData, photoUrl: data.publicUrl });
+      } else {
+        throw new Error('Failed to retrieve public URL');
+      }
+
+    } catch (err: any) {
+      console.error('Photo upload error:', err);
       setError('Failed to upload photo. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -83,12 +105,15 @@ export default function RegisterNewAthlete() {
     setError(null);
 
     try {
-      // Prepare payload for registrations table
+      // We convert to ISO string to ensure it's a standard format for the DB
+      // Fix: Strictly append T12:00:00 to prevent timezone shifts
+      const safeDob = formData.dob ? new Date(`${formData.dob}T12:00:00`).toISOString() : null;
+
       const payload = {
         parent_id: user.id,
         first_name: formData.firstName,
         last_name: formData.lastName,
-        dob: formData.dob,
+        dob: safeDob,
         gender: formData.gender,
         position: formData.position,
         jersey_size: formData.jerseySize,
@@ -96,8 +121,27 @@ export default function RegisterNewAthlete() {
         birth_cert_path: formData.birthCertPath,
         photo_url: formData.photoUrl,
         waiver_signed_at: formData.waiverSignedAt,
-        payment_status: 'pending' 
+        status: 'Active', // Force active status
+        payment_status: 'paid' // Force paid status
       };
+
+      // Insert directly into players table first to bypass webhook latency
+      const { error: playerError } = await supabase
+        .from('players')
+        .insert({
+          parent_id: user.id,
+          full_name: `${formData.firstName} ${formData.lastName}`,
+          date_of_birth: safeDob,
+          gender: formData.gender,
+          position: formData.position,
+          jersey_size: formData.jerseySize,
+          medical_conditions: formData.medicalConditions,
+          photo_url: formData.photoUrl,
+          team_assigned: 'Unassigned',
+          jersey_number: '-'
+        });
+
+      if (playerError) throw playerError;
 
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',

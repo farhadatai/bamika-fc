@@ -110,31 +110,30 @@ export default function CoachDashboard() {
     try {
       if (!user) return;
 
-      // SIMPLIFIED & BULLETPROOF QUERY
+      // FETCH ONLY PLAYERS ASSIGNED TO THIS COACH
       const { data, error } = await supabase
-        .from('registrations')
-        .select('*, profiles:parent_id(*)') // Simple select with join
-        .eq('coach_id', user.id) // Explicit filter
-        .order('first_name', { ascending: true });
+        .from('players') // Use players table instead of registrations
+        .select('*, profiles:parent_id(full_name, phone)') // Fetch parent details
+        .eq('coach_id', user.id) // Filter by coach_id
+        .order('full_name', { ascending: true });
 
       if (error) throw error;
 
       if (data) {
         // Map data safely
-        const formattedData = data.map((p: any) => {
-          const profileData = Array.isArray(p.profiles) ? p.profiles[0] : p.profiles;
-          return {
-            ...p,
-            profiles: profileData || { full_name: 'N/A', phone: 'N/A' }
-          };
-        });
+        const formattedData = data.map((p: any) => ({
+          ...p,
+          first_name: p.full_name.split(' ')[0], // Split full_name for backward compatibility if needed
+          last_name: p.full_name.split(' ').slice(1).join(' '),
+          dob: p.date_of_birth,
+          profiles: p.profiles || { full_name: 'N/A', phone: 'N/A' }
+        }));
         setPlayers(formattedData);
       }
     } catch (err: any) {
       console.error('Error fetching roster:', err);
       setError('Failed to load roster.');
     } finally {
-      // CRITICAL: Always stop loading
       setLoading(false);
     }
   };

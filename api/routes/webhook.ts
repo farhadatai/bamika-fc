@@ -67,7 +67,8 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
                     jersey_size: registration.jersey_size,
                     medical_conditions: registration.medical_conditions,
                     team_assigned: 'Unassigned',
-                    jersey_number: '-'
+                    jersey_number: '-',
+                    photo_url: registration.photo_url
                   });
                 
                 if (playerError) {

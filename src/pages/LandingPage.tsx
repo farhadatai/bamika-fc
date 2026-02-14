@@ -55,9 +55,15 @@ const coachesData: Coach[] = [
     image: "https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/Abobaker.jpg",
     bio: "Abobaker combines his passion for the sport with a focus on agility and speed training. He works with players to enhance their physical capabilities and reaction times, essential for the modern game."
   },
-  // Generate 4 more placeholders to reach 10 total
-  ...Array(4).fill(null).map((_, i) => ({
-    name: `Coach Name ${i + 7}`,
+  {
+    name: "Seema Sadat",
+    role: "Coach",
+    image: "https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/coach-photos/ChatGPT%20Image%20Feb%2014,%202026,%2011_58_58%20AM.png",
+    bio: "Seema is a dedicated coach who focuses on developing player confidence and technical skills. She brings passion and expertise to help young athletes reach their full potential."
+  },
+  // Generate 3 more placeholders to reach 10 total
+  ...Array(3).fill(null).map((_, i) => ({
+    name: `Coach Name ${i + 8}`,
     role: i % 2 === 0 ? "Assistant Coach" : "Technical Staff",
     image: "https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=400", // Generic soccer/coach placeholder
     bio: "Passionate about youth soccer development. Focuses on building fundamental skills and team cohesion in a positive, encouraging environment."

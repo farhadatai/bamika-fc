@@ -4,12 +4,21 @@ import { supabase } from '../lib/supabase'
 import { Shield, LogOut } from 'lucide-react'
 
 export const Navbar = () => {
-  const { user, userRole } = useAuthStore()
+  const { user, userRole, setLoading, setIsLoggingOut } = useAuthStore()
   const navigate = useNavigate()
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    navigate('/login')
+    setIsLoggingOut(true)
+    setLoading(true)
+    try {
+      await supabase.auth.signOut()
+    } catch (error) {
+      console.error('Error signing out:', error)
+    } finally {
+      setLoading(false)
+      setIsLoggingOut(false)
+      navigate('/login')
+    }
   }
 
   return (

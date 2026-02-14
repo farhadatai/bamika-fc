@@ -2,9 +2,9 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 
 export function ProtectedRoute() {
-  const { user, loading } = useAuthStore();
+  const { user, loading, isLoggingOut } = useAuthStore();
 
-  if (loading) {
+  if (loading || isLoggingOut) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
   }
 

@@ -8,6 +8,8 @@ interface AuthState {
   setUserRole: (role: string | null) => void
   loading: boolean
   setLoading: (loading: boolean) => void
+  isLoggingOut: boolean
+  setIsLoggingOut: (isLoggingOut: boolean) => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -17,4 +19,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   setUserRole: (role) => set({ userRole: role }),
   loading: true,
   setLoading: (loading) => set({ loading }),
+  isLoggingOut: false,
+  setIsLoggingOut: (isLoggingOut) => set({ isLoggingOut }),
 }))

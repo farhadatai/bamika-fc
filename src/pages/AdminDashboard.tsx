@@ -14,6 +14,7 @@ interface RosterPlayer {
   parent_id?: string;
   date_of_birth?: string;
   gender?: string;
+  coach_id?: string;
   profiles?: {
     full_name: string;
     email: string;
@@ -23,7 +24,6 @@ interface RosterPlayer {
 
 interface Coach {
   id: string;
-  email: string;
   full_name: string;
   photo_url?: string;
 }
@@ -64,7 +64,16 @@ export default function AdminDashboard() {
   const [isEditPlayerModalOpen, setIsEditPlayerModalOpen] = useState(false);
   const [isAddPlayerModalOpen, setIsAddPlayerModalOpen] = useState(false);
   
-  // Form States
+  const [isEditCoachModalOpen, setIsEditCoachModalOpen] = useState(false);
+  const [editingCoach, setEditingCoach] = useState<Coach | null>(null);
+  const [coachForm, setCoachForm] = useState({
+    full_name: '',
+    photo_file: null as File | null
+  });
+  const [isUploadingCoachPhoto, setIsUploadingCoachPhoto] = useState(false);
+  
+  const [sortedRoster, setSortedRoster] = useState<RosterPlayer[]>([]);
+  const [coachList, setCoachList] = useState<Coach[]>([]);
   const [gameLoading, setGameLoading] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [newGame, setNewGame] = useState({
@@ -79,8 +88,10 @@ export default function AdminDashboard() {
   const [playerForm, setPlayerForm] = useState({
     position: '',
     team_assigned: '',
-    jersey_number: ''
+    jersey_number: '',
+    photo_file: null as File | null // Add file state
   });
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false); // Loading state for photo upload
 
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
   const [selectedParentName, setSelectedParentName] = useState<string>('');
@@ -89,6 +100,15 @@ export default function AdminDashboard() {
     dob: '',
     gender: 'Male'
   });
+
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   useEffect(() => {
     fetchData();
@@ -109,25 +129,32 @@ export default function AdminDashboard() {
       }
 
       // 2. Fetch Roster Players (Joined with parent profiles)
+      // Use !left join to ensure players appear even if parent profile is missing
       const { data: playersData, error: playersError } = await supabase
         .from('players')
-        .select('*, profiles:parent_id(full_name, email, phone)');
+        .select('*, profiles:parent_id!left(full_name, email, phone)');
       
       if (playersData) {
         setRosterPlayers(playersData);
       }
 
-      // 3. Fetch Coaches
-      const { data: coachesData, error: coachesError } = await supabase
+      // 3. Fetch Coaches (from coaches table)
+      // Note: We join with profiles to get the photo_url if possible, otherwise we fall back to initials
+      const { data: coachesData } = await supabase
         .from('coaches')
-        .select('*, profiles:id(photo_url, email)');
+        .select('id, full_name, profiles:id(photo_url)')
+        .order('full_name', { ascending: true });
         
       if (coachesData) {
-        setCoaches(coachesData.map((c: any) => ({
-          ...c,
-          photo_url: c.profiles?.photo_url,
-          email: c.profiles?.email
-        })));
+        // Map the data to flatten the profile photo
+        const formattedCoaches = coachesData.map((c: any) => ({
+          id: c.id,
+          full_name: c.full_name,
+          photo_url: c.profiles?.photo_url
+        }));
+        
+        setCoaches(formattedCoaches); 
+        setCoachList(formattedCoaches); 
       }
 
       // 4. Fetch Games
@@ -147,7 +174,40 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- ACTIONS: PARENTS TAB ---
+  useEffect(() => {
+    // Simple sorting: Coach Assigned First, then Newest Registered
+    if (rosterPlayers.length > 0) {
+      const sorted = [...rosterPlayers].sort((a, b) => {
+        // 1. Group by Coach Status (Assigned first)
+        if (a.coach_id && !b.coach_id) return -1;
+        if (!a.coach_id && b.coach_id) return 1;
+        
+        // 2. Sort by Date Created (Newest first)
+        return (b.created_at || '').localeCompare(a.created_at || ''); 
+      });
+      setSortedRoster(sorted);
+    }
+  }, [rosterPlayers]);
+
+  const handleAssignCoach = async (playerId: string, coachId: string) => {
+    try {
+      const { error } = await supabase
+        .from('players')
+        .update({ coach_id: coachId === 'unassigned' ? null : coachId })
+        .eq('id', playerId);
+
+      if (error) throw error;
+
+      // Optimistic update
+      setRosterPlayers(prev => prev.map(p => 
+        p.id === playerId ? { ...p, coach_id: coachId === 'unassigned' ? undefined : coachId } : p
+      ));
+
+      setToast({ message: 'Coach assigned successfully.', type: 'success' });
+    } catch (err: any) {
+      setToast({ message: 'Failed to assign coach: ' + err.message, type: 'error' });
+    }
+  };
 
   const toggleParentExpansion = (parentId: string) => {
     const newExpanded = new Set(expandedParents);
@@ -171,12 +231,16 @@ export default function AdminDashboard() {
     if (!selectedParentId) return;
 
     try {
+      // Fix: Date Bug - Append T12:00:00 to ensure date is treated as local midday
+      // We convert to ISO string to ensure it's a standard format for the DB
+      const safeDob = newChild.dob ? new Date(`${newChild.dob}T12:00:00`).toISOString() : null;
+
       const { error } = await supabase
         .from('players')
         .insert({
           parent_id: selectedParentId,
           full_name: newChild.fullName,
-          date_of_birth: newChild.dob,
+          date_of_birth: safeDob,
           gender: newChild.gender,
           position: 'TBD',
           team_assigned: 'Unassigned',
@@ -218,7 +282,8 @@ export default function AdminDashboard() {
     setPlayerForm({
       position: player.position || '',
       team_assigned: player.team_assigned || '',
-      jersey_number: player.jersey_number || ''
+      jersey_number: player.jersey_number || '',
+      photo_file: null
     });
     setIsEditPlayerModalOpen(true);
   };
@@ -227,24 +292,53 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!editingPlayer) return;
 
+    setIsUploadingPhoto(true);
+
     try {
+      let photoUrl = editingPlayer.photo_url;
+
+      // Upload Photo if a new file is selected
+      if (playerForm.photo_file) {
+        const file = playerForm.photo_file;
+        const fileName = `${Date.now()}_${file.name}`; // Unique filename
+
+        const { error: uploadError } = await supabase.storage
+          .from('player-photos')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('player-photos')
+          .getPublicUrl(fileName);
+
+        photoUrl = publicUrlData.publicUrl;
+      }
+
+      // Update Database
       const { error } = await supabase
         .from('players')
         .update({
           position: playerForm.position,
           team_assigned: playerForm.team_assigned,
-          jersey_number: playerForm.jersey_number
+          jersey_number: playerForm.jersey_number,
+          photo_url: photoUrl
         })
         .eq('id', editingPlayer.id);
 
       if (error) throw error;
 
-      alert('Player details updated!');
+      setToast({ message: 'Player details and photo saved.', type: 'success' });
       setIsEditPlayerModalOpen(false);
       setEditingPlayer(null);
       fetchData();
     } catch (error: any) {
-      alert('Error updating player: ' + error.message);
+      setToast({ message: 'Error updating player: ' + error.message, type: 'error' });
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
@@ -265,8 +359,8 @@ export default function AdminDashboard() {
         .from('coaches')
         .insert({
           id: user.id,
-          full_name: user.full_name,
-          email: user.email
+          full_name: user.full_name
+          // email removed as column does not exist
         });
 
       if (coachError) {
@@ -278,6 +372,77 @@ export default function AdminDashboard() {
       fetchData();
     } catch (error: any) {
       alert('Error making coach: ' + error.message);
+    }
+  };
+
+  const handleEditCoachClick = (coach: Coach) => {
+    setEditingCoach(coach);
+    setCoachForm({
+      full_name: coach.full_name,
+      photo_file: null
+    });
+    setIsEditCoachModalOpen(true);
+  };
+
+  const handleSaveCoachDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCoach) return;
+
+    setIsUploadingCoachPhoto(true);
+
+    try {
+      let photoUrl = editingCoach.photo_url;
+
+      // Upload Photo if a new file is selected
+      if (coachForm.photo_file) {
+        const file = coachForm.photo_file;
+        const fileName = `coach_${Date.now()}_${file.name}`; // Unique filename
+
+        const { error: uploadError } = await supabase.storage
+          .from('coach-photos') // Using a dedicated bucket for coaches
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('coach-photos')
+          .getPublicUrl(fileName);
+
+        photoUrl = publicUrlData.publicUrl;
+      }
+
+      // 1. Update Coaches Table
+      const { error: coachError } = await supabase
+        .from('coaches')
+        .update({
+          full_name: coachForm.full_name
+        })
+        .eq('id', editingCoach.id);
+
+      if (coachError) throw coachError;
+
+      // 2. Update Profiles Table (Sync)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: coachForm.full_name,
+          photo_url: photoUrl
+        })
+        .eq('id', editingCoach.id);
+
+      if (profileError) throw profileError;
+
+      setToast({ message: 'Coach details updated successfully.', type: 'success' });
+      setIsEditCoachModalOpen(false);
+      setEditingCoach(null);
+      fetchData();
+    } catch (error: any) {
+      setToast({ message: 'Error updating coach: ' + error.message, type: 'error' });
+    } finally {
+      setIsUploadingCoachPhoto(false);
     }
   };
 
@@ -454,6 +619,7 @@ export default function AdminDashboard() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {users.map((user) => {
+                  // Fix: Count ALL linked players regardless of status/assignment
                   const parentPlayers = rosterPlayers.filter(p => p.parent_id === user.id);
                   const isExpanded = expandedParents.has(user.id);
 
@@ -554,27 +720,55 @@ export default function AdminDashboard() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Player</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Age / DOB</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Team</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Team / Coach</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Parent</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Jersey</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {rosterPlayers.map((player) => (
+                {sortedRoster.map((player) => (
                   <tr key={player.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-bold text-gray-900">{player.full_name}</div>
-                      <div className="text-xs text-gray-500">{player.position}</div>
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 overflow-hidden border border-gray-200">
+                          {player.photo_url ? (
+                            <img src={player.photo_url} alt={player.full_name} className="h-full w-full object-cover" />
+                          ) : (
+                            player.full_name.charAt(0)
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-bold text-gray-900">{player.full_name}</div>
+                          <div className="text-xs text-gray-500">{player.position}</div>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       <div>{calculateAge(player.date_of_birth)} years</div>
                       <div className="text-xs text-gray-400">{player.date_of_birth || 'N/A'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs font-bold uppercase rounded-full bg-blue-100 text-blue-800">
-                        {player.team_assigned}
-                      </span>
+                       <select
+                        className={`text-xs font-bold uppercase rounded-full border p-1 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer w-full max-w-[140px] ${
+                          player.coach_id 
+                            ? 'bg-blue-50 text-blue-800 border-blue-200' 
+                            : 'bg-red-50 text-red-800 border-red-200'
+                        }`}
+                        value={player.coach_id || 'unassigned'}
+                        onChange={(e) => handleAssignCoach(player.id, e.target.value)}
+                      >
+                        <option value="unassigned" className="text-gray-500 font-normal">Select Coach</option>
+                        {coachList.length > 0 ? (
+                          coachList.map(coach => (
+                            <option key={coach.id} value={coach.id} className="text-black font-normal">
+                              {coach.full_name}
+                            </option>
+                          ))
+                        ) : (
+                          <option disabled className="text-gray-400 italic">No Coaches Found</option>
+                        )}
+                      </select>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       <div className="font-medium">{player.profiles?.full_name || 'Unknown'}</div>
@@ -623,7 +817,7 @@ export default function AdminDashboard() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Profile</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Email</th>
+                  {/* Email column removed as requested */}
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -640,9 +834,15 @@ export default function AdminDashboard() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{coach.full_name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{coach.email || 'N/A'}</td>
+                    {/* Email cell removed */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEditCoachClick(coach)}
+                          className="bg-yellow-500 text-white px-3 py-1 rounded text-xs font-bold hover:bg-yellow-600 flex items-center gap-1"
+                        >
+                          <Pencil size={14} /> Edit
+                        </button>
                         <button
                           onClick={() => handleRemoveCoach(coach.id)}
                           className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-700 flex items-center gap-1"
@@ -833,6 +1033,41 @@ export default function AdminDashboard() {
               <button onClick={() => setIsEditPlayerModalOpen(false)} className="text-gray-500 hover:text-black"><X size={24} /></button>
             </div>
             <form onSubmit={handleSavePlayerDetails} className="p-6 space-y-4">
+              {/* PHOTO UPLOAD SECTION */}
+              <div className="flex flex-col items-center mb-4">
+                <div className="h-24 w-24 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-3xl overflow-hidden border border-gray-200 mb-2 relative group">
+                  {playerForm.photo_file ? (
+                    <img 
+                      src={URL.createObjectURL(playerForm.photo_file)} 
+                      alt="Preview" 
+                      className="h-full w-full object-cover" 
+                    />
+                  ) : editingPlayer?.photo_url ? (
+                    <img 
+                      src={editingPlayer.photo_url} 
+                      alt={editingPlayer.full_name} 
+                      className="h-full w-full object-cover" 
+                    />
+                  ) : (
+                    editingPlayer?.full_name?.charAt(0) || <Users size={40} />
+                  )}
+                </div>
+                
+                <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-md text-sm font-medium transition-colors">
+                  Change Photo
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setPlayerForm({...playerForm, photo_file: e.target.files[0]});
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Position</label>
                 <select 
@@ -874,11 +1109,93 @@ export default function AdminDashboard() {
                   onChange={e => setPlayerForm({...playerForm, jersey_number: e.target.value})}
                 />
               </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold hover:bg-blue-700">
-                Save Changes
+              <button 
+                type="submit" 
+                disabled={isUploadingPhoto}
+                className={`w-full text-white py-2 rounded-lg font-bold transition-colors ${
+                  isUploadingPhoto ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {isUploadingPhoto ? 'Uploading Photo...' : 'Save Changes'}
               </button>
             </form>
           </div>
+        </div>
+      )}
+      {/* MODAL: EDIT COACH */}
+      {isEditCoachModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="font-bold text-xl text-gray-900">Edit Coach Details</h3>
+              <button onClick={() => setIsEditCoachModalOpen(false)} className="text-gray-500 hover:text-black"><X size={24} /></button>
+            </div>
+            <form onSubmit={handleSaveCoachDetails} className="p-6 space-y-4">
+              {/* PHOTO UPLOAD SECTION */}
+              <div className="flex flex-col items-center mb-4">
+                <div className="h-24 w-24 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-3xl overflow-hidden border border-gray-200 mb-2 relative group">
+                  {coachForm.photo_file ? (
+                    <img 
+                      src={URL.createObjectURL(coachForm.photo_file)} 
+                      alt="Preview" 
+                      className="h-full w-full object-cover" 
+                    />
+                  ) : editingCoach?.photo_url ? (
+                    <img 
+                      src={editingCoach.photo_url} 
+                      alt={editingCoach.full_name} 
+                      className="h-full w-full object-cover" 
+                    />
+                  ) : (
+                    <Users size={40} />
+                  )}
+                </div>
+                
+                <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-md text-sm font-medium transition-colors">
+                  Change Photo
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setCoachForm({...coachForm, photo_file: e.target.files[0]});
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Full Name</label>
+                <input 
+                  type="text" 
+                  required
+                  className="w-full border rounded-lg p-2"
+                  value={coachForm.full_name}
+                  onChange={e => setCoachForm({...coachForm, full_name: e.target.value})}
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={isUploadingCoachPhoto}
+                className={`w-full text-white py-2 rounded-lg font-bold transition-colors ${
+                  isUploadingCoachPhoto ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {isUploadingCoachPhoto ? 'Uploading...' : 'Save Changes'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* TOAST NOTIFICATION */}
+      {toast && (
+        <div className={`fixed bottom-8 right-8 px-6 py-3 rounded-lg shadow-lg text-white font-bold transition-all transform translate-y-0 z-50 ${
+          toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        }`}>
+          {toast.message}
         </div>
       )}
     </div>

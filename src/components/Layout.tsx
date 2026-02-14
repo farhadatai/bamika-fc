@@ -5,14 +5,23 @@ import { supabase } from '../lib/supabase';
 import { Shield } from 'lucide-react';
 
 export function Layout() {
-  const { user, userRole, setUser } = useAuthStore();
+  const { user, userRole, setUser, setLoading, setIsLoggingOut } = useAuthStore();
   const navigate = useNavigate();
   const [logoError, setLogoError] = useState(false);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    navigate('/login');
+    setIsLoggingOut(true); // Prevent premature redirect
+    setLoading(true);
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    } finally {
+      setUser(null);
+      setLoading(false);
+      setIsLoggingOut(false); // Allow redirect now (or manual navigate below)
+      navigate('/login');
+    }
   };
 
   return (
