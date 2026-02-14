@@ -382,6 +382,32 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to permanently delete this user? This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      console.log('Attempting to delete user:', userId);
+
+      const { error } = await supabase.rpc('delete_user_account', { target_user_id: userId });
+
+      if (error) {
+        console.error('Delete user failed:', error);
+        throw error;
+      }
+
+      alert('User permanently deleted.');
+      
+      // Refresh UI Data cleanly
+      await fetchData();
+      
+    } catch (err: any) {
+      console.error('Error deleting user:', err);
+      alert('Failed to delete user: ' + err.message);
+    }
+  };
+
   const handleAddGame = async (e: React.FormEvent) => {
     e.preventDefault();
     setGameLoading(true);
@@ -762,12 +788,21 @@ export default function AdminDashboard() {
                       {user.email || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => handleMakeCoach(user.id)}
-                        className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs font-bold transition-colors"
-                      >
-                        Make Coach
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleMakeCoach(user.id)}
+                          className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs font-bold transition-colors"
+                        >
+                          Make Coach
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50"
+                          title="Delete User"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -817,12 +852,21 @@ export default function AdminDashboard() {
                       {user.email || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => handleUnassignCoach(user.id)}
-                        className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1"
-                      >
-                        Remove Access
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleUnassignCoach(user.id)}
+                          className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1"
+                        >
+                          Remove Access
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50"
+                          title="Delete User"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -918,70 +962,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* USERS TAB */}
-      {activeTab === 'users' && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">All Users Management</h2>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Role</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 mr-3">
-                          {user.full_name.charAt(0)}
-                        </div>
-                        <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-bold uppercase rounded-full ${
-                        user.role === 'admin' ? 'bg-red-100 text-red-800' :
-                        user.role === 'coach' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      {user.role === 'user' && (
-                        <button
-                          onClick={() => handleMakeCoach(user.id)}
-                          className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs font-bold"
-                        >
-                          Make Coach
-                        </button>
-                      )}
-                      {user.role === 'coach' && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-400 text-xs italic">Coach</span>
-                          <button
-                            onClick={() => handleUnassignCoach(user.id)}
-                            className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs font-bold"
-                          >
-                            Unassign
-                          </button>
-                        </div>
-                      )}
-                      {user.role === 'admin' && (
-                        <span className="text-gray-400 text-xs italic">Admin Access</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+
 
       {/* ADD COACH MODAL */}
       {isCoachModalOpen && (
