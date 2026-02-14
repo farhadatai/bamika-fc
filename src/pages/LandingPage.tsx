@@ -117,26 +117,34 @@ export default function LandingPage() {
 
   // Fetch upcoming events
   useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('events')
-          .select('*')
-          .gte('date', new Date().toISOString().split('T')[0]) // Only future events
-          .order('date', { ascending: true })
-          .limit(3);
-
-        if (error) throw error;
-        setEvents(data || []);
-      } catch (error) {
-        console.error('Error fetching events:', error);
-      } finally {
-        setLoadingEvents(false);
-      }
-    };
-
-    fetchEvents();
+    fetchUpcomingEvents();
   }, []);
+
+  const fetchUpcomingEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .gte('date', new Date().toISOString().split('T')[0]) // Only future events
+        .order('date', { ascending: true })
+        .limit(3);
+
+      if (error) throw error;
+      setEvents(data || []);
+    } catch (error) {
+      console.error('Error fetching events:', error);
+    } finally {
+      setLoadingEvents(false);
+    }
+  };
+
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+      setMobileMenuOpen(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
@@ -327,56 +335,55 @@ export default function LandingPage() {
       </section>
 
       {/* UPCOMING EVENTS SECTION */}
-      <section id="events" className="py-24 bg-white">
-        <div className="container mx-auto px-6">
+      <section className="py-20 bg-neutral-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-extrabold text-black uppercase tracking-tight mb-4">
-              Upcoming <span className="text-[#EF4444]">Events</span>
+            <h2 className="text-3xl md:text-5xl font-black italic uppercase tracking-tighter text-white mb-4">
+              UPCOMING <span className="text-[#EF4444]">MATCHES</span>
             </h2>
-            <div className="h-1 w-24 bg-[#EF4444] mx-auto"></div>
+            <div className="w-24 h-2 bg-[#EF4444] mx-auto skew-x-[-12deg]"></div>
           </div>
 
-          <div className="max-w-4xl mx-auto">
-            {loadingEvents ? (
-              <div className="text-center text-gray-500">Loading events...</div>
-            ) : events.length > 0 ? (
-              <div className="grid gap-6">
-                {events.map((event) => (
-                  <div key={event.id} className="bg-gray-50 border border-gray-100 rounded-xl p-6 hover:shadow-lg transition-shadow flex flex-col md:flex-row items-start md:items-center justify-between gap-6 group">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-900 group-hover:text-[#EF4444] transition-colors mb-2">{event.title}</h3>
-                      <div className="flex flex-wrap gap-4 text-gray-600 text-sm">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4 text-[#EF4444]" />
-                          <span>{new Date(event.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4 text-[#EF4444]" />
-                          <span>{event.time.slice(0, 5)}</span>
-                        </div>
-                      </div>
+          {loadingEvents ? (
+            <div className="text-center text-gray-400">Loading upcoming matches...</div>
+          ) : events.length === 0 ? (
+            <div className="text-center text-gray-500 italic">No upcoming matches scheduled at the moment.</div>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-6">
+              {events.map((event) => (
+                <div key={event.id} className="bg-black border border-gray-800 p-6 rounded-xl hover:border-[#EF4444] transition-colors group">
+                  <div className="flex flex-col h-full">
+                    <div className="mb-4">
+                      <span className="text-[#EF4444] font-bold text-sm uppercase tracking-wider block mb-1">
+                        {new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                      <span className="text-gray-400 text-sm flex items-center gap-2">
+                        <Clock size={14} />
+                        {event.time ? new Date(`2000-01-01T${event.time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'TBA'}
+                      </span>
                     </div>
                     
-                    <div className="flex items-center gap-2 text-gray-500 bg-white px-4 py-2 rounded-lg border border-gray-200">
-                      <MapPin className="h-5 w-5 text-[#EF4444]" />
-                      <span className="font-medium">{event.location}</span>
+                    <h3 className="text-xl font-bold text-white mb-4 group-hover:text-[#EF4444] transition-colors">
+                      {event.title}
+                    </h3>
+                    
+                    <div className="mt-auto pt-4 border-t border-gray-800 flex items-center text-gray-400 text-sm">
+                      <MapPin size={16} className="mr-2 text-[#EF4444]" />
+                      {event.location}
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 bg-gray-50 rounded-2xl border border-gray-100">
-                <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-xl font-medium text-gray-900 mb-2">No upcoming events</p>
-                <p className="text-gray-500">Check back soon for our latest schedule.</p>
-              </div>
-            )}
-            
-            <div className="mt-10 text-center">
-              <Link to="/login" className="inline-flex items-center gap-2 text-[#EF4444] font-bold hover:text-red-700 transition-colors">
-                View Full Calendar <ArrowRight size={18} />
-              </Link>
+                </div>
+              ))}
             </div>
+          )}
+          
+          <div className="text-center mt-12">
+            <button 
+              onClick={() => scrollToSection('register')}
+              className="px-8 py-3 bg-[#EF4444] hover:bg-red-600 text-white font-black italic uppercase tracking-wider skew-x-[-12deg] transition-all transform hover:scale-105 shadow-lg shadow-red-900/20"
+            >
+              <span className="block skew-x-[12deg]">View Full Schedule</span>
+            </button>
           </div>
         </div>
       </section>
