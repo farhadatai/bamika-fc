@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { uploadPhoto } from '../lib/upload';
 import { useNavigate } from 'react-router-dom';
-import { X, Pencil, Trash2, Calendar, Clock, MapPin, Users, UserPlus, Shield } from 'lucide-react';
+import { X, Pencil, Trash2, Calendar, Clock, MapPin, Users, UserPlus, Shield, Baby, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface RosterPlayer {
   id: string;
@@ -10,14 +10,22 @@ interface RosterPlayer {
   position: string;
   team_assigned: string;
   jersey_number?: string;
-  photo_url?: string; // From joined profile
+  photo_url?: string;
+  parent_id?: string;
+  date_of_birth?: string;
+  gender?: string;
+  profiles?: {
+    full_name: string;
+    email: string;
+    phone: string;
+  };
 }
 
 interface Coach {
   id: string;
   email: string;
   full_name: string;
-  photo_url?: string; // From joined profile
+  photo_url?: string;
 }
 
 interface Game {
@@ -34,22 +42,27 @@ interface User {
   full_name: string;
   role: string;
   email?: string;
+  phone?: string;
   photo_url?: string;
   created_at?: string;
 }
 
 export default function AdminDashboard() {
-  const [users, setUsers] = useState<User[]>([]); // All profiles
+  const [users, setUsers] = useState<User[]>([]); // All profiles (Parents)
   const [rosterPlayers, setRosterPlayers] = useState<RosterPlayer[]>([]);
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'new_signups' | 'players' | 'coaches' | 'schedule'>('new_signups');
+  const [activeTab, setActiveTab] = useState<'parents' | 'roster' | 'coaches' | 'schedule'>('parents');
   
+  // Expanded Parent Rows
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+
   // Modals
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
   const [isEditPlayerModalOpen, setIsEditPlayerModalOpen] = useState(false);
+  const [isAddPlayerModalOpen, setIsAddPlayerModalOpen] = useState(false);
   
   // Form States
   const [gameLoading, setGameLoading] = useState(false);
@@ -69,6 +82,14 @@ export default function AdminDashboard() {
     jersey_number: ''
   });
 
+  const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  const [selectedParentName, setSelectedParentName] = useState<string>('');
+  const [newChild, setNewChild] = useState({
+    fullName: '',
+    dob: '',
+    gender: 'Male'
+  });
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -76,7 +97,7 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch All Profiles (Users)
+      // 1. Fetch All Profiles (Users/Parents)
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
@@ -86,16 +107,13 @@ export default function AdminDashboard() {
         setUsers(profilesData);
       }
 
-      // 2. Fetch Roster Players (Joined with profiles for photo)
+      // 2. Fetch Roster Players (Joined with parent profiles)
       const { data: playersData, error: playersError } = await supabase
         .from('players')
-        .select('*, profiles:id(photo_url)');
+        .select('*, profiles:parent_id(full_name, email, phone)');
       
       if (playersData) {
-        setRosterPlayers(playersData.map((p: any) => ({
-          ...p,
-          photo_url: p.profiles?.photo_url
-        })));
+        setRosterPlayers(playersData);
       }
 
       // 3. Fetch Coaches
@@ -128,93 +146,64 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- ACTIONS: NEW SIGNUPS TAB ---
+  // --- ACTIONS: PARENTS TAB ---
 
-  const handleMakePlayer = async (user: User) => {
+  const toggleParentExpansion = (parentId: string) => {
+    const newExpanded = new Set(expandedParents);
+    if (newExpanded.has(parentId)) {
+      newExpanded.delete(parentId);
+    } else {
+      newExpanded.add(parentId);
+    }
+    setExpandedParents(newExpanded);
+  };
+
+  const handleOpenAddPlayerModal = (user: User) => {
+    setSelectedParentId(user.id);
+    setSelectedParentName(user.full_name);
+    setNewChild({ fullName: '', dob: '', gender: 'Male' });
+    setIsAddPlayerModalOpen(true);
+  };
+
+  const handleAddChild = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedParentId) return;
+
     try {
-      // 1. Update Profile Role
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ role: 'player' })
-        .eq('id', user.id);
-
-      if (profileError) throw profileError;
-
-      // 2. Insert into Players Table
-      const { error: playerError } = await supabase
+      const { error } = await supabase
         .from('players')
         .insert({
-          id: user.id,
-          full_name: user.full_name,
+          parent_id: selectedParentId,
+          full_name: newChild.fullName,
+          date_of_birth: newChild.dob,
+          gender: newChild.gender,
           position: 'TBD',
-          team_assigned: 'Unassigned'
+          team_assigned: 'Unassigned',
+          jersey_number: '-'
         });
 
-      if (playerError) {
-        // Rollback profile update if player insert fails (optional but good practice)
-        await supabase.from('profiles').update({ role: 'user' }).eq('id', user.id);
-        throw playerError;
-      }
+      if (error) throw error;
 
-      alert(`${user.full_name} is now a Player!`);
+      alert(`Successfully added ${newChild.fullName}!`);
+      setIsAddPlayerModalOpen(false);
       fetchData();
-    } catch (error: any) {
-      alert('Error making player: ' + error.message);
+    } catch (err: any) {
+      alert('Error adding child: ' + err.message);
     }
   };
 
-  const handleMakeCoach = async (user: User) => {
-    try {
-      // 1. Update Profile Role
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ role: 'coach' })
-        .eq('id', user.id);
+  // --- ACTIONS: ROSTER TAB ---
 
-      if (profileError) throw profileError;
-
-      // 2. Insert into Coaches Table
-      const { error: coachError } = await supabase
-        .from('coaches')
-        .insert({
-          id: user.id,
-          full_name: user.full_name,
-          email: user.email
-        });
-
-      if (coachError) {
-        await supabase.from('profiles').update({ role: 'user' }).eq('id', user.id);
-        throw coachError;
-      }
-
-      alert(`${user.full_name} is now a Coach!`);
-      fetchData();
-    } catch (error: any) {
-      alert('Error making coach: ' + error.message);
-    }
-  };
-
-  // --- ACTIONS: PLAYERS TAB ---
-
-  const handleRemovePlayer = async (playerId: string) => {
-    if (!confirm('Are you sure you want to remove this player? They will be demoted to a regular user.')) return;
+  const handleDeletePlayer = async (playerId: string) => {
+    if (!confirm('Are you sure you want to permanently remove this player from the academy?')) return;
 
     try {
-      // 1. Delete from Players Table
-      const { error: deleteError } = await supabase
+      const { error } = await supabase
         .from('players')
         .delete()
         .eq('id', playerId);
 
-      if (deleteError) throw deleteError;
-
-      // 2. Update Profile Role
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ role: 'user' })
-        .eq('id', playerId);
-
-      if (profileError) throw profileError;
+      if (error) throw error;
 
       alert('Player removed successfully.');
       fetchData();
@@ -258,7 +247,38 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- ACTIONS: COACHES TAB ---
+  // --- ACTIONS: COACHES ---
+
+  const handleMakeCoach = async (user: User) => {
+    try {
+      // 1. Update Profile Role
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ role: 'coach' })
+        .eq('id', user.id);
+
+      if (profileError) throw profileError;
+
+      // 2. Insert into Coaches Table
+      const { error: coachError } = await supabase
+        .from('coaches')
+        .insert({
+          id: user.id,
+          full_name: user.full_name,
+          email: user.email
+        });
+
+      if (coachError) {
+        await supabase.from('profiles').update({ role: 'user' }).eq('id', user.id);
+        throw coachError;
+      }
+
+      alert(`${user.full_name} is now a Coach!`);
+      fetchData();
+    } catch (error: any) {
+      alert('Error making coach: ' + error.message);
+    }
+  };
 
   const handleRemoveCoach = async (coachId: string) => {
     if (!confirm('Are you sure you want to remove this coach? They will be demoted to a regular user.')) return;
@@ -290,14 +310,14 @@ export default function AdminDashboard() {
   // --- ACTIONS: GLOBAL ---
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to PERMANENTLY delete this user? This cannot be undone.')) return;
+    if (!confirm('Are you sure you want to PERMANENTLY delete this user account? This will remove the parent and all linked players.')) return;
 
     try {
       const { error } = await supabase.rpc('delete_user_account', { target_user_id: userId });
 
       if (error) throw error;
 
-      alert('User permanently deleted.');
+      alert('User account permanently deleted.');
       fetchData();
     } catch (error: any) {
       alert('Error deleting user: ' + error.message);
@@ -370,6 +390,18 @@ export default function AdminDashboard() {
     setIsGameModalOpen(true);
   };
 
+  const calculateAge = (dob?: string) => {
+    if (!dob) return 'N/A';
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
   // --- RENDER HELPERS ---
 
   if (loading) return <div className="flex justify-center items-center h-screen">Loading...</div>;
@@ -381,22 +413,22 @@ export default function AdminDashboard() {
       {/* TABS */}
       <div className="flex border-b border-gray-200 bg-white rounded-t-xl overflow-hidden mb-6">
         <button
-          className={`px-6 py-3 font-bold text-sm ${activeTab === 'new_signups' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
-          onClick={() => setActiveTab('new_signups')}
+          className={`px-6 py-3 font-bold text-sm ${activeTab === 'parents' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
+          onClick={() => setActiveTab('parents')}
         >
-          New Signups (Waiting Room)
+          Parents / Users
         </button>
         <button
-          className={`px-6 py-3 font-bold text-sm ${activeTab === 'players' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
-          onClick={() => setActiveTab('players')}
+          className={`px-6 py-3 font-bold text-sm ${activeTab === 'roster' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
+          onClick={() => setActiveTab('roster')}
         >
-          Players (Roster)
+          Player Roster (Master)
         </button>
         <button
           className={`px-6 py-3 font-bold text-sm ${activeTab === 'coaches' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
           onClick={() => setActiveTab('coaches')}
         >
-          Coaches (Staff)
+          Coaches
         </button>
         <button
           className={`px-6 py-3 font-bold text-sm ${activeTab === 'schedule' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
@@ -406,83 +438,124 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {/* TAB 1: NEW SIGNUPS */}
-      {activeTab === 'new_signups' && (
+      {/* TAB 1: PARENTS */}
+      {activeTab === 'parents' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">New Signups</h2>
-          <p className="text-sm text-gray-500 mb-4">Users who have created an account but are not yet assigned a role.</p>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Registered Parents</h2>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Date Joined</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Parent Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Contact Info</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {users.filter(u => u.role === 'user').map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 mr-3">
-                          {user.full_name.charAt(0)}
-                        </div>
-                        <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email || 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleMakePlayer(user)}
-                          className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-700 flex items-center gap-1"
-                        >
-                          <UserPlus size={14} /> Make Player
-                        </button>
-                        <button
-                          onClick={() => handleMakeCoach(user)}
-                          className="bg-green-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-green-700 flex items-center gap-1"
-                        >
-                          <Shield size={14} /> Make Coach
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="bg-red-100 text-red-600 p-1 rounded hover:bg-red-200"
-                          title="Permanently Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {users.filter(u => u.role === 'user').length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500 italic">No new signups found.</td>
-                  </tr>
-                )}
+                {users.filter(u => u.role === 'user').map((user) => {
+                  const parentPlayers = rosterPlayers.filter(p => p.parent_id === user.id);
+                  const isExpanded = expandedParents.has(user.id);
+
+                  return (
+                    <React.Fragment key={user.id}>
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 mr-3">
+                              {user.full_name.charAt(0)}
+                            </div>
+                            <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div>{user.email}</div>
+                          <div className="text-xs text-gray-400">{user.phone || 'No Phone'}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleOpenAddPlayerModal(user)}
+                              className="bg-green-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-green-700 flex items-center gap-1"
+                            >
+                              <UserPlus size={14} /> Add Player
+                            </button>
+                            <button
+                              onClick={() => toggleParentExpansion(user.id)}
+                              className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-xs font-bold hover:bg-blue-200 flex items-center gap-1"
+                            >
+                              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />} 
+                              Children ({parentPlayers.length})
+                            </button>
+                            {/* Make Coach Button moved to end or kept if needed */}
+                            <button
+                              onClick={() => handleMakeCoach(user)}
+                              className="text-gray-400 hover:text-blue-600 p-1"
+                              title="Promote to Coach"
+                            >
+                              <Shield size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="text-red-400 hover:text-red-600 p-1"
+                              title="Delete Account"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Expanded Children Row */}
+                      {isExpanded && (
+                        <tr className="bg-gray-50">
+                          <td colSpan={3} className="px-6 py-4">
+                            <div className="pl-12">
+                              <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Linked Players</h4>
+                              {parentPlayers.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                  {parentPlayers.map(child => (
+                                    <div key={child.id} className="bg-white p-3 rounded border border-gray-200 flex justify-between items-center">
+                                      <div>
+                                        <div className="font-bold text-sm">{child.full_name}</div>
+                                        <div className="text-xs text-gray-500">{child.team_assigned} • {calculateAge(child.date_of_birth)} yrs</div>
+                                      </div>
+                                      <button 
+                                        onClick={() => handleEditPlayerClick(child)}
+                                        className="text-blue-600 hover:text-blue-800 text-xs font-bold"
+                                      >
+                                        Edit
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-gray-500 italic">No players registered yet.</div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* TAB 2: PLAYERS (ROSTER) */}
-      {activeTab === 'players' && (
+      {/* TAB 2: PLAYER ROSTER (MASTER) */}
+      {activeTab === 'roster' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Team Roster</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Master Player Roster</h2>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Player</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Position</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Age / DOB</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Team</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Parent</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Jersey</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -490,25 +563,24 @@ export default function AdminDashboard() {
                 {rosterPlayers.map((player) => (
                   <tr key={player.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 overflow-hidden border border-gray-300 mr-3">
-                          {player.photo_url ? (
-                            <img src={player.photo_url} alt={player.full_name} className="h-full w-full object-cover" />
-                          ) : (
-                            <span>{player.full_name.charAt(0)}</span>
-                          )}
-                        </div>
-                        <div>
-                          <div className="text-sm font-bold text-gray-900">{player.full_name}</div>
-                          <div className="text-xs text-gray-500">#{player.jersey_number || '00'}</div>
-                        </div>
-                      </div>
+                      <div className="font-bold text-gray-900">{player.full_name}</div>
+                      <div className="text-xs text-gray-500">{player.position}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{player.position}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      <div>{calculateAge(player.date_of_birth)} years</div>
+                      <div className="text-xs text-gray-400">{player.date_of_birth || 'N/A'}</div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2 py-1 text-xs font-bold uppercase rounded-full bg-blue-100 text-blue-800">
                         {player.team_assigned}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      <div className="font-medium">{player.profiles?.full_name || 'Unknown'}</div>
+                      <div className="text-xs text-gray-500">{player.profiles?.phone}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono">
+                      #{player.jersey_number || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-2">
@@ -519,15 +591,9 @@ export default function AdminDashboard() {
                           <Pencil size={14} /> Edit
                         </button>
                         <button
-                          onClick={() => handleRemovePlayer(player.id)}
-                          className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-700 flex items-center gap-1"
-                        >
-                          <X size={14} /> Remove
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(player.id)}
+                          onClick={() => handleDeletePlayer(player.id)}
                           className="bg-red-100 text-red-600 p-1 rounded hover:bg-red-200"
-                          title="Permanently Delete"
+                          title="Remove Player"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -537,7 +603,7 @@ export default function AdminDashboard() {
                 ))}
                 {rosterPlayers.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500 italic">No players on the roster yet.</td>
+                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500 italic">No players on the roster yet.</td>
                   </tr>
                 )}
               </tbody>
@@ -676,6 +742,54 @@ export default function AdminDashboard() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD PLAYER FOR PARENT */}
+      {isAddPlayerModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="font-bold text-xl text-gray-900">Add Child for {selectedParentName}</h3>
+              <button onClick={() => setIsAddPlayerModalOpen(false)} className="text-gray-500 hover:text-black"><X size={24} /></button>
+            </div>
+            <form onSubmit={handleAddChild} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Child Full Name</label>
+                <input 
+                  type="text" 
+                  required
+                  className="w-full border rounded-lg p-2"
+                  value={newChild.fullName}
+                  onChange={e => setNewChild({...newChild, fullName: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Date of Birth</label>
+                <input 
+                  type="date" 
+                  required
+                  className="w-full border rounded-lg p-2"
+                  value={newChild.dob}
+                  onChange={e => setNewChild({...newChild, dob: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Gender</label>
+                <select
+                  className="w-full border rounded-lg p-2"
+                  value={newChild.gender}
+                  onChange={e => setNewChild({...newChild, gender: e.target.value})}
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
+              </div>
+              <button type="submit" className="w-full bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700">
+                Register Player
+              </button>
+            </form>
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, UserPlus, X, Users, Calendar, Trophy } from 'lucide-react';
 
 interface Registration {
   id: string;
@@ -12,14 +12,34 @@ interface Registration {
   dob: string;
 }
 
+interface Player {
+  id: string;
+  full_name: string;
+  date_of_birth: string;
+  gender: string;
+  team_assigned: string;
+  jersey_number: string;
+  parent_id: string;
+}
+
 export default function Dashboard() {
   const { user, userRole } = useAuthStore();
   const navigate = useNavigate();
   const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [roleChecking, setRoleChecking] = useState(true);
   const [searchParams] = useSearchParams();
   const showSuccess = searchParams.get('success') === 'true';
+
+  // Modal State
+  const [isAddPlayerModalOpen, setIsAddPlayerModalOpen] = useState(false);
+  const [newPlayer, setNewPlayer] = useState({
+    fullName: '',
+    dob: '',
+    gender: 'Male'
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     // Immediate Store Check
@@ -73,14 +93,26 @@ export default function Dashboard() {
         // If we are here, we are a parent
         if (mounted) setRoleChecking(false);
         
-        const { data } = await supabase
+        // Fetch Registrations
+        const { data: regData } = await supabase
           .from('registrations')
           .select('*')
           .eq('parent_id', user.id);
 
-        if (data && mounted) {
-          setRegistrations(data);
+        if (regData && mounted) {
+          setRegistrations(regData);
         }
+
+        // Fetch Players (My Athletes)
+        const { data: playersData } = await supabase
+          .from('players')
+          .select('*')
+          .eq('parent_id', user.id);
+
+        if (playersData && mounted) {
+          setPlayers(playersData);
+        }
+
       } catch (error) {
         console.error('Error loading dashboard:', error);
       } finally {
@@ -97,6 +129,47 @@ export default function Dashboard() {
       mounted = false;
     };
   }, [user, navigate]);
+
+  const handleAddPlayer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsSubmitting(true);
+
+    try {
+      const { error } = await supabase
+        .from('players')
+        .insert({
+          parent_id: user.id,
+          full_name: newPlayer.fullName,
+          date_of_birth: newPlayer.dob,
+          gender: newPlayer.gender,
+          position: 'TBD',
+          team_assigned: 'Unassigned',
+          jersey_number: '-'
+        });
+
+      if (error) throw error;
+
+      // Refresh data
+      const { data: updatedPlayers } = await supabase
+        .from('players')
+        .select('*')
+        .eq('parent_id', user.id);
+        
+      if (updatedPlayers) {
+        setPlayers(updatedPlayers);
+      }
+
+      setNewPlayer({ fullName: '', dob: '', gender: 'Male' });
+      setIsAddPlayerModalOpen(false);
+      alert('Player registered successfully!');
+
+    } catch (error: any) {
+      alert('Error registering player: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (roleChecking || loading) {
     return (
@@ -122,47 +195,137 @@ export default function Dashboard() {
 
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">Parent Dashboard</h1>
-        <Link 
-          to="/register/new" 
+        <button 
+          onClick={() => setIsAddPlayerModalOpen(true)}
           className="bg-primary text-white px-4 py-2 rounded-md font-bold hover:bg-red-700 transition-colors flex items-center gap-2"
         >
-          + Add New Player
-        </Link>
+          <UserPlus size={20} /> Register New Player
+        </button>
       </div>
 
+      {/* MY ATHLETES SECTION */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <h2 className="text-xl font-bold mb-4">My Children</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Trophy className="text-primary" /> My Athletes
+          </h2>
+        </div>
         
-        {loading ? (
-          <p>Loading...</p>
-        ) : registrations.length === 0 ? (
-          <div className="text-center py-10 text-gray-500">
-            <p className="mb-4">No players registered yet.</p>
-            <Link 
-              to="/register/new" 
+        {players.length === 0 ? (
+          <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+            <Users className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+            <p className="mb-4">No athletes linked to your account yet.</p>
+            <button 
+              onClick={() => setIsAddPlayerModalOpen(true)}
               className="text-primary font-bold hover:underline"
             >
-              Register your first child now
-            </Link>
+              Register your first athlete now
+            </button>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {players.map((player) => (
+              <div key={player.id} className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow bg-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-bl-lg uppercase">
+                  {player.team_assigned}
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-xl">
+                    {player.full_name.charAt(0)}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900">{player.full_name}</h3>
+                    <div className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                      <Calendar size={14} /> {player.date_of_birth || 'N/A'}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-2">
+                      Jersey: <span className="font-mono text-gray-600">{player.jersey_number}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* RECENT REGISTRATIONS (Legacy/History) */}
+      {registrations.length > 0 && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 opacity-75">
+          <h2 className="text-lg font-bold text-gray-700 mb-4">Registration History</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {registrations.map((reg) => (
-              <div key={reg.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+              <div key={reg.id} className="border rounded-lg p-4 bg-gray-50">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-bold text-lg">{reg.first_name} {reg.last_name}</h3>
+                  <h3 className="font-bold text-sm text-gray-600">{reg.first_name} {reg.last_name}</h3>
                   <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
                     reg.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                   }`}>
                     {reg.status}
                   </span>
                 </div>
-                <p className="text-sm text-gray-600">DOB: {new Date(reg.dob).toLocaleDateString()}</p>
+                <p className="text-xs text-gray-500">Registered: {new Date(reg.dob).toLocaleDateString()}</p>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* MODAL: REGISTER NEW PLAYER */}
+      {isAddPlayerModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-fade-in">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="font-bold text-xl text-gray-900">Register New Athlete</h3>
+              <button onClick={() => setIsAddPlayerModalOpen(false)} className="text-gray-500 hover:text-black">
+                <X size={24} />
+              </button>
+            </div>
+            <form onSubmit={handleAddPlayer} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Full Name</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g. John Doe"
+                  className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                  value={newPlayer.fullName}
+                  onChange={e => setNewPlayer({...newPlayer, fullName: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Date of Birth</label>
+                <input 
+                  type="date" 
+                  required
+                  className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                  value={newPlayer.dob}
+                  onChange={e => setNewPlayer({...newPlayer, dob: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Gender</label>
+                <select
+                  className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                  value={newPlayer.gender}
+                  onChange={e => setNewPlayer({...newPlayer, gender: e.target.value})}
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
+              </div>
+              
+              <button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="w-full bg-primary text-white py-3 rounded-lg font-bold hover:bg-red-700 transition-all shadow-lg transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? 'Registering...' : 'Complete Registration'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
