@@ -125,7 +125,7 @@ export default function LandingPage() {
       const { data, error } = await supabase
         .from('events')
         .select('*')
-        .gte('date', new Date().toISOString().split('T')[0]) // Only future events
+        // Removed strict date filter to debug/ensure visibility as requested
         .order('date', { ascending: true })
         .limit(3);
 
