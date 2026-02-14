@@ -1,36 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { uploadPhoto } from '../lib/upload';
-import { useAuthStore } from '../store/auth';
 import { useNavigate } from 'react-router-dom';
-import { X, CheckCircle, XCircle, Pencil, Trash2, Calendar, Clock, MapPin, Users } from 'lucide-react';
+import { X, Pencil, Trash2, Calendar, Clock, MapPin, Users, UserPlus, Shield } from 'lucide-react';
 
-interface Player {
+interface RosterPlayer {
   id: string;
-  first_name: string;
-  last_name: string;
-  dob: string;
-  gender: string;
-  status: string;
-  parent_id: string;
-  created_at: string;
-  coach_id?: string;
-  waiver_signed_at: string | null;
-  manual_parent_name?: string;
-  manual_phone?: string;
-  photo_url?: string;
-  age_group?: string;
-  payment_status?: string;
-  profiles: {
-    full_name: string;
-    phone: string;
-  };
+  full_name: string;
+  position: string;
+  team_assigned: string;
+  jersey_number?: string;
+  photo_url?: string; // From joined profile
 }
 
 interface Coach {
   id: string;
   email: string;
   full_name: string;
+  photo_url?: string; // From joined profile
 }
 
 interface Game {
@@ -48,39 +35,25 @@ interface User {
   role: string;
   email?: string;
   photo_url?: string;
+  created_at?: string;
 }
 
 export default function AdminDashboard() {
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [users, setUsers] = useState<User[]>([]); // All profiles
+  const [rosterPlayers, setRosterPlayers] = useState<RosterPlayer[]>([]);
   const [coaches, setCoaches] = useState<Coach[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [games, setGames] = useState<Game[]>([]);
+  
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterGroup, setFilterGroup] = useState('All Groups');
-  const [filterCoach, setFilterCoach] = useState('All Coaches');
-  const [filterPayment, setFilterPayment] = useState('All');
-  const [activeTab, setActiveTab] = useState<'users' | 'coaches' | 'schedule'>('users');
-  const navigate = useNavigate();
-
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isCoachModalOpen, setIsCoachModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'new_signups' | 'players' | 'coaches' | 'schedule'>('new_signups');
+  
+  // Modals
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [playerLoading, setPlayerLoading] = useState(false);
-  const [coachLoading, setCoachLoading] = useState(false);
+  const [isEditPlayerModalOpen, setIsEditPlayerModalOpen] = useState(false);
+  
+  // Form States
   const [gameLoading, setGameLoading] = useState(false);
-  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
-
-  // New Coach Form State
-  const [newCoach, setNewCoach] = useState({
-    fullName: '',
-    email: ''
-  });
-
-  // New Game Form State
   const [newGame, setNewGame] = useState({
     date: '',
     time: '',
@@ -89,324 +62,249 @@ export default function AdminDashboard() {
     teamGroup: 'All'
   });
 
-  // New Player Form State
-  const [newPlayer, setNewPlayer] = useState({
-    firstName: '',
-    lastName: '',
-    dob: '',
-    gender: 'Male', // Default gender
-    parentName: '',
-    phone: '',
-    waiverSigned: true, 
-    photoUrl: '',
-    ageGroup: 'U6'
+  const [editingPlayer, setEditingPlayer] = useState<RosterPlayer | null>(null);
+  const [playerForm, setPlayerForm] = useState({
+    position: '',
+    team_assigned: '',
+    jersey_number: ''
   });
 
-  const [renderError, setRenderError] = useState<string | null>(null);
-
   useEffect(() => {
-    try {
-      fetchData();
-    } catch (e: any) {
-      setRenderError(e.message);
-    }
+    fetchData();
   }, []);
-
-  const calculateAgeGroup = (dob: string) => {
-    if (!dob) return 'U6';
-    const birthYear = new Date(dob).getFullYear();
-    const currentYear = new Date().getFullYear();
-    const age = currentYear - birthYear;
-    
-    if (age <= 6) return 'U6';
-    if (age <= 8) return 'U8';
-    if (age <= 10) return 'U10';
-    if (age <= 12) return 'U12';
-    if (age <= 14) return 'U14';
-    if (age <= 16) return 'U16';
-    return 'Open';
-  };
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Coaches
-      try {
-        const { data: coachesData, error: coachesError } = await supabase
-          .from('profiles')
-          .select('id, full_name, role')
-          .or('role.eq.coach,role.eq.admin');
-          
-        if (coachesData) {
-          setCoaches(coachesData.map((c: any) => ({
-            id: c.id,
-            full_name: c.full_name || 'Unknown Coach',
-            email: '' 
-          })));
-        }
-      } catch (coachErr) {
-        console.error('Error fetching coaches:', coachErr);
-        setCoaches([]);
-      }
-
-      // 2. Fetch Players
-      const { data, error } = await supabase
-        .from('registrations')
-        .select('*, profiles:parent_id(full_name, phone)')
+      // 1. Fetch All Profiles (Users)
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
         .order('created_at', { ascending: false });
+      
+      if (profilesData) {
+        setUsers(profilesData);
+      }
 
-      if (error) throw error;
+      // 2. Fetch Roster Players (Joined with profiles for photo)
+      const { data: playersData, error: playersError } = await supabase
+        .from('players')
+        .select('*, profiles:id(photo_url)');
+      
+      if (playersData) {
+        setRosterPlayers(playersData.map((p: any) => ({
+          ...p,
+          photo_url: p.profiles?.photo_url
+        })));
+      }
 
-      // 3. Fetch Games
-      try {
-        const { data: gamesData, error: gamesError } = await supabase
-          .from('games')
-          .select('*')
-          .order('date', { ascending: true });
+      // 3. Fetch Coaches
+      const { data: coachesData, error: coachesError } = await supabase
+        .from('coaches')
+        .select('*, profiles:id(photo_url, email)');
         
-        if (gamesData) {
-          setGames(gamesData);
-        }
-      } catch (gameErr) {
-        console.error('Error fetching games:', gameErr);
+      if (coachesData) {
+        setCoaches(coachesData.map((c: any) => ({
+          ...c,
+          photo_url: c.profiles?.photo_url,
+          email: c.profiles?.email
+        })));
       }
 
-      // 4. Fetch Users (All Profiles)
-      try {
-        const { data: usersData, error: usersError } = await supabase
-          .from('profiles')
-          .select('id, full_name, role, photo_url');
-          
-        if (usersData) {
-          setUsers(usersData.map((u: any) => ({
-            id: u.id,
-            full_name: u.full_name || 'Unknown User',
-            role: u.role || 'user',
-            photo_url: u.photo_url
-          })));
-        }
-      } catch (userErr) {
-        console.error('Error fetching users:', userErr);
+      // 4. Fetch Games
+      const { data: gamesData } = await supabase
+        .from('games')
+        .select('*')
+        .order('date', { ascending: true });
+        
+      if (gamesData) {
+        setGames(gamesData);
       }
 
-      if (data) {
-        const formattedData = data.map((p: any) => {
-          try {
-            let profileObj = { full_name: 'N/A', phone: 'N/A' };
-            if (p.profiles) {
-              if (Array.isArray(p.profiles)) {
-                if (p.profiles.length > 0) profileObj = p.profiles[0];
-              } else if (typeof p.profiles === 'object') {
-                profileObj = p.profiles;
-              }
-            }
-            return {
-              ...p,
-              profiles: {
-                full_name: profileObj?.full_name || 'N/A',
-                phone: profileObj?.phone || 'N/A'
-              }
-            };
-          } catch (mapErr) {
-            return p;
-          }
-        });
-        setPlayers(formattedData);
-      }
-    } catch (err: any) {
-      console.error('Unexpected error in fetchData:', err);
-      setRenderError(err.message || 'Failed to load data');
+    } catch (error) {
+      console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddCoach = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCoachLoading(true);
+  // --- ACTIONS: NEW SIGNUPS TAB ---
+
+  const handleMakePlayer = async (user: User) => {
+    try {
+      // 1. Update Profile Role
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ role: 'player' })
+        .eq('id', user.id);
+
+      if (profileError) throw profileError;
+
+      // 2. Insert into Players Table
+      const { error: playerError } = await supabase
+        .from('players')
+        .insert({
+          id: user.id,
+          full_name: user.full_name,
+          position: 'TBD',
+          team_assigned: 'Unassigned'
+        });
+
+      if (playerError) {
+        // Rollback profile update if player insert fails (optional but good practice)
+        await supabase.from('profiles').update({ role: 'user' }).eq('id', user.id);
+        throw playerError;
+      }
+
+      alert(`${user.full_name} is now a Player!`);
+      fetchData();
+    } catch (error: any) {
+      alert('Error making player: ' + error.message);
+    }
+  };
+
+  const handleMakeCoach = async (user: User) => {
+    try {
+      // 1. Update Profile Role
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ role: 'coach' })
+        .eq('id', user.id);
+
+      if (profileError) throw profileError;
+
+      // 2. Insert into Coaches Table
+      const { error: coachError } = await supabase
+        .from('coaches')
+        .insert({
+          id: user.id,
+          full_name: user.full_name,
+          email: user.email
+        });
+
+      if (coachError) {
+        await supabase.from('profiles').update({ role: 'user' }).eq('id', user.id);
+        throw coachError;
+      }
+
+      alert(`${user.full_name} is now a Coach!`);
+      fetchData();
+    } catch (error: any) {
+      alert('Error making coach: ' + error.message);
+    }
+  };
+
+  // --- ACTIONS: PLAYERS TAB ---
+
+  const handleRemovePlayer = async (playerId: string) => {
+    if (!confirm('Are you sure you want to remove this player? They will be demoted to a regular user.')) return;
 
     try {
-      // 1. Create a placeholder profile for the coach
-      // Note: In a real app, you would create an auth user first. 
-      // Here we are just creating a profile row so they appear in lists.
-      // We generate a random UUID for the ID since we don't have an auth user yet.
-      const fakeId = crypto.randomUUID();
-      
-      const { error } = await supabase
+      // 1. Delete from Players Table
+      const { error: deleteError } = await supabase
+        .from('players')
+        .delete()
+        .eq('id', playerId);
+
+      if (deleteError) throw deleteError;
+
+      // 2. Update Profile Role
+      const { error: profileError } = await supabase
         .from('profiles')
-        .insert({
-          id: fakeId,
-          full_name: newCoach.fullName,
-          role: 'user', // Default to user, "Make Coach" button promotes them
-          // Store email in a metadata field or just ignore it for now if schema doesn't support it
-          // Assuming we might add an email column later or just use it for display
-        });
+        .update({ role: 'user' })
+        .eq('id', playerId);
+
+      if (profileError) throw profileError;
+
+      alert('Player removed successfully.');
+      fetchData();
+    } catch (error: any) {
+      alert('Error removing player: ' + error.message);
+    }
+  };
+
+  const handleEditPlayerClick = (player: RosterPlayer) => {
+    setEditingPlayer(player);
+    setPlayerForm({
+      position: player.position || '',
+      team_assigned: player.team_assigned || '',
+      jersey_number: player.jersey_number || ''
+    });
+    setIsEditPlayerModalOpen(true);
+  };
+
+  const handleSavePlayerDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlayer) return;
+
+    try {
+      const { error } = await supabase
+        .from('players')
+        .update({
+          position: playerForm.position,
+          team_assigned: playerForm.team_assigned,
+          jersey_number: playerForm.jersey_number
+        })
+        .eq('id', editingPlayer.id);
 
       if (error) throw error;
 
-      alert('Coach added successfully! Use the "Make Coach" button to grant dashboard access.');
-      setNewCoach({ fullName: '', email: '' });
-      setIsCoachModalOpen(false);
-      fetchData(); // Refresh list
-    } catch (err: any) {
-      console.error('Error adding coach:', err);
-      alert('Failed to add coach: ' + err.message);
-    } finally {
-      setCoachLoading(false);
+      alert('Player details updated!');
+      setIsEditPlayerModalOpen(false);
+      setEditingPlayer(null);
+      fetchData();
+    } catch (error: any) {
+      alert('Error updating player: ' + error.message);
     }
   };
 
-  const handleMakeCoach = async (userId: string) => {
-    try {
-      console.log('Attempting to promote user to coach:', userId);
+  // --- ACTIONS: COACHES TAB ---
 
-      // 0. Verify Auth
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('You must be logged in to perform this action.');
-      }
-      console.log('Current user performing action:', user.id);
-
-      // 1. Direct Update with Verification
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({ role: 'coach' })
-        .eq('id', userId)
-        .select();
-
-      if (error) {
-        console.error('Database update failed:', error);
-        throw error;
-      }
-
-      // Check if array is empty
-      if (!data || data.length === 0) {
-        console.error('Update operation returned no data. Possible RLS issue even after fix.');
-        // Check if the user exists
-        const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('id', userId);
-        if (count === 0) {
-            throw new Error(`User with ID ${userId} does not exist in profiles table.`);
-        }
-        throw new Error('Database update failed - no rows affected (RLS might still be blocking).');
-      }
-
-      console.log('User successfully promoted:', data);
-
-      // 2. Sync to coaches table
-      try {
-        const userProfile = data[0];
-        // Use upsert to handle potential duplicates
-        const { error: syncError } = await supabase.from('coaches').upsert({
-          id: userProfile.id,
-          full_name: userProfile.full_name,
-          email: userProfile.email
-        }, { onConflict: 'id' });
-
-        if (syncError) console.error('Coach sync error:', syncError);
-      } catch (syncErr) {
-        console.log('Note: Coaches table sync skipped or failed', syncErr);
-      }
-
-      // 3. Session Refresh
-      const { error: sessionError } = await supabase.auth.refreshSession();
-      if (sessionError) console.error('Session refresh warning:', sessionError);
-
-      alert('User promoted to Coach successfully!');
-      
-      // 4. Refresh UI Data cleanly
-      await fetchData();
-      
-    } catch (err: any) {
-      console.error('Error promoting user:', err);
-      alert('Failed to promote user: ' + err.message);
-    }
-  };
-
-  const handleUnassignCoach = async (userId: string) => {
-    if (!confirm('Are you sure you want to remove this coach? This will demote them to a regular user and unassign all their players.')) {
-      return;
-    }
+  const handleRemoveCoach = async (coachId: string) => {
+    if (!confirm('Are you sure you want to remove this coach? They will be demoted to a regular user.')) return;
 
     try {
-      console.log('Attempting to unassign coach:', userId);
+      // 1. Delete from Coaches Table
+      const { error: deleteError } = await supabase
+        .from('coaches')
+        .delete()
+        .eq('id', coachId);
 
-      // 1. Unassign players first
-      const { error: playersError } = await supabase
-        .from('registrations')
-        .update({ coach_id: null })
-        .eq('coach_id', userId);
+      if (deleteError) throw deleteError;
 
-      if (playersError) {
-        console.error('Failed to unassign players:', playersError);
-      }
-
-      // 2. Demote Role in profiles
-      const { data, error } = await supabase
+      // 2. Update Profile Role
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ role: 'user' })
-        .eq('id', userId)
-        .select();
+        .eq('id', coachId);
 
-      if (error) {
-        console.error('Database update failed:', error);
-        throw error;
-      }
+      if (profileError) throw profileError;
 
-      // Check if array is empty
-      if (!data || data.length === 0) {
-        console.error('Update operation returned no data. Check RLS policies.');
-        throw new Error('Database update failed - no rows affected.');
-      }
-
-      console.log('Coach successfully demoted:', data);
-
-      // Sync removal from coaches table
-      try {
-        await supabase.from('coaches').delete().eq('id', userId);
-      } catch (syncErr) {
-        console.log('Note: Coaches table sync skipped', syncErr);
-      }
-
-      // 3. Session Refresh
-      const { error: sessionError } = await supabase.auth.refreshSession();
-      if (sessionError) console.error('Session refresh warning:', sessionError);
-
-      alert('Coach removed and demoted successfully!');
-      
-      // 4. Refresh UI Data cleanly
-      await fetchData();
-      
-    } catch (err: any) {
-      console.error('Error removing coach:', err);
-      alert('Failed to remove coach: ' + err.message);
+      alert('Coach removed successfully.');
+      fetchData();
+    } catch (error: any) {
+      alert('Error removing coach: ' + error.message);
     }
   };
+
+  // --- ACTIONS: GLOBAL ---
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to permanently delete this user? This cannot be undone.')) {
-      return;
-    }
+    if (!confirm('Are you sure you want to PERMANENTLY delete this user? This cannot be undone.')) return;
 
     try {
-      console.log('Attempting to delete user:', userId);
-
       const { error } = await supabase.rpc('delete_user_account', { target_user_id: userId });
 
-      if (error) {
-        console.error('Delete user failed:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       alert('User permanently deleted.');
-      
-      // Refresh UI Data cleanly
-      await fetchData();
-      
-    } catch (err: any) {
-      console.error('Error deleting user:', err);
-      alert('Failed to delete user: ' + err.message);
+      fetchData();
+    } catch (error: any) {
+      alert('Error deleting user: ' + error.message);
     }
   };
+
+  // --- ACTIONS: GAMES ---
 
   const handleAddGame = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -414,7 +312,6 @@ export default function AdminDashboard() {
 
     try {
       if (editingGame) {
-        // UPDATE EXISTING GAME
         const { error } = await supabase
           .from('games')
           .update({
@@ -425,11 +322,8 @@ export default function AdminDashboard() {
             team_group: newGame.teamGroup
           })
           .eq('id', editingGame.id);
-
         if (error) throw error;
-        alert('Game updated successfully!');
       } else {
-        // INSERT NEW GAME
         const { error } = await supabase
           .from('games')
           .insert({
@@ -439,20 +333,28 @@ export default function AdminDashboard() {
             location: newGame.location,
             team_group: newGame.teamGroup
           });
-
         if (error) throw error;
-        alert('Game scheduled successfully!');
       }
-
-      setNewGame({ date: '', time: '', opponent: '', location: '', teamGroup: 'All' });
-      setEditingGame(null);
+      
+      alert(editingGame ? 'Game updated!' : 'Game scheduled!');
       setIsGameModalOpen(false);
+      setEditingGame(null);
+      setNewGame({ date: '', time: '', opponent: '', location: '', teamGroup: 'All' });
       fetchData();
     } catch (err: any) {
-      console.error('Error saving game:', err);
-      alert('Failed to save game: ' + err.message);
+      alert('Error saving game: ' + err.message);
     } finally {
       setGameLoading(false);
+    }
+  };
+
+  const handleDeleteGame = async (id: string) => {
+    if (!confirm('Delete this game?')) return;
+    try {
+      await supabase.from('games').delete().eq('id', id);
+      setGames(games.filter(g => g.id !== id));
+    } catch (err) {
+      alert('Failed to delete game');
     }
   };
 
@@ -463,294 +365,38 @@ export default function AdminDashboard() {
       time: game.time,
       opponent: game.opponent,
       location: game.location,
-      teamGroup: game.team_group || 'All'
+      teamGroup: game.team_group
     });
     setIsGameModalOpen(true);
   };
 
-  const handleDeleteGame = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this game?')) return;
-    
-    try {
-      const { error } = await supabase
-        .from('games')
-        .delete()
-        .eq('id', id);
+  // --- RENDER HELPERS ---
 
-      if (error) throw error;
-      setGames(games.filter(g => g.id !== id));
-    } catch (err: any) {
-      alert('Failed to delete game');
-    }
-  };
-
-  const handleEditClick = (player: Player) => {
-    setEditingPlayer(player);
-    setNewPlayer({
-      firstName: player.first_name,
-      lastName: player.last_name,
-      dob: player.dob,
-      gender: player.gender,
-      parentName: player.profiles?.full_name !== 'N/A' ? player.profiles.full_name : (player.manual_parent_name || ''),
-      phone: player.profiles?.phone !== 'N/A' ? player.profiles.phone : (player.manual_phone || ''),
-      waiverSigned: !!player.waiver_signed_at,
-      photoUrl: player.photo_url || '',
-      ageGroup: player.age_group || calculateAgeGroup(player.dob)
-    });
-    setIsEditModalOpen(true);
-  };
-
-  const handleEditSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingPlayer) return;
-    setPlayerLoading(true);
-
-    try {
-      const { error } = await supabase
-        .from('registrations')
-        .update({
-          first_name: newPlayer.firstName,
-          last_name: newPlayer.lastName,
-          dob: newPlayer.dob,
-          gender: newPlayer.gender,
-          manual_parent_name: newPlayer.parentName,
-          manual_phone: newPlayer.phone,
-          photo_url: newPlayer.photoUrl,
-          age_group: newPlayer.ageGroup
-        })
-        .eq('id', editingPlayer.id);
-
-      if (error) throw error;
-
-      alert('Player details updated successfully!');
-      setIsEditModalOpen(false);
-      setEditingPlayer(null);
-      setNewPlayer({ firstName: '', lastName: '', dob: '', gender: 'Male', parentName: '', phone: '', waiverSigned: true, photoUrl: '', ageGroup: 'U6' });
-      fetchData();
-    } catch (err: any) {
-      console.error('Error updating player:', err);
-      alert('Failed to update player: ' + err.message);
-    } finally {
-      setPlayerLoading(false);
-    }
-  };
-
-  const handleManualRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPlayerLoading(true);
-
-    console.log('Registering player with data:', newPlayer); // Debug log
-
-    try {
-      // 1. Insert into registrations
-      const { data, error } = await supabase
-        .from('registrations')
-        .insert({
-          first_name: newPlayer.firstName,
-          last_name: newPlayer.lastName,
-          dob: newPlayer.dob,
-          gender: newPlayer.gender || 'Male',
-          status: 'active',
-          waiver_signed_at: newPlayer.waiverSigned ? new Date().toISOString() : null,
-          manual_parent_name: newPlayer.parentName, 
-          manual_phone: newPlayer.phone,
-          photo_url: newPlayer.photoUrl,
-          parent_id: null,
-          age_group: newPlayer.ageGroup
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      alert('Player registered manually!');
-      
-      if (newPlayer.proceedToPayment && data) {
-        // Redirect to payment page with new registration ID
-        navigate(`/payment?registration_id=${data.id}`);
-        return; // Stop execution here so we don't just close the modal
-      }
-
-      setNewPlayer({ firstName: '', lastName: '', dob: '', gender: 'Male', parentName: '', phone: '', waiverSigned: true, photoUrl: '', proceedToPayment: true, ageGroup: 'U6' });
-      setIsModalOpen(false);
-      fetchData();
-    } catch (err: any) {
-      console.error('Error registering player:', err);
-      alert('Failed to register: ' + err.message);
-    } finally {
-      setPlayerLoading(false);
-    }
-  };
-
-  const handleAdminPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    const publicUrl = await uploadPhoto(file, 'players');
-    if (publicUrl) {
-      setNewPlayer(prev => ({ ...prev, photoUrl: publicUrl }));
-    } else {
-      alert('Failed to upload photo');
-    }
-  };
-
-  const handleAssignCoach = async (playerId: string, coachId: string) => {
-    try {
-      const { error } = await supabase
-        .from('registrations')
-        .update({ coach_id: coachId || null })
-        .eq('id', playerId);
-
-      if (error) throw error;
-
-      setPlayers(players.map(p => 
-        p.id === playerId ? { ...p, coach_id: coachId } : p
-      ));
-    } catch (error) {
-      alert('Failed to assign coach');
-    }
-  };
-
-  const handleUpdatePaymentStatus = async (playerId: string, status: string) => {
-    try {
-      const { error } = await supabase
-        .from('registrations')
-        .update({ payment_status: status })
-        .eq('id', playerId);
-
-      if (error) throw error;
-
-      setPlayers(players.map(p => 
-        p.id === playerId ? { ...p, payment_status: status } : p
-      ));
-      
-      // Simple toast simulation
-      const toast = document.createElement('div');
-      toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-bounce';
-      toast.innerText = 'Payment status updated!';
-      document.body.appendChild(toast);
-      setTimeout(() => document.body.removeChild(toast), 2000);
-
-    } catch (error) {
-      alert('Failed to update payment status');
-    }
-  };
-
-  const handleApprove = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('registrations')
-        .update({ status: 'active' })
-        .eq('id', id);
-
-      if (error) throw error;
-      setPlayers(players.map(p => p.id === id ? { ...p, status: 'active' } : p));
-    } catch (error) {
-      alert('Failed to approve player');
-    }
-  };
-
-  const handleExportCSV = () => {
-    const headers = ['First Name', 'Last Name', 'DOB', 'Status', 'Parent', 'Phone'];
-    const csvContent = [
-      headers.join(','),
-      ...players.map(p => [
-        p.first_name,
-        p.last_name,
-        p.dob,
-        p.status,
-        p.profiles?.full_name !== 'N/A' ? p.profiles.full_name : (p.manual_parent_name || ''),
-        p.profiles?.phone !== 'N/A' ? p.profiles.phone : (p.manual_phone || '')
-      ].join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'bamika_roster.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const safePlayers = Array.isArray(players) ? players : [];
-  const filteredPlayers = safePlayers.filter(p => {
-    const matchesSearch = (p.first_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.last_name || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesGroup = filterGroup === 'All Groups' || 
-                         (p.age_group === filterGroup) ||
-                         (!p.age_group && calculateAgeGroup(p.dob) === filterGroup);
-
-    const matchesCoach = filterCoach === 'All Coaches' || 
-                         (filterCoach === 'Unassigned' ? !p.coach_id : p.coach_id === filterCoach);
-
-    const matchesPayment = filterPayment === 'All' ||
-                           (filterPayment === 'Paid' ? p.payment_status === 'paid' : (p.payment_status !== 'paid' || !p.payment_status));
-
-    return matchesSearch && matchesGroup && matchesCoach && matchesPayment;
-  });
-
-  if (renderError) return <div className="p-4 text-red-500">{renderError}</div>;
   if (loading) return <div className="flex justify-center items-center h-screen">Loading...</div>;
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-        
-        {activeTab === 'players' && (
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setIsCoachModalOpen(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-md font-bold hover:bg-blue-700 transition-colors"
-            >
-              + Add Coach
-            </button>
-            <button 
-              onClick={() => setIsModalOpen(true)}
-              className="bg-green-600 text-white px-4 py-2 rounded-md font-bold hover:bg-green-700 transition-colors"
-            >
-              + Register Player
-            </button>
-            <button 
-              onClick={handleExportCSV}
-              className="bg-primary text-white px-4 py-2 rounded-md font-bold hover:bg-red-700 transition-colors"
-            >
-              Download CSV
-            </button>
-          </div>
-        )}
-
-        {activeTab === 'schedule' && (
-          <div className="flex gap-2">
-            <button 
-              onClick={() => {
-                setEditingGame(null);
-                setNewGame({ date: '', time: '', opponent: '', location: '', teamGroup: 'All' });
-                setIsGameModalOpen(true);
-              }}
-              className="bg-primary text-white px-4 py-2 rounded-md font-bold hover:bg-red-700 transition-colors flex items-center gap-2"
-            >
-              + Schedule New Game
-            </button>
-          </div>
-        )}
-      </div>
+      <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
 
       {/* TABS */}
       <div className="flex border-b border-gray-200 bg-white rounded-t-xl overflow-hidden mb-6">
         <button
-          className={`px-6 py-3 font-bold text-sm ${activeTab === 'users' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
-          onClick={() => setActiveTab('users')}
+          className={`px-6 py-3 font-bold text-sm ${activeTab === 'new_signups' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
+          onClick={() => setActiveTab('new_signups')}
         >
-          Users
+          New Signups (Waiting Room)
+        </button>
+        <button
+          className={`px-6 py-3 font-bold text-sm ${activeTab === 'players' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
+          onClick={() => setActiveTab('players')}
+        >
+          Players (Roster)
         </button>
         <button
           className={`px-6 py-3 font-bold text-sm ${activeTab === 'coaches' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
           onClick={() => setActiveTab('coaches')}
         >
-          Coaches
+          Coaches (Staff)
         </button>
         <button
           className={`px-6 py-3 font-bold text-sm ${activeTab === 'schedule' ? 'border-b-2 border-primary text-primary' : 'text-gray-500 hover:text-gray-700'}`}
@@ -760,16 +406,18 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {/* USERS TAB (Role: user) */}
-      {activeTab === 'users' && (
+      {/* TAB 1: NEW SIGNUPS */}
+      {activeTab === 'new_signups' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Registered Users</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">New Signups</h2>
+          <p className="text-sm text-gray-500 mb-4">Users who have created an account but are not yet assigned a role.</p>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Name</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Date Joined</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -784,23 +432,30 @@ export default function AdminDashboard() {
                         <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
                       </div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email || 'N/A'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.email || 'N/A'}
+                      {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleMakeCoach(user.id)}
-                          className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs font-bold transition-colors"
+                          onClick={() => handleMakePlayer(user)}
+                          className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-700 flex items-center gap-1"
                         >
-                          Make Coach
+                          <UserPlus size={14} /> Make Player
+                        </button>
+                        <button
+                          onClick={() => handleMakeCoach(user)}
+                          className="bg-green-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-green-700 flex items-center gap-1"
+                        >
+                          <Shield size={14} /> Make Coach
                         </button>
                         <button
                           onClick={() => handleDeleteUser(user.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50"
-                          title="Delete User"
+                          className="bg-red-100 text-red-600 p-1 rounded hover:bg-red-200"
+                          title="Permanently Delete"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </td>
@@ -808,9 +463,7 @@ export default function AdminDashboard() {
                 ))}
                 {users.filter(u => u.role === 'user').length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-6 py-4 text-center text-gray-500 italic">
-                      No regular users found.
-                    </td>
+                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500 italic">No new signups found.</td>
                   </tr>
                 )}
               </tbody>
@@ -819,7 +472,81 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* COACHES TAB (Role: coach) */}
+      {/* TAB 2: PLAYERS (ROSTER) */}
+      {activeTab === 'players' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Team Roster</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Player</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Position</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Team</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {rosterPlayers.map((player) => (
+                  <tr key={player.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 overflow-hidden border border-gray-300 mr-3">
+                          {player.photo_url ? (
+                            <img src={player.photo_url} alt={player.full_name} className="h-full w-full object-cover" />
+                          ) : (
+                            <span>{player.full_name.charAt(0)}</span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-gray-900">{player.full_name}</div>
+                          <div className="text-xs text-gray-500">#{player.jersey_number || '00'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{player.position}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 text-xs font-bold uppercase rounded-full bg-blue-100 text-blue-800">
+                        {player.team_assigned}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEditPlayerClick(player)}
+                          className="bg-yellow-500 text-white px-3 py-1 rounded text-xs font-bold hover:bg-yellow-600 flex items-center gap-1"
+                        >
+                          <Pencil size={14} /> Edit
+                        </button>
+                        <button
+                          onClick={() => handleRemovePlayer(player.id)}
+                          className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-700 flex items-center gap-1"
+                        >
+                          <X size={14} /> Remove
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(player.id)}
+                          className="bg-red-100 text-red-600 p-1 rounded hover:bg-red-200"
+                          title="Permanently Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {rosterPlayers.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500 italic">No players on the roster yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: COACHES */}
       {activeTab === 'coaches' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Coaching Staff</h2>
@@ -834,47 +561,41 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {users.filter(u => u.role === 'coach').map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                {coaches.map((coach) => (
+                  <tr key={coach.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                       <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 overflow-hidden border border-gray-300">
-                          {user.photo_url ? (
-                            <img src={user.photo_url} alt={user.full_name} className="h-full w-full object-cover" />
-                          ) : (
-                            <Users size={20} />
-                          )}
-                        </div>
+                      <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 overflow-hidden border border-gray-300">
+                        {coach.photo_url ? (
+                          <img src={coach.photo_url} alt={coach.full_name} className="h-full w-full object-cover" />
+                        ) : (
+                          <Users size={20} />
+                        )}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                      {user.full_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.email || 'N/A'}
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{coach.full_name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{coach.email || 'N/A'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleUnassignCoach(user.id)}
-                          className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1"
+                          onClick={() => handleRemoveCoach(coach.id)}
+                          className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-700 flex items-center gap-1"
                         >
-                          Remove Access
+                          <X size={14} /> Remove Access
                         </button>
                         <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50"
-                          title="Delete User"
+                          onClick={() => handleDeleteUser(coach.id)}
+                          className="bg-red-100 text-red-600 p-1 rounded hover:bg-red-200"
+                          title="Permanently Delete"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </td>
                   </tr>
                 ))}
-                {users.filter(u => u.role === 'coach').length === 0 && (
+                {coaches.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500 italic">
-                      No coaches found. Go to the Users tab to add one.
-                    </td>
+                    <td colSpan={4} className="px-6 py-4 text-center text-gray-500 italic">No coaches found.</td>
                   </tr>
                 )}
               </tbody>
@@ -883,518 +604,168 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* GAME SCHEDULE TAB */}
+      {/* TAB 4: SCHEDULE */}
       {activeTab === 'schedule' && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Upcoming Games</h2>
-          {games.length === 0 ? (
-            <div className="text-center py-10 text-gray-500">
-              <p>No games scheduled yet.</p>
-              <button 
-                onClick={() => setIsGameModalOpen(true)}
-                className="mt-2 text-primary font-bold hover:underline"
-              >
-                Schedule the first game
-              </button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Time</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Opponent</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Location</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Group</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Upcoming Games</h2>
+            <button 
+              onClick={() => {
+                setEditingGame(null);
+                setNewGame({ date: '', time: '', opponent: '', location: '', teamGroup: 'All' });
+                setIsGameModalOpen(true);
+              }}
+              className="bg-primary text-white px-4 py-2 rounded-md font-bold hover:bg-red-700 transition-colors flex items-center gap-2"
+            >
+              + Schedule Game
+            </button>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Opponent</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Location</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Group</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {games.map((game) => (
+                  <tr key={game.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 flex items-center gap-2">
+                      <Calendar size={16} className="text-gray-400" />
+                      {new Date(game.date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center gap-2">
+                        <Clock size={16} className="text-gray-400" />
+                        {game.time}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{game.opponent}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="flex items-center gap-2">
+                        <MapPin size={16} className="text-gray-400" />
+                        {game.location}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 text-xs font-bold uppercase rounded-full bg-blue-100 text-blue-800">
+                        {game.team_group}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex items-center gap-2">
+                      <button
+                        onClick={() => handleEditGameClick(game)}
+                        className="text-gray-600 hover:text-blue-600 p-1 rounded-full hover:bg-gray-100"
+                      >
+                        <Pencil size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteGame(game.id)}
+                        className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {games.map((game) => (
-                    <tr key={game.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 flex items-center gap-2">
-                        <Calendar size={16} className="text-gray-400" />
-                        {new Date(game.date).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div className="flex items-center gap-2">
-                          <Clock size={16} className="text-gray-400" />
-                          {game.time}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        {game.opponent}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div className="flex items-center gap-2">
-                          <MapPin size={16} className="text-gray-400" />
-                          {game.location}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 text-xs font-bold uppercase rounded-full bg-blue-100 text-blue-800">
-                          {game.team_group}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex items-center gap-2">
-                        <button
-                          onClick={() => handleEditGameClick(game)}
-                          className="text-gray-600 hover:text-blue-600 p-1 rounded-full hover:bg-gray-100"
-                          title="Edit Game"
-                        >
-                          <Pencil size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteGame(game.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50"
-                          title="Delete Game"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-
-
-      {/* ADD COACH MODAL */}
-      {isCoachModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="font-bold text-xl text-gray-900">Add New Coach</h3>
-              <button 
-                onClick={() => setIsCoachModalOpen(false)}
-                className="text-gray-500 hover:text-black"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleAddCoach} className="p-6 space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Full Name</label>
-                <input
-                  type="text"
-                  className="w-full border rounded-lg p-2"
-                  value={newCoach.fullName}
-                  onChange={e => setNewCoach({...newCoach, fullName: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Email (Optional)</label>
-                <input
-                  type="email"
-                  className="w-full border rounded-lg p-2"
-                  value={newCoach.email}
-                  onChange={e => setNewCoach({...newCoach, email: e.target.value})}
-                />
-              </div>
-
-              <div className="pt-4 flex gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsCoachModalOpen(false)}
-                  className="px-5 py-2 text-gray-700 font-bold hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={coachLoading}
-                  className="bg-blue-600 text-white px-8 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {coachLoading ? 'Adding...' : 'Add Coach'}
-                </button>
-              </div>
-            </form>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* ADD GAME MODAL */}
+      {/* MODAL: GAME */}
       {isGameModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
             <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="font-bold text-xl text-gray-900">
-                {editingGame ? 'Edit Game' : 'Schedule New Game'}
-              </h3>
-              <button 
-                onClick={() => {
-                  setIsGameModalOpen(false);
-                  setEditingGame(null);
-                  setNewGame({ date: '', time: '', opponent: '', location: '', teamGroup: 'All' });
-                }}
-                className="text-gray-500 hover:text-black"
-              >
-                <X size={24} />
-              </button>
+              <h3 className="font-bold text-xl text-gray-900">{editingGame ? 'Edit Game' : 'Schedule New Game'}</h3>
+              <button onClick={() => setIsGameModalOpen(false)} className="text-gray-500 hover:text-black"><X size={24} /></button>
             </div>
-            
             <form onSubmit={handleAddGame} className="p-6 space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Date</label>
-                <input
-                  type="date"
-                  className="w-full border rounded-lg p-2"
-                  value={newGame.date}
-                  onChange={e => setNewGame({...newGame, date: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Time</label>
-                <input
-                  type="time"
-                  className="w-full border rounded-lg p-2"
-                  value={newGame.time}
-                  onChange={e => setNewGame({...newGame, time: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Opponent</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Vienna United"
-                  className="w-full border rounded-lg p-2"
-                  value={newGame.opponent}
-                  onChange={e => setNewGame({...newGame, opponent: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Location</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Home Field or Address"
-                  className="w-full border rounded-lg p-2"
-                  value={newGame.location}
-                  onChange={e => setNewGame({...newGame, location: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Team Group</label>
-                <select
-                  className="w-full border rounded-lg p-2"
-                  value={newGame.teamGroup}
-                  onChange={e => setNewGame({...newGame, teamGroup: e.target.value})}
-                >
-                  <option value="All">All Teams</option>
-                  <option value="U6">U6</option>
-                  <option value="U8">U8</option>
-                  <option value="U10">U10</option>
-                  <option value="U12">U12</option>
-                  <option value="U14">U14</option>
-                </select>
-              </div>
-
-              <div className="pt-4 flex gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsGameModalOpen(false);
-                    setEditingGame(null);
-                    setNewGame({ date: '', time: '', opponent: '', location: '', teamGroup: 'All' });
-                  }}
-                  className="px-5 py-2 text-gray-700 font-bold hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={gameLoading}
-                  className="bg-primary text-white px-8 py-2 rounded-lg font-bold hover:bg-red-700 disabled:opacity-50"
-                >
-                  {gameLoading ? 'Saving...' : (editingGame ? 'Save Changes' : 'Schedule Game')}
-                </button>
-              </div>
+              <input type="date" required className="w-full border rounded-lg p-2" value={newGame.date} onChange={e => setNewGame({...newGame, date: e.target.value})} />
+              <input type="time" required className="w-full border rounded-lg p-2" value={newGame.time} onChange={e => setNewGame({...newGame, time: e.target.value})} />
+              <input type="text" placeholder="Opponent" required className="w-full border rounded-lg p-2" value={newGame.opponent} onChange={e => setNewGame({...newGame, opponent: e.target.value})} />
+              <input type="text" placeholder="Location" required className="w-full border rounded-lg p-2" value={newGame.location} onChange={e => setNewGame({...newGame, location: e.target.value})} />
+              <select className="w-full border rounded-lg p-2" value={newGame.teamGroup} onChange={e => setNewGame({...newGame, teamGroup: e.target.value})}>
+                <option value="All">All Teams</option>
+                <option value="U6">U6</option>
+                <option value="U8">U8</option>
+                <option value="U10">U10</option>
+                <option value="U12">U12</option>
+                <option value="U14">U14</option>
+              </select>
+              <button type="submit" disabled={gameLoading} className="w-full bg-primary text-white py-2 rounded-lg font-bold hover:bg-red-700">
+                {gameLoading ? 'Saving...' : 'Save Game'}
+              </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL */}
-      {isModalOpen && (
+      {/* MODAL: EDIT PLAYER */}
+      {isEditPlayerModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center p-6 border-b sticky top-0 bg-white z-10">
-              <h3 className="font-bold text-xl text-green-800">Manual Player Registration</h3>
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="text-gray-500 hover:text-black"
-              >
-                <X size={24} />
-              </button>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="font-bold text-xl text-gray-900">Edit Player Details</h3>
+              <button onClick={() => setIsEditPlayerModalOpen(false)} className="text-gray-500 hover:text-black"><X size={24} /></button>
             </div>
-            
-            <form onSubmit={handleManualRegister} className="p-6 grid md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">First Name</label>
-                <input
-                  type="text"
+            <form onSubmit={handleSavePlayerDetails} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Position</label>
+                <select 
                   className="w-full border rounded-lg p-2"
-                  value={newPlayer.firstName}
-                  onChange={e => setNewPlayer({...newPlayer, firstName: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Last Name</label>
-                <input
-                  type="text"
-                  className="w-full border rounded-lg p-2"
-                  value={newPlayer.lastName}
-                  onChange={e => setNewPlayer({...newPlayer, lastName: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Date of Birth</label>
-                <input
-                  type="date"
-                  className="w-full border rounded-lg p-2"
-                  value={newPlayer.dob}
-                  onChange={e => {
-                    const newDob = e.target.value;
-                    const smartGroup = calculateAgeGroup(newDob);
-                    setNewPlayer({...newPlayer, dob: newDob, ageGroup: smartGroup});
-                  }}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Age Group</label>
-                <select
-                  className="w-full border rounded-lg p-2"
-                  value={newPlayer.ageGroup}
-                  onChange={e => setNewPlayer({...newPlayer, ageGroup: e.target.value})}
+                  value={playerForm.position}
+                  onChange={e => setPlayerForm({...playerForm, position: e.target.value})}
                 >
+                  <option value="TBD">TBD</option>
+                  <option value="Forward">Forward</option>
+                  <option value="Midfielder">Midfielder</option>
+                  <option value="Defender">Defender</option>
+                  <option value="Goalkeeper">Goalkeeper</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Team Assignment</label>
+                <select 
+                  className="w-full border rounded-lg p-2"
+                  value={playerForm.team_assigned}
+                  onChange={e => setPlayerForm({...playerForm, team_assigned: e.target.value})}
+                >
+                  <option value="Unassigned">Unassigned</option>
                   <option value="U6">U6</option>
                   <option value="U8">U8</option>
                   <option value="U10">U10</option>
                   <option value="U12">U12</option>
                   <option value="U14">U14</option>
                   <option value="U16">U16</option>
-                  <option value="Open">Open</option>
+                  <option value="First Team">First Team</option>
                 </select>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Gender</label>
-                <select
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Jersey Number</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. 10" 
                   className="w-full border rounded-lg p-2"
-                  value={newPlayer.gender}
-                  onChange={e => setNewPlayer({...newPlayer, gender: e.target.value})}
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Parent Name</label>
-                <input
-                  type="text"
-                  className="w-full border rounded-lg p-2"
-                  value={newPlayer.parentName}
-                  onChange={e => setNewPlayer({...newPlayer, parentName: e.target.value})}
-                  required
+                  value={playerForm.jersey_number}
+                  onChange={e => setPlayerForm({...playerForm, jersey_number: e.target.value})}
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Phone</label>
-                <input
-                  type="tel"
-                  className="w-full border rounded-lg p-2"
-                  value={newPlayer.phone}
-                  onChange={e => setNewPlayer({...newPlayer, phone: e.target.value})}
-                  required
-                />
-              </div>
-              
-              <div className="col-span-full space-y-2">
-                <label className="text-sm font-bold text-gray-700">Player Photo</label>
-                <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 flex items-center gap-4">
-                  <input type="file" accept="image/*" onChange={handleAdminPhotoUpload} />
-                  {newPlayer.photoUrl && (
-                    <img src={newPlayer.photoUrl} alt="Preview" className="h-16 w-16 rounded-full object-cover border-2 border-green-500" />
-                  )}
-                </div>
-              </div>
-
-              <div className="col-span-full pt-4 border-t flex gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2 text-gray-700 font-bold hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={playerLoading}
-                  className="bg-green-600 text-white px-8 py-2 rounded-lg font-bold hover:bg-green-700 disabled:opacity-50"
-                >
-                  {playerLoading ? 'Registering...' : 'Register Player'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* EDIT PLAYER MODAL */}
-      {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center p-6 border-b sticky top-0 bg-white z-10">
-              <h3 className="font-bold text-xl text-blue-800">Edit Player Details</h3>
-              <button 
-                onClick={() => {
-                  setIsEditModalOpen(false);
-                  setEditingPlayer(null);
-                  setNewPlayer({ firstName: '', lastName: '', dob: '', gender: 'Male', parentName: '', phone: '', waiverSigned: true, photoUrl: '' });
-                }}
-                className="text-gray-500 hover:text-black"
-              >
-                <X size={24} />
+              <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold hover:bg-blue-700">
+                Save Changes
               </button>
-            </div>
-            
-            <form onSubmit={handleEditSave} className="p-6 grid md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">First Name</label>
-                <input
-                  type="text"
-                  className="w-full border rounded-lg p-2"
-                  value={newPlayer.firstName}
-                  onChange={e => setNewPlayer({...newPlayer, firstName: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Last Name</label>
-                <input
-                  type="text"
-                  className="w-full border rounded-lg p-2"
-                  value={newPlayer.lastName}
-                  onChange={e => setNewPlayer({...newPlayer, lastName: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Date of Birth</label>
-                <input
-                  type="date"
-                  className="w-full border rounded-lg p-2"
-                  value={newPlayer.dob}
-                  onChange={e => {
-                    const newDob = e.target.value;
-                    const smartGroup = calculateAgeGroup(newDob);
-                    setNewPlayer({...newPlayer, dob: newDob, ageGroup: smartGroup});
-                  }}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Age Group</label>
-                <select
-                  className="w-full border rounded-lg p-2"
-                  value={newPlayer.ageGroup}
-                  onChange={e => setNewPlayer({...newPlayer, ageGroup: e.target.value})}
-                >
-                  <option value="U6">U6</option>
-                  <option value="U8">U8</option>
-                  <option value="U10">U10</option>
-                  <option value="U12">U12</option>
-                  <option value="U14">U14</option>
-                  <option value="U16">U16</option>
-                  <option value="Open">Open</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Gender</label>
-                <select
-                  className="w-full border rounded-lg p-2"
-                  value={newPlayer.gender}
-                  onChange={e => setNewPlayer({...newPlayer, gender: e.target.value})}
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Parent Name</label>
-                <input
-                  type="text"
-                  className="w-full border rounded-lg p-2"
-                  value={newPlayer.parentName}
-                  onChange={e => setNewPlayer({...newPlayer, parentName: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-700">Phone</label>
-                <input
-                  type="tel"
-                  className="w-full border rounded-lg p-2"
-                  value={newPlayer.phone}
-                  onChange={e => setNewPlayer({...newPlayer, phone: e.target.value})}
-                  required
-                />
-              </div>
-              
-              <div className="col-span-full space-y-2">
-                <label className="text-sm font-bold text-gray-700">Player Photo</label>
-                <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 flex items-center gap-4">
-                  <input type="file" accept="image/*" onChange={handleAdminPhotoUpload} />
-                  {newPlayer.photoUrl && (
-                    <img src={newPlayer.photoUrl} alt="Preview" className="h-16 w-16 rounded-full object-cover border-2 border-green-500" />
-                  )}
-                </div>
-              </div>
-
-              <div className="col-span-full pt-4 border-t flex gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditModalOpen(false);
-                    setEditingPlayer(null);
-                    setNewPlayer({ firstName: '', lastName: '', dob: '', gender: 'Male', parentName: '', phone: '', waiverSigned: true, photoUrl: '' });
-                  }}
-                  className="px-5 py-2 text-gray-700 font-bold hover:bg-gray-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={playerLoading}
-                  className="bg-blue-600 text-white px-8 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {playerLoading ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
             </form>
           </div>
         </div>
       )}
-
-
     </div>
   );
 }
