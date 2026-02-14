@@ -47,6 +47,7 @@ interface User {
   full_name: string;
   role: string;
   email?: string;
+  photo_url?: string;
 }
 
 export default function AdminDashboard() {
@@ -174,13 +175,14 @@ export default function AdminDashboard() {
       try {
         const { data: usersData, error: usersError } = await supabase
           .from('profiles')
-          .select('id, full_name, role');
+          .select('id, full_name, role, photo_url');
           
         if (usersData) {
           setUsers(usersData.map((u: any) => ({
             id: u.id,
             full_name: u.full_name || 'Unknown User',
-            role: u.role || 'user'
+            role: u.role || 'user',
+            photo_url: u.photo_url
           })));
         }
       } catch (userErr) {
@@ -800,9 +802,12 @@ export default function AdminDashboard() {
                 {users.filter(u => u.role === 'coach').map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                       <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 overflow-hidden">
-                          {/* Placeholder or actual image logic if available in future */}
-                          <Users size={20} />
+                       <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 overflow-hidden border border-gray-300">
+                          {user.photo_url ? (
+                            <img src={user.photo_url} alt={user.full_name} className="h-full w-full object-cover" />
+                          ) : (
+                            <Users size={20} />
+                          )}
                         </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
