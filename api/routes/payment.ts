@@ -49,25 +49,44 @@ router.post('/create-checkout-session', async (req, res) => {
       registration = newReg
     }
 
-    // 2. Create Stripe Checkout Session
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Bamika FC Membership',
-              description: `Monthly membership for ${registration.first_name} ${registration.last_name}`,
-            },
-            unit_amount: 5000, // $50.00
-            recurring: {
-              interval: 'month',
-            },
+    // DYNAMIC PRICING LOGIC
+    const now = new Date();
+    const mayFirst2026 = new Date('2026-05-01T00:00:00Z');
+    const juneFirst2026 = new Date('2026-06-01T00:00:00Z');
+
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: 'Monthly Club Fee',
+            description: `Monthly membership for ${registration.first_name} ${registration.last_name}`,
           },
-          quantity: 1,
+          unit_amount: 5000, // $50.00
+          recurring: {
+            interval: 'month',
+          },
         },
-      ],
+        quantity: 1,
+      },
+    ];
+
+    if (now >= juneFirst2026) {
+      lineItems.push({
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: 'One-Time Registration Fee',
+          },
+          unit_amount: 9900, // $99.00
+        },
+        quantity: 1,
+      });
+    }
+
+    const checkoutOptions: Stripe.Checkout.SessionCreateParams = {
+      payment_method_types: ['card'],
+      line_items: lineItems,
       mode: 'subscription',
       success_url: successUrl || `${process.env.VITE_CLIENT_URL || 'http://localhost:5173'}/dashboard?success=true`,
       cancel_url: `${process.env.VITE_CLIENT_URL || 'http://localhost:5173'}/register?canceled=true`,
@@ -75,11 +94,16 @@ router.post('/create-checkout-session', async (req, res) => {
       metadata: {
         registration_id: registration.id,
       },
-      subscription_data: {
-        trial_end: Math.floor(new Date('2026-05-01T00:00:00Z').getTime() / 1000),
-      },
       allow_promotion_codes: true,
-    })
+    };
+
+    if (now < mayFirst2026) {
+      checkoutOptions.subscription_data = {
+        trial_end: Math.floor(mayFirst2026.getTime() / 1000),
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(checkoutOptions);
 
     res.json({ url: session.url })
   } catch (error: any) {
