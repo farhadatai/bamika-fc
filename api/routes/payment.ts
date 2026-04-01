@@ -78,6 +78,7 @@ router.post('/create-checkout-session', async (req, res) => {
       subscription_data: {
         trial_end: Math.floor(new Date('2026-05-01T00:00:00Z').getTime() / 1000),
       },
+      allow_promotion_codes: true,
     })
 
     res.json({ url: session.url })
