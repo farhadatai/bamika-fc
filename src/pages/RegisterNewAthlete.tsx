@@ -105,6 +105,24 @@ export default function RegisterNewAthlete() {
     setError(null);
 
     try {
+      // 1. Check for duplicates before proceeding
+      const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`;
+      const { data: existingPlayer, error: existingPlayerError } = await supabase
+        .from('players')
+        .select('id')
+        .eq('parent_id', user.id)
+        .ilike('full_name', fullName);
+
+      if (existingPlayerError) {
+        throw new Error(existingPlayerError.message);
+      }
+
+      if (existingPlayer && existingPlayer.length > 0) {
+        setError('You have already registered a player with this name. Please check your dashboard.');
+        setLoading(false);
+        return;
+      }
+
       // We convert to ISO string to ensure it's a standard format for the DB
       // Fix: Strictly append T12:00:00 to prevent timezone shifts
       const safeDob = formData.dob ? new Date(`${formData.dob}T12:00:00`).toISOString() : null;
@@ -130,7 +148,7 @@ export default function RegisterNewAthlete() {
         .from('players')
         .insert({
           parent_id: user.id,
-          full_name: `${formData.firstName} ${formData.lastName}`,
+          full_name: fullName,
           date_of_birth: safeDob,
           gender: formData.gender,
           position: formData.position,
