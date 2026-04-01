@@ -32,6 +32,11 @@ export const Navbar = () => {
         </Link>
 
         <div className="flex items-center gap-6">
+          {/* Always Visible: Training Lab */}
+          <Link to="/training-lab" className="hover:text-[#EF4444] transition-colors">
+            Training Lab
+          </Link>
+
           {user ? (
             <>
               {userRole === 'admin' && (
@@ -45,16 +50,17 @@ export const Navbar = () => {
                 </Link>
               )}
               
-              <Link to="/dashboard" className="hover:text-primary transition-colors">
+              <Link to="/dashboard" className="hover:text-[#EF4444] transition-colors">
                 Dashboard
               </Link>
+              
               <div className="flex items-center gap-4">
                 <span className="text-sm text-muted-foreground hidden md:inline-block">
                   {user.email}
                 </span>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-2 text-sm hover:text-destructive transition-colors"
+                  className="flex items-center gap-2 text-sm hover:text-red-500 transition-colors"
                 >
                   <LogOut className="h-4 w-4" />
                   Logout
@@ -63,12 +69,12 @@ export const Navbar = () => {
             </>
           ) : (
             <div className="flex items-center gap-4">
-              <Link to="/login" className="hover:text-primary transition-colors">
+              <Link to="/login" className="hover:text-[#EF4444] transition-colors">
                 Login
               </Link>
               <Link
                 to="/register"
-                className="bg-primary text-white px-4 py-2 rounded-md font-bold hover:bg-red-700 transition-colors"
+                className="bg-[#EF4444] text-white px-4 py-2 rounded-md font-bold hover:bg-red-700 transition-colors"
               >
                 Join Now
               </Link>
@@ -78,4 +84,3 @@ export const Navbar = () => {
       </div>
     </nav>
   )
-}

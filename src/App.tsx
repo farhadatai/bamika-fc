@@ -15,6 +15,7 @@ import AdminDashboard from './pages/AdminDashboard'
 import CoachDashboard from './pages/CoachDashboard'
 import Payment from './pages/Payment'
 import RegistrationSuccess from './pages/registration/Success'
+import TrainingLab from './pages/TrainingLab'
 
 function App() {
   const { setUser, setUserRole, setLoading } = useAuthStore()
@@ -66,6 +67,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/registration/success" element={<RegistrationSuccess />} />
+        <Route path="/training-lab" element={<TrainingLab />} />
         
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>

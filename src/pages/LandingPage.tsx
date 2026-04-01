@@ -174,6 +174,7 @@ export default function LandingPage() {
           {/* Desktop Links */}
           <div className="hidden md:flex items-center gap-8 font-medium text-white">
             <Link to="/" className="hover:text-[#EF4444] transition-colors">Home</Link>
+            <Link to="/training-lab" className="hover:text-[#EF4444] transition-colors">Training Lab</Link>
             <a href="#programs" className="hover:text-[#EF4444] transition-colors">Programs</a>
             <a href="#contact" className="hover:text-[#EF4444] transition-colors">Contact</a>
           </div>
