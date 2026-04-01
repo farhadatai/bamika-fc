@@ -463,6 +463,11 @@ export default function RegisterNewAthlete() {
               <CreditCard className="text-primary" /> Review & Pay
             </h2>
             
+            <div className="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 rounded-md mb-6">
+              <p className="font-bold">Register today to secure your spot!</p>
+              <p className="text-sm">Your card will not be charged until our season officially begins on May 1st.</p>
+            </div>
+            
             <div className="bg-gray-50 p-6 rounded-lg space-y-4 border border-gray-200">
               <div className="flex justify-between border-b border-gray-200 pb-2">
                 <span className="text-gray-600">Player Name</span>
@@ -486,9 +491,9 @@ export default function RegisterNewAthlete() {
               </div>
               <div className="flex justify-between pt-4">
                 <span className="text-xl font-bold">Total Due Now</span>
-                <span className="text-xl font-bold text-primary">$50.00</span>
+                <span className="text-xl font-bold text-primary">$0.00</span>
               </div>
-              <p className="text-xs text-gray-500 mt-2 text-right">Recurring monthly membership</p>
+              <p className="text-xs text-gray-500 mt-2 text-right">First payment of $50.00 on May 1st</p>
             </div>
 
             <p className="text-sm text-gray-500 text-center italic">

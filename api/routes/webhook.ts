@@ -80,6 +80,49 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
         }
       }
       break
+    case 'customer.subscription.created':
+      const subscription = event.data.object as Stripe.Subscription;
+      if (subscription.status === 'trialing') {
+        const registrationId = subscription.metadata.registration_id;
+        if (registrationId) {
+          const { data: registration, error: regError } = await supabase
+            .from('registrations')
+            .update({ 
+              status: 'active', 
+              stripe_subscription_id: subscription.id, 
+              payment_status: 'paid' 
+            })
+            .eq('id', registrationId)
+            .select()
+            .single();
+
+          if (regError) {
+            console.error('Error updating registration from subscription:', regError);
+          } else {
+            console.log(`Registration ${registrationId} activated via trialing subscription.`);
+            if (registration) {
+              const { error: playerError } = await supabase
+                .from('players')
+                .insert({
+                  parent_id: registration.parent_id,
+                  full_name: `${registration.first_name} ${registration.last_name}`,
+                  date_of_birth: registration.dob,
+                  gender: registration.gender,
+                  position: registration.position || 'TBD',
+                  jersey_size: registration.jersey_size,
+                  medical_conditions: registration.medical_conditions,
+                  team_assigned: 'Unassigned',
+                  jersey_number: '-',
+                  photo_url: registration.photo_url
+                });
+              if (playerError) {
+                console.error('Error creating player record from subscription:', playerError);
+              }
+            }
+          }
+        }
+      }
+      break;
     default:
       console.log(`Unhandled event type ${event.type}`)
   }
