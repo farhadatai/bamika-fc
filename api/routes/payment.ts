@@ -88,4 +88,19 @@ router.post('/create-checkout-session', async (req, res) => {
   }
 })
 
+router.post('/create-billing-portal-session', async (req, res) => {
+  const { customerId } = req.body;
+
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${process.env.VITE_CLIENT_URL || 'http://localhost:5173'}/dashboard`,
+    });
+    res.json({ url: session.url });
+  } catch (error: any) {
+    console.error('Stripe Billing Portal Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router

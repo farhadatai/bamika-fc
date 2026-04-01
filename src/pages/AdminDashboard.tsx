@@ -15,6 +15,8 @@ interface RosterPlayer {
   date_of_birth?: string;
   gender?: string;
   coach_id?: string;
+  payment_status?: string; // Add payment_status
+  registration_id?: string; // Add registration_id
   profiles?: {
     full_name: string;
     email: string;
@@ -135,7 +137,27 @@ export default function AdminDashboard() {
         .select('*, profiles:parent_id!left(full_name, email, phone)');
       
       if (playersData) {
-        setRosterPlayers(playersData);
+        // For each player, find their most recent registration to get the payment status
+        const playersWithStatus = await Promise.all(
+          playersData.map(async (player) => {
+            const { data: registrationData } = await supabase
+              .from('registrations')
+              .select('payment_status, id')
+              .eq('parent_id', player.parent_id)
+              .eq('first_name', player.full_name.split(' ')[0])
+              .eq('last_name', player.full_name.split(' ').slice(1).join(' '))
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single();
+
+            return {
+              ...player,
+              payment_status: registrationData?.payment_status || 'pending',
+              registration_id: registrationData?.id
+            };
+          })
+        );
+        setRosterPlayers(playersWithStatus);
       }
 
       // 3. Fetch Coaches (from coaches table)
@@ -283,6 +305,7 @@ export default function AdminDashboard() {
       position: player.position || '',
       team_assigned: player.team_assigned || '',
       jersey_number: player.jersey_number || '',
+      payment_status: player.payment_status || 'pending', // Add this
       photo_file: null
     });
     setIsEditPlayerModalOpen(true);
@@ -318,18 +341,15 @@ export default function AdminDashboard() {
         photoUrl = publicUrlData.publicUrl;
       }
 
-      // Update Database
-      const { error } = await supabase
-        .from('players')
-        .update({
-          position: playerForm.position,
-          team_assigned: playerForm.team_assigned,
-          jersey_number: playerForm.jersey_number,
-          photo_url: photoUrl
+      const { error: regError } = await supabase
+        .from('registrations')
+        .update({ 
+          payment_status: playerForm.payment_status,
+          status: playerForm.payment_status === 'paid' || playerForm.payment_status === 'active' ? 'active' : 'pending_payment'
         })
-        .eq('id', editingPlayer.id);
+        .eq('id', editingPlayer.registration_id);
 
-      if (error) throw error;
+      if (regError) throw regError;
 
       setToast({ message: 'Player details and photo saved.', type: 'success' });
       setIsEditPlayerModalOpen(false);
@@ -1032,7 +1052,21 @@ export default function AdminDashboard() {
               <h3 className="font-bold text-xl text-gray-900">Edit Player Details</h3>
               <button onClick={() => setIsEditPlayerModalOpen(false)} className="text-gray-500 hover:text-black"><X size={24} /></button>
             </div>
-            <form onSubmit={handleSavePlayerDetails} className="p-6 space-y-4">
+                <form onSubmit={handleSavePlayerDetails} className="p-6 space-y-4">
+      {/* PAYMENT STATUS DROPDOWN */}
+      <div>
+        <label className="block text-sm font-bold text-gray-700 mb-1">Payment Status</label>
+        <select 
+          className="w-full border rounded-lg p-2 bg-gray-50"
+          value={playerForm.payment_status}
+          onChange={e => setPlayerForm({...playerForm, payment_status: e.target.value})}
+        >
+          <option value="pending">Pending Payment</option>
+          <option value="paid">Paid</option>
+          <option value="active">Active</option>
+          <option value="waived">Waived</option>
+        </select>
+      </div>
               {/* PHOTO UPLOAD SECTION */}
               <div className="flex flex-col items-center mb-4">
                 <div className="h-24 w-24 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-3xl overflow-hidden border border-gray-200 mb-2 relative group">

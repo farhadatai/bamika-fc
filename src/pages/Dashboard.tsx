@@ -21,6 +21,7 @@ interface Player {
   jersey_number: string;
   parent_id: string;
   photo_url?: string;
+  status?: string; // Add status to Player interface
 }
 
 export default function Dashboard() {
@@ -45,94 +46,114 @@ export default function Dashboard() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    // Immediate Store Check
-    if (userRole === 'admin') {
-      navigate('/admin');
-      return;
-    }
-    if (userRole === 'coach') {
-      navigate('/coach');
-      return;
-    }
-  }, [userRole, navigate]);
+  async function fetchDashboardData() {
+    if (!user) return;
 
-  useEffect(() => {
-    let mounted = true;
+    try {
+      const { data: playersData, error: playersError } = await supabase
+        .from('players')
+        .select('*')
+        .eq('parent_id', user.id);
 
-    async function checkRoleAndFetchData() {
-      if (!user) return;
+      if (playersError) throw playersError;
 
-      try {
-        // If store already has role, skip fetch (handled by effect above)
-        // But if store is null (first load), we double check DB
-        
-        let currentRole = userRole;
-
-        if (!currentRole) {
-           const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
+      // For each player, find their most recent registration to get the status
+      const playersWithStatus = await Promise.all(
+        playersData.map(async (player) => {
+          const { data: registrationData, error: registrationError } = await supabase
+            .from('registrations')
+            .select('status, id')
+            .eq('first_name', player.full_name.split(' ')[0])
+            .eq('last_name', player.full_name.split(' ').slice(1).join(' '))
+            .eq('parent_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
             .single();
-            
-           currentRole = profile?.role;
-        }
+          
+          return {
+            ...player,
+            status: registrationData?.status || 'unknown',
+            registration_id: registrationData?.id
+          };
+        })
+      );
 
-        if (!mounted) return;
+      setPlayers(playersWithStatus);
 
-        // Fallback: Check email if role is missing
-        const isAdminEmail = user.email?.toLowerCase().includes('admin');
-        
-        if (currentRole === 'admin' || isAdminEmail) {
-          navigate('/admin');
-          return;
-        } 
-        
-        if (currentRole === 'coach') {
-          navigate('/coach');
-          return;
-        }
-
-        // If we are here, we are a parent
-        if (mounted) setRoleChecking(false);
-        
-        // Fetch Registrations
-        const { data: regData } = await supabase
-          .from('registrations')
-          .select('*')
-          .eq('parent_id', user.id);
-
-        if (regData && mounted) {
-          setRegistrations(regData);
-        }
-
-        // Fetch Players (My Athletes)
-        const { data: playersData } = await supabase
-          .from('players')
-          .select('*')
-          .eq('parent_id', user.id);
-
-        if (playersData && mounted) {
-          setPlayers(playersData);
-        }
-
-      } catch (error) {
-        console.error('Error loading dashboard:', error);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-          setRoleChecking(false);
-        }
-      }
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+      setRoleChecking(false);
     }
+  }
 
-    checkRoleAndFetchData();
+  useEffect(() => {
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
 
-    return () => {
-      mounted = false;
-    };
-  }, [user, navigate]);
+  const handleManageBilling = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      // Find a registration with a stripe_customer_id for this user
+      const { data: registration, error: regError } = await supabase
+        .from('registrations')
+        .select('stripe_customer_id')
+        .eq('parent_id', user.id)
+        .not('stripe_customer_id', 'is', null)
+        .limit(1)
+        .single();
+
+      if (regError || !registration) {
+        throw new Error('Could not find your billing information.');
+      }
+
+      const response = await fetch('/api/create-billing-portal-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ customerId: registration.stripe_customer_id }),
+      });
+
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('Could not create billing portal session.');
+      }
+    } catch (error: any) {
+      console.error('Billing portal failed:', error);
+      alert(error.message || 'An unexpected error occurred.');
+      setLoading(false);
+    }
+  };
+
+  const handleCompletePayment = async (registrationId: string) => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ registrationId }),
+      });
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('Could not create checkout session.');
+      }
+    } catch (error) {
+      console.error('Payment initiation failed:', error);
+      alert('Could not initiate payment. Please try again.');
+      setLoading(false);
+    }
+  };
 
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -217,12 +238,20 @@ export default function Dashboard() {
 
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">Parent Dashboard</h1>
-        <Link 
-          to="/register/new"
-          className="bg-primary text-white px-4 py-2 rounded-md font-bold hover:bg-red-700 transition-colors flex items-center gap-2"
-        >
-          <UserPlus size={20} /> Register New Player
-        </Link>
+        <div className="flex gap-4">
+          <button 
+            onClick={() => { alert('Manage Billing clicked!') }}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md font-bold hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            Manage Billing
+          </button>
+          <Link 
+            to="/register/new"
+            className="bg-primary text-white px-4 py-2 rounded-md font-bold hover:bg-red-700 transition-colors flex items-center gap-2"
+          >
+            <UserPlus size={20} /> Register New Player
+          </Link>
+        </div>
       </div>
 
       {/* MY ATHLETES SECTION */}
@@ -246,10 +275,10 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {players.map((player) => (
+            {players.map((player: any) => (
               <div key={player.id} className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow bg-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-bl-lg uppercase">
-                  {player.team_assigned}
+                <div className={`absolute top-0 right-0 text-xs font-bold px-2 py-1 rounded-bl-lg uppercase ${player.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                  {player.status ? player.status.replace('_', ' ') : 'Unknown'}
                 </div>
                 <div className="flex items-start gap-4">
                   <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 text-xl overflow-hidden border border-gray-200">
@@ -258,10 +287,6 @@ export default function Dashboard() {
                         src={player.photo_url} 
                         alt={player.full_name} 
                         className="h-full w-full object-cover"
-                        onError={(e) => {
-                          console.error('Error loading image:', player.photo_url);
-                          e.currentTarget.style.display = 'none';
-                        }}
                       />
                     ) : (
                       player.full_name.charAt(0)
@@ -270,13 +295,20 @@ export default function Dashboard() {
                   <div>
                     <h3 className="font-bold text-lg text-gray-900">{player.full_name}</h3>
                     <div className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                      <Calendar size={14} /> {player.date_of_birth ? new Date(player.date_of_birth).toLocaleDateString() : 'N/A'}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-2">
-                      Jersey: <span className="font-mono text-gray-600">{player.jersey_number}</span>
+                      <Calendar size={14} /> {player.date_of_birth ? new Date(`${player.date_of_birth}T12:00:00Z`).toLocaleDateString() : 'N/A'}
                     </div>
                   </div>
                 </div>
+                {player.status === 'pending_payment' && (
+                  <div className="mt-4">
+                    <button 
+                      onClick={() => handleCompletePayment(player.registration_id)}
+                      className="w-full bg-red-600 text-white py-2 rounded-md font-bold hover:bg-red-700 transition-all"
+                    >
+                      Complete Payment
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

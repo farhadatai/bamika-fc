@@ -32,54 +32,30 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
   // Handle the event
   switch (event.type) {
     case 'checkout.session.completed':
-      const session = event.data.object as Stripe.Checkout.Session
-      const registrationId = session.client_reference_id
-      const subscriptionId = session.subscription as string
+      const session = event.data.object as Stripe.Checkout.Session;
+      const registrationId = session.client_reference_id;
+      const subscriptionId = session.subscription as string;
+      const customerId = session.customer as string;
 
       if (registrationId) {
-        // 1. Update Registration Status
-        const { data: registration, error: regError } = await supabase
+        // 1. Update Registration Status and store customer ID
+        const { error: regError } = await supabase
           .from('registrations')
           .update({
             status: 'active',
+            payment_status: 'paid',
             stripe_subscription_id: subscriptionId,
-            payment_status: 'paid'
+            stripe_customer_id: customerId, // Store customer ID
           })
-          .eq('id', registrationId)
-          .select()
-          .single();
+          .eq('id', registrationId);
 
         if (regError) {
-            console.error('Error updating registration:', regError);
+          console.error('Error updating registration:', regError);
         } else {
-            console.log(`Registration ${registrationId} activated.`);
-
-            // 2. Create Player Record (Copy from Registration)
-            if (registration) {
-                const { error: playerError } = await supabase
-                  .from('players')
-                  .insert({
-                    parent_id: registration.parent_id,
-                    full_name: `${registration.first_name} ${registration.last_name}`,
-                    date_of_birth: registration.dob,
-                    gender: registration.gender,
-                    position: registration.position || 'TBD',
-                    jersey_size: registration.jersey_size,
-                    medical_conditions: registration.medical_conditions,
-                    team_assigned: 'Unassigned',
-                    jersey_number: '-',
-                    photo_url: registration.photo_url
-                  });
-                
-                if (playerError) {
-                    console.error('Error creating player record:', playerError);
-                } else {
-                    console.log('Player record created successfully from registration.');
-                }
-            }
+          console.log(`Registration ${registrationId} activated.`);
         }
       }
-      break
+      break;
     case 'customer.subscription.created':
       const subscription = event.data.object as Stripe.Subscription;
       if (subscription.status === 'trialing') {

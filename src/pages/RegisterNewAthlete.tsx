@@ -139,8 +139,8 @@ export default function RegisterNewAthlete() {
         birth_cert_path: formData.birthCertPath,
         photo_url: formData.photoUrl,
         waiver_signed_at: formData.waiverSignedAt,
-        status: 'Active', // Force active status
-        payment_status: 'paid' // Force paid status
+        status: 'pending_payment', // Set initial status to pending
+        payment_status: 'pending' // Set initial status to pending
       };
 
       // Insert directly into players table first to bypass webhook latency
