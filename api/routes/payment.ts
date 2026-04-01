@@ -54,6 +54,9 @@ router.post('/create-checkout-session', async (req, res) => {
     const mayFirst2026 = new Date('2026-05-01T00:00:00Z');
     const juneFirst2026 = new Date('2026-06-01T00:00:00Z');
 
+    const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VITE_BASE_URL || 'https://bamika-fc.vercel.app';
+    const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
       {
         price_data: {
@@ -88,8 +91,8 @@ router.post('/create-checkout-session', async (req, res) => {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'subscription',
-      success_url: successUrl || `${process.env.VITE_CLIENT_URL || 'http://localhost:5173'}/dashboard?success=true`,
-      cancel_url: `${process.env.VITE_CLIENT_URL || 'http://localhost:5173'}/register?canceled=true`,
+      success_url: `${baseUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/registration/payment`,
       client_reference_id: registration.id,
       metadata: {
         registration_id: registration.id,
