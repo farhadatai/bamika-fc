@@ -107,8 +107,8 @@ const CoachCard = ({ coach }: { coach: Coach }) => {
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [games, setGames] = useState<Game[]>([]); // Changed from events
+  const [loadingGames, setLoadingGames] = useState(true); // Changed from loadingEvents
 
   // Handle scroll effect for navbar
   useEffect(() => {
@@ -121,26 +121,27 @@ export default function LandingPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Fetch upcoming events
+  // Fetch upcoming games
   useEffect(() => {
-    fetchUpcomingEvents();
+    fetchUpcomingGames();
   }, []);
 
-  const fetchUpcomingEvents = async () => {
+  const fetchUpcomingGames = async () => {
     try {
+      const today = new Date().toISOString().split('T')[0]; // Get YYYY-MM-DD format
       const { data, error } = await supabase
-        .from('events')
+        .from('games')
         .select('*')
-        // Removed strict date filter to debug/ensure visibility as requested
+        .gte('date', today) // Fetch games from today onwards
         .order('date', { ascending: true })
-        .limit(3);
+        .order('time', { ascending: true });
 
       if (error) throw error;
-      setEvents(data || []);
+      setGames(data || []);
     } catch (error) {
-      console.error('Error fetching events:', error);
+      console.error('Error fetching games:', error);
     } finally {
-      setLoadingEvents(false);
+      setLoadingGames(false);
     }
   };
 
@@ -350,32 +351,32 @@ export default function LandingPage() {
             <div className="w-24 h-2 bg-[#EF4444] mx-auto skew-x-[-12deg]"></div>
           </div>
 
-          {loadingEvents ? (
+          {loadingGames ? (
             <div className="text-center text-gray-400">Loading upcoming matches...</div>
-          ) : events.length === 0 ? (
+          ) : games.length === 0 ? (
             <div className="text-center text-gray-500 italic">No upcoming matches scheduled at the moment.</div>
           ) : (
             <div className="grid md:grid-cols-3 gap-6">
-              {events.map((event) => (
-                <div key={event.id} className="bg-black border border-gray-800 p-6 rounded-xl hover:border-[#EF4444] transition-colors group">
+              {games.map((game) => (
+                <div key={game.id} className="bg-black border border-gray-800 p-6 rounded-xl hover:border-[#EF4444] transition-colors group">
                   <div className="flex flex-col h-full">
                     <div className="mb-4">
                       <span className="text-[#EF4444] font-bold text-sm uppercase tracking-wider block mb-1">
-                        {new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {new Date(game.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
                       <span className="text-gray-400 text-sm flex items-center gap-2">
                         <Clock size={14} />
-                        {event.time ? new Date(`2000-01-01T${event.time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'TBA'}
+                        {game.time ? new Date(`1970-01-01T${game.time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'TBA'}
                       </span>
                     </div>
                     
                     <h3 className="text-xl font-bold text-white mb-4 group-hover:text-[#EF4444] transition-colors">
-                      {event.title}
+                      vs. {game.opponent}
                     </h3>
                     
                     <div className="mt-auto pt-4 border-t border-gray-800 flex items-center text-gray-400 text-sm">
                       <MapPin size={16} className="mr-2 text-[#EF4444]" />
-                      {event.location}
+                      {game.location}
                     </div>
                   </div>
                 </div>

@@ -115,13 +115,16 @@ router.post('/create-checkout-session', async (req, res) => {
   }
 })
 
-router.post('/create-billing-portal-session', async (req, res) => {
+router.post('/create-portal-session', async (req, res) => {
   const { customerId } = req.body;
+
+  const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VITE_BASE_URL || 'https://bamika-fc.vercel.app';
+  const baseUrl = rawBaseUrl.endsWith('/') ? rawCBaseUrl.slice(0, -1) : rawBaseUrl;
 
   try {
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${process.env.VITE_CLIENT_URL || 'http://localhost:5173'}/dashboard`,
+      return_url: `${baseUrl}/dashboard`,
     });
     res.json({ url: session.url });
   } catch (error: any) {

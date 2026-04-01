@@ -108,10 +108,12 @@ export default function Dashboard() {
         .single();
 
       if (regError || !registration) {
-        throw new Error('Could not find your billing information.');
+        alert('Billing management will be available after your first successful payment.');
+        setLoading(false);
+        return;
       }
 
-      const response = await fetch('/api/create-billing-portal-session', {
+      const response = await fetch('/api/create-portal-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -240,7 +242,7 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold text-gray-900">Parent Dashboard</h1>
         <div className="flex gap-4">
           <button 
-            onClick={() => { alert('Manage Billing clicked!') }}
+            onClick={handleManageBilling}
             className="bg-blue-600 text-white px-4 py-2 rounded-md font-bold hover:bg-blue-700 transition-colors flex items-center gap-2"
           >
             Manage Billing
