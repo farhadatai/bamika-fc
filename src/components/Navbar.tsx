@@ -33,7 +33,7 @@ export const Navbar = () => {
 
         <div className="flex items-center gap-6">
           {/* Always Visible: Training Lab */}
-          <Link to="/training-lab" className="hover:text-[#EF4444] transition-colors">
+          <Link to="/training-lab" className="hover:text-[#EF4444] transition-colors font-medium">
             Training Lab
           </Link>
 
@@ -50,12 +50,13 @@ export const Navbar = () => {
                 </Link>
               )}
               
+              {/* Dynamic Dashboard Link */}
               <Link 
-  to={userRole === 'admin' ? "/admin" : "/dashboard"} 
-  className="..."
->
-  Dashboard
-</Link>
+                to={userRole === 'admin' ? "/admin" : "/dashboard"} 
+                className="hover:text-[#EF4444] transition-colors font-medium"
+              >
+                Dashboard
+              </Link>
               
               <div className="flex items-center gap-4">
                 <span className="text-sm text-muted-foreground hidden md:inline-block">
@@ -72,7 +73,7 @@ export const Navbar = () => {
             </>
           ) : (
             <div className="flex items-center gap-4">
-              <Link to="/login" className="hover:text-[#EF4444] transition-colors">
+              <Link to="/login" className="hover:text-[#EF4444] transition-colors font-medium">
                 Login
               </Link>
               <Link
@@ -83,7 +84,3 @@ export const Navbar = () => {
               </Link>
             </div>
           )}
-        </div>
-      </div>
-    </nav>
-  )
