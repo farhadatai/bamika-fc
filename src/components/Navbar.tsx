@@ -50,9 +50,12 @@ export const Navbar = () => {
                 </Link>
               )}
               
-              <Link to="/dashboard" className="hover:text-[#EF4444] transition-colors">
-                Dashboard
-              </Link>
+              <Link 
+  to={userRole === 'admin' ? "/admin" : "/dashboard"} 
+  className="..."
+>
+  Dashboard
+</Link>
               
               <div className="flex items-center gap-4">
                 <span className="text-sm text-muted-foreground hidden md:inline-block">
