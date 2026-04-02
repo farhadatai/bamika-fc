@@ -101,3 +101,75 @@ export default function TrainingLab() {
     </div>
   );
 }
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+
+interface Drill {
+  id: string;
+  title: string;
+  description: string;
+  video_url: string;
+  category: string;
+}
+
+const TrainingLab = () => {
+  const [drills, setDrills] = useState<Drill[]>([]);
+
+  useEffect(() => {
+    const fetchDrills = async () => {
+      const { data } = await supabase
+        .from('weekly_drills')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (data) setDrills(data);
+    };
+    fetchDrills();
+  }, []);
+
+  // Function to turn a YouTube link into an embed link
+  const getEmbedUrl = (url: string) => {
+    const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+    return `https://www.youtube.com/embed/${videoId}`;
+  };
+
+  return (
+    <div className="bg-black min-h-screen text-white py-12 px-4">
+      <div className="container mx-auto">
+        <h1 className="text-4xl font-bold mb-2 uppercase tracking-tighter">
+          Training <span className="text-[#EF4444]">Lab</span>
+        </h1>
+        <p className="text-gray-400 mb-12">Weekly drills and skills to master at home.</p>
+
+        <div className="grid md:grid-cols-3 gap-8">
+          {drills.map((drill) => (
+            <div key={drill.id} className="bg-[#111] rounded-xl overflow-hidden border border-white/10 hover:border-[#EF4444] transition-all">
+              <div className="aspect-video">
+                <iframe
+                  className="w-full h-full"
+                  src={getEmbedUrl(drill.video_url)}
+                  title={drill.title}
+                  allowFullScreen
+                ></iframe>
+              </div>
+              <div className="p-6">
+                <span className="text-xs font-bold uppercase text-[#EF4444] bg-red-500/10 px-2 py-1 rounded">
+                  {drill.category}
+                </span>
+                <h3 className="text-xl font-bold mt-3 mb-2">{drill.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">{drill.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {drills.length === 0 && (
+          <div className="text-center py-20 bg-[#111] rounded-xl border border-dashed border-white/20">
+            <p className="text-gray-500">New drills coming this week! Stay tuned.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default TrainingLab;

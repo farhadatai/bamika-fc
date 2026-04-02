@@ -60,8 +60,7 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
-      
+
       <Route element={<Layout />}>
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
