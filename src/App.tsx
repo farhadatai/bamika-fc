@@ -63,6 +63,7 @@ function App() {
 
       <Route element={<Layout />}>
         {/* Public Routes */}
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/registration/success" element={<RegistrationSuccess />} />

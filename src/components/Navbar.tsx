@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/auth'
 import { supabase } from '../lib/supabase'
-import { Shield, LogOut } from 'lucide-react'
+import { LogOut } from 'lucide-react' // Removed Shield as it was unused here
 
 export const Navbar = () => {
   const { user, userRole, setLoading, setIsLoggingOut } = useAuthStore()
@@ -32,7 +32,6 @@ export const Navbar = () => {
         </Link>
 
         <div className="flex items-center gap-6">
-          {/* Always Visible: Training Lab */}
           <Link to="/training-lab" className="hover:text-[#EF4444] transition-colors font-medium">
             Training Lab
           </Link>
@@ -50,7 +49,6 @@ export const Navbar = () => {
                 </Link>
               )}
               
-              {/* Dynamic Dashboard Link */}
               <Link 
                 to={userRole === 'admin' ? "/admin" : "/dashboard"} 
                 className="hover:text-[#EF4444] transition-colors font-medium"
@@ -59,8 +57,9 @@ export const Navbar = () => {
               </Link>
               
               <div className="flex items-center gap-4">
+                {/* Optional chaining on user.email to prevent crash if user is null */}
                 <span className="text-sm text-muted-foreground hidden md:inline-block">
-                  {user.email}
+                  {user?.email}
                 </span>
                 <button
                   onClick={handleLogout}
@@ -84,3 +83,8 @@ export const Navbar = () => {
               </Link>
             </div>
           )}
+        </div>
+      </div>
+    </nav>
+  )
+}
