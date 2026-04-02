@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/auth'
 import { supabase } from '../lib/supabase'
-import { LogOut } from 'lucide-react' // Removed Shield as it was unused here
+import { LogOut } from 'lucide-react'
 
 export const Navbar = () => {
   const { user, userRole, setLoading, setIsLoggingOut } = useAuthStore()
@@ -10,6 +10,7 @@ export const Navbar = () => {
   const handleLogout = async () => {
     setIsLoggingOut(true)
     setLoading(true)
+
     try {
       await supabase.auth.signOut()
     } catch (error) {
@@ -22,8 +23,8 @@ export const Navbar = () => {
   }
 
   return (
-    <nav className="bg-black text-white border-b border-white/10">
-      <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+    <nav className="w-full bg-black text-white border-b border-white/10">
+      <div className="w-full px-6 py-4 flex justify-between items-center">
         <Link to="/" className="flex items-center gap-2 group">
           <img src="/logo.png" alt="Bamika FC" className="h-10 w-auto" />
           <span className="text-xl font-bold tracking-tighter uppercase text-white">
@@ -32,35 +33,45 @@ export const Navbar = () => {
         </Link>
 
         <div className="flex items-center gap-6">
-          <Link to="/training-lab" className="hover:text-[#EF4444] transition-colors font-medium">
+          <Link
+            to="/training-lab"
+            className="hover:text-[#EF4444] transition-colors font-medium"
+          >
             Training Lab
           </Link>
 
           {user ? (
             <>
               {userRole === 'admin' && (
-                <Link to="/admin" className="font-bold text-red-500 hover:text-red-400 transition-colors">
+                <Link
+                  to="/admin"
+                  className="font-bold text-red-500 hover:text-red-400 transition-colors"
+                >
                   Admin
                 </Link>
               )}
+
               {userRole === 'coach' && (
-                <Link to="/coach" className="font-bold text-blue-500 hover:text-blue-400 transition-colors">
+                <Link
+                  to="/coach"
+                  className="font-bold text-blue-500 hover:text-blue-400 transition-colors"
+                >
                   Coach
                 </Link>
               )}
-              
-              <Link 
-                to={userRole === 'admin' ? "/admin" : "/dashboard"} 
+
+              <Link
+                to={userRole === 'admin' ? '/admin' : '/dashboard'}
                 className="hover:text-[#EF4444] transition-colors font-medium"
               >
                 Dashboard
               </Link>
-              
+
               <div className="flex items-center gap-4">
-                {/* Optional chaining on user.email to prevent crash if user is null */}
-                <span className="text-sm text-muted-foreground hidden md:inline-block">
+                <span className="text-sm text-gray-400 hidden md:inline-block">
                   {user?.email}
                 </span>
+
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-2 text-sm hover:text-red-500 transition-colors"
@@ -72,9 +83,13 @@ export const Navbar = () => {
             </>
           ) : (
             <div className="flex items-center gap-4">
-              <Link to="/login" className="hover:text-[#EF4444] transition-colors font-medium">
+              <Link
+                to="/login"
+                className="hover:text-[#EF4444] transition-colors font-medium"
+              >
                 Login
               </Link>
+
               <Link
                 to="/register"
                 className="bg-[#EF4444] text-white px-4 py-2 rounded-md font-bold hover:bg-red-700 transition-colors"

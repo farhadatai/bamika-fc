@@ -27,31 +27,33 @@ function App() {
         .select('role')
         .eq('id', userId)
         .single()
-      
+
       if (data) {
         setUserRole(data.role)
       }
     }
 
-    // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
+
       if (session?.user) {
         fetchRole(session.user.id)
       }
+
       setLoading(false)
     })
 
-    // Listen for changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
+
       if (session?.user) {
         fetchRole(session.user.id)
       } else {
         setUserRole(null)
       }
+
       setLoading(false)
     })
 
@@ -60,18 +62,17 @@ function App() {
 
   return (
     <Routes>
-
       <Route element={<Layout />}>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/home" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/registration/success" element={<RegistrationSuccess />} />
         <Route path="/training-lab" element={<TrainingLab />} />
-        
+
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/home" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/register/new" element={<RegisterNewAthlete />} />
           <Route path="/admin" element={<AdminDashboard />} />
