@@ -235,7 +235,7 @@ import React, { useEffect, useState } from 'react';
  
        {/* 2. TAB NAVIGATION */} 
        <div className="flex gap-2 p-1 bg-neutral-900 rounded-2xl border border-gray-800 w-fit"> 
-         {['parents', 'coaches', 'roster', 'games'].map((tab) => ( 
+         {['parents', 'coaches', 'roster', 'schedule', 'drills'].map((tab) => ( 
            <button 
              key={tab} 
              onClick={() => setActiveTab(tab)} 
@@ -255,68 +255,79 @@ import React, { useEffect, useState } from 'react';
              {data.parents.map((u: any) => ( 
                <div key={u.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center group"> 
                  <Link to={`/admin/parent/${u.id}`} className="text-white font-bold hover:text-[#EF4444] transition-colors">{u.full_name}</Link> 
-                 <Shield size={18} className="text-gray-600 group-hover:text-blue-500 cursor-pointer" /> 
+                 <div className="w-4 h-4 border-2 border-gray-700 rounded-full group-hover:border-white transition-colors"></div> 
                </div> 
              ))} 
            </div> 
          )} 
  
-         {activeTab === 'coaches' && ( 
-           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"> 
-             {data.coaches.map((coach: any) => ( 
-               <div key={coach.id} className="bg-neutral-900 border border-gray-800 rounded-2xl p-6 group flex flex-col"> 
-                 <div className="flex items-center gap-4 mb-6"> 
-                   <img src={coach.profiles?.photo_url || "https://via.placeholder.com/150"} className="h-16 w-16 object-cover rounded-full border-2 border-gray-800" /> 
-                   <div> 
-                     <h3 className="text-lg font-black uppercase italic text-white">{coach.name}</h3> 
-                     <p className="text-[#EF4444] text-[10px] font-black uppercase">{coach.role}</p> 
-                   </div> 
-                 </div> 
-                 <select 
-                   className="w-full bg-black border border-gray-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-[#EF4444]" 
-                   value={coach.team_id || ''} 
-                   onChange={(e) => handleAssignTeam(coach.id, e.target.value)} 
-                 > 
-                   <option value="">Unassigned</option> 
-                   <option value="u10">U10 Junior Academy</option> 
-                   <option value="u12">U12 Competitive</option> 
-                   <option value="elite">Elite Performance</option> 
-                 </select> 
-               </div> 
-             ))} 
-           </div> 
-         )} 
- 
-         {activeTab === 'games' && ( 
-           <div className="space-y-4"> 
-             <button onClick={() => setIsGameModalOpen(true)} className="bg-[#EF4444] text-white px-6 py-3 rounded-lg font-black text-xs uppercase shadow-lg hover:bg-red-700"> 
-               + Schedule Match 
-             </button> 
-             {data.games.map((g: any) => ( 
-               <div key={g.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center"> 
-                 <div> 
-                   <div className="font-black uppercase italic text-white">{g.opponent}</div> 
-                   <div className="text-[10px] text-gray-500 font-bold uppercase">{g.date} • {g.location}</div> 
-                 </div> 
-                 <button onClick={() => handleDeleteGame(g.id)} className="text-gray-600 hover:text-red-500"> 
-                   <Trash2 size={18} /> 
-                 </button> 
-               </div> 
-             ))} 
-           </div> 
-         )} 
- 
-         {activeTab === 'roster' && ( 
-           <div className="grid gap-2"> 
-             {data.roster.map((p: any) => ( 
-               <div key={p.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center"> 
-                 <span className="text-white font-bold">{p.full_name}</span> 
-                 <span className="text-[#EF4444] text-[10px] font-black uppercase">{p.team_assigned || 'UNASSIGNED'}</span> 
-               </div> 
-             ))} 
-           </div> 
-         )} 
-       </div> 
+         {activeTab === 'coaches' && (
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {data.coaches.map((coach: any) => (
+              <div key={coach.id} className="bg-neutral-900 border border-gray-800 rounded-2xl p-6 group flex flex-col">
+                <div className="flex items-center gap-4 mb-6">
+                  <img src={coach.profiles?.photo_url || "https://via.placeholder.com/150"} className="h-16 w-16 object-cover rounded-full border-2 border-gray-800" />
+                  <div>
+                    <h3 className="text-lg font-black uppercase italic text-white">{coach.name}</h3>
+                    <p className="text-[#EF4444] text-[10px] font-black uppercase">{coach.role}</p>
+                  </div>
+                </div>
+                <select
+                  className="w-full bg-black border border-gray-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-[#EF4444]"
+                  value={coach.team_id || ''}
+                  onChange={(e) => handleAssignTeam(coach.id, e.target.value)}
+                >
+                  <option value="">Unassigned</option>
+                  <option value="u10">U10 Junior Academy</option>
+                  <option value="u12">U12 Competitive</option>
+                  <option value="elite">Elite Performance</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'roster' && (
+          <div className="grid gap-2">
+            {data.roster.map((p: any) => (
+              <div key={p.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
+                <span className="text-white font-bold">{p.full_name}</span>
+                <span className="text-[#EF4444] text-[10px] font-black uppercase">{p.team_assigned || 'UNASSIGNED'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'schedule' && (
+          <div className="space-y-4">
+            <button onClick={() => setIsGameModalOpen(true)} className="bg-[#EF4444] text-white px-6 py-3 rounded-lg font-black text-xs uppercase shadow-lg hover:bg-red-700">
+              + Schedule Match
+            </button>
+            {data.games.map((g: any) => (
+              <div key={g.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
+                <div>
+                  <div className="font-black uppercase italic text-white">{g.opponent}</div>
+                  <div className="text-[10px] text-gray-500 font-bold uppercase">{g.date} • {g.location}</div>
+                </div>
+                <button onClick={() => handleDeleteGame(g.id)} className="text-gray-600 hover:text-red-500">
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'drills' && (
+          <div className="grid gap-2">
+            {data.drills.map((d: any) => (
+              <div key={d.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
+                <span className="text-white font-bold">{d.title}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div> 
  
        {/* 4. MODALS */} 
        {isOnboardModalOpen && ( 
