@@ -120,9 +120,22 @@ export default function AdminDashboard() {
             {data.roster.map((p: any) => (
               <div
                 key={p.id}
-                className="p-4 border-b flex justify-between font-bold text-gray-700"
+                className="p-4 border-b flex justify-between items-center font-bold text-gray-700"
               >
-                <span>{p.full_name}</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 overflow-hidden border border-gray-200">
+                    {p.photo_url ? (
+                      <img
+                        src={p.photo_url}
+                        alt={p.full_name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      p.full_name.charAt(0)
+                    )}
+                  </div>
+                  <span>{p.full_name}</span>
+                </div>
                 <span className="text-[#EF4444] text-[10px] font-black uppercase">
                   {p.team_assigned || 'UNASSIGNED'}
                 </span>
