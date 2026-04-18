@@ -8,7 +8,8 @@ export default function Register() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    fullName: '',
+    firstName: '',
+    lastName: '',
     phone: ''
   });
   const [loading, setLoading] = useState(false);
@@ -23,13 +24,15 @@ export default function Register() {
     setLoading(true);
     setError(null);
 
+    const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`;
+
     // 1. Sign up with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: formData.email,
       password: formData.password,
       options: {
         data: {
-          full_name: formData.fullName,
+          full_name: fullName,
           phone: formData.phone,
         },
       },
@@ -49,7 +52,7 @@ export default function Register() {
           .from('profiles')
           .insert({
             id: authData.user.id,
-            full_name: formData.fullName,
+            full_name: fullName,
             phone: formData.phone,
           });
 
@@ -85,16 +88,29 @@ export default function Register() {
           </div>
         )}
         <form onSubmit={handleRegister} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Full Name</label>
-            <input
-              type="text"
-              name="fullName"
-              value={formData.fullName}
-              onChange={handleChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#EF4444] focus:ring-[#EF4444] p-3 border"
-              required
-            />
+          <div className="flex gap-4">
+            <div className="w-1/2">
+              <label className="block text-sm font-medium text-gray-700">First Name</label>
+              <input
+                type="text"
+                name="firstName"
+                value={formData.firstName}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#EF4444] focus:ring-[#EF4444] p-3 border"
+                required
+              />
+            </div>
+            <div className="w-1/2">
+              <label className="block text-sm font-medium text-gray-700">Last Name</label>
+              <input
+                type="text"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#EF4444] focus:ring-[#EF4444] p-3 border"
+                required
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Phone Number</label>

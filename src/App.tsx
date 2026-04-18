@@ -16,6 +16,7 @@ import CoachDashboard from './pages/CoachDashboard'
 import Payment from './pages/Payment'
 import RegistrationSuccess from './pages/registration/Success'
 import TrainingLab from './pages/TrainingLab'
+import ParentDetailView from './pages/ParentDetailView'
 
 function App() {
   const { setUser, setUserRole, setLoading } = useAuthStore()
@@ -76,6 +77,7 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/register/new" element={<RegisterNewAthlete />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/parent/:id" element={<ParentDetailView />} />
           <Route path="/coach" element={<CoachDashboard />} />
           <Route path="/payment" element={<Payment />} />
         </Route>

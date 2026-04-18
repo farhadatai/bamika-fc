@@ -21,6 +21,26 @@ export default function AdminDashboard() {
     location: 'Home',
   });
 
+  const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
+  const [newCoach, setNewCoach] = useState({
+    full_name: '',
+    email: '',
+    role: 'Coach',
+    specialization: 'Technical',
+    bio: '',
+    photo_url: ''
+  });
+
+  const [isDrillModalOpen, setIsDrillModalOpen] = useState(false);
+  const [newDrill, setNewDrill] = useState({
+    title: '',
+    category: 'Dribbling',
+    video_url: '',
+    difficulty: 'Beginner',
+    duration: 15,
+    description: ''
+  });
+
   const fetchData = async () => {
     setLoading(true);
 
@@ -57,6 +77,26 @@ export default function AdminDashboard() {
     }
   };
 
+  const getYoutubeThumbnail = (url: string) => {
+    const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+      const videoId = match[2];
+      return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    }
+    return "https://via.placeholder.com/1280x720?text=No+Thumbnail";
+  };
+
+  const handleAddDrill = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const thumbnail_url = getYoutubeThumbnail(newDrill.video_url);
+    const { error } = await supabase.from('drills').insert([{ ...newDrill, thumbnail_url }]);
+    if (!error) {
+      setIsDrillModalOpen(false);
+      fetchData();
+    }
+  };
+
   const handleDeleteGame = async (id: string) => {
     const confirmed = window.confirm('Delete match?');
     if (!confirmed) return;
@@ -65,11 +105,130 @@ export default function AdminDashboard() {
     fetchData();
   };
 
+  const handleAssignTeam = async (coachId: string, teamId: string) => {
+    const { error } = await supabase
+      .from('coaches')
+      .update({ team_id: teamId })
+      .eq('id', coachId);
+
+    if (!error) {
+      // logAdminAction('ASSIGN_COACH_TO_TEAM', { coachId, teamId });
+      fetchData();
+    } else {
+      alert("Error updating assignment: " + error.message);
+    }
+  };
+
+  const handleOnboardSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const { data: profile, error: pError } = await supabase
+      .from('profiles')
+      .insert([{
+        full_name: newCoach.full_name,
+        email: newCoach.email,
+        role: 'coach',
+        photo_url: newCoach.photo_url
+      }])
+      .select()
+      .single();
+
+    if (pError) return alert(pError.message);
+
+    const { error: cError } = await supabase
+      .from('coaches')
+      .insert([{
+        id: profile.id,
+        name: newCoach.full_name,
+        role: newCoach.role,
+        bio: newCoach.bio,
+        is_published: true
+      }]);
+
+    if (!cError) {
+      // logAdminAction('ONBOARD_NEW_COACH', { name: newCoach.full_name });
+      setIsOnboardModalOpen(false);
+      fetchData();
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-20 text-center font-black uppercase italic">
         Syncing Bamika...
-      </div>
+          </div>
+      )}
+
+      {isOnboardModalOpen && (
+   <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md">
+     <div className="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+       <div className="p-8 border-b border-gray-800 flex justify-between items-center sticky top-0 bg-neutral-900 z-10">
+         <h2 className="text-2xl font-black uppercase italic text-white">Onboard New <span className="text-[#EF4444]">Coach</span></h2>
+         <X className="text-gray-500 cursor-pointer hover:text-white" onClick={() => setIsOnboardModalOpen(false)} />
+       </div>
+ 
+       <form onSubmit={handleOnboardSubmit} className="p-8 space-y-6">
+         <div className="grid md:grid-cols-2 gap-6">
+           <div>
+             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Full Name</label>
+             <input 
+               required 
+               className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none"
+               onChange={e => setNewCoach({...newCoach, full_name: e.target.value})} 
+             />
+           </div>
+           <div>
+             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Email Address</label>
+             <input 
+               required 
+               type="email" 
+               className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none"
+               onChange={e => setNewCoach({...newCoach, email: e.target.value})} 
+             />
+           </div>
+         </div>
+ 
+         <div className="grid md:grid-cols-2 gap-6">
+           <div>
+             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Primary Role</label>
+             <select 
+               className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none appearance-none"
+               onChange={e => setNewCoach({...newCoach, role: e.target.value})} 
+             >
+               <option>Head Coach</option>
+               <option>Assistant Coach</option>
+               <option>Goalkeeper Coach</option>
+               <option>Technical Director</option>
+             </select>
+           </div>
+           <div>
+             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Photo URL</label>
+             <input 
+               placeholder="https://..." 
+               className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none"
+               onChange={e => setNewCoach({...newCoach, photo_url: e.target.value})} 
+             />
+           </div>
+         </div>
+ 
+         <div>
+           <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Professional Bio</label>
+           <textarea 
+             rows={4} 
+             className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none resize-none"
+             placeholder="Describe the coach's experience and philosophy..." 
+             onChange={e => setNewCoach({...newCoach, bio: e.target.value})} 
+           />
+         </div>
+ 
+         <button type="submit" className="w-full bg-[#EF4444] text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-500/20">
+           Complete Onboarding
+         </button>
+       </form>
+     </div>
+   </div>
+ )}
+    </div>
     );
   }
 
@@ -105,7 +264,7 @@ export default function AdminDashboard() {
                 key={u.id}
                 className="p-4 border-b flex justify-between font-bold text-gray-700"
               >
-                <span>{u.full_name}</span>
+                <Link to={`/admin/parent/${u.id}`}>{u.full_name}</Link>
                 <Shield
                   size={18}
                   className="text-gray-200 hover:text-blue-500 cursor-pointer"
@@ -145,27 +304,76 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === 'coaches' && (
-          <div>
-            {data.coaches.map((c: any) => (
-              <div
-                key={c.id}
-                className="p-4 border-b flex items-center gap-4 font-bold text-gray-700"
-              >
-                <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-100 border flex items-center justify-center">
-                  {c.profiles?.photo_url ? (
-                    <img
-                      src={c.profiles.photo_url}
-                      alt={c.full_name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <Users className="text-gray-300" size={18} />
-                  )}
-                </div>
-                <span>{c.full_name}</span>
-              </div>
-            ))}
-          </div>
+           <div className="space-y-6">
+     {/* Header with Stats */}
+     <div className="flex justify-between items-center bg-neutral-900 p-6 rounded-2xl border border-gray-800">
+       <div>
+         <h2 className="text-xl font-black uppercase italic text-white">Staff <span className="text-[#EF4444]">Directory</span></h2>
+         <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-1">Total Coaches: {data.coaches.length}</p>
+       </div>
+       <button onClick={() => setIsOnboardModalOpen(true)} className="bg-[#EF4444] text-white px-6 py-2 rounded-xl font-black uppercase italic text-xs hover:bg-red-700 transition-all flex items-center gap-2">
+         <Plus size={16} /> Onboard Coach
+       </button>
+     </div>
+ 
+     {/* Coach Assignment Grid */}
+     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+       {data.coaches.map((coach: any) => (
+         <div key={coach.id} className="bg-neutral-900 border border-gray-800 rounded-2xl p-6 group hover:border-[#EF4444] transition-all flex flex-col">
+           <div className="flex items-center gap-4 mb-6">
+             <div className="relative h-16 w-16">
+               <img 
+                 src={coach.profiles?.photo_url || "https://via.placeholder.com/150"}
+                 className="h-full w-full object-cover rounded-full border-2 border-gray-800 group-hover:border-[#EF4444] transition-colors"
+               />
+               {coach.is_published && (
+                 <div className="absolute -top-1 -right-1 bg-green-500 h-4 w-4 rounded-full border-2 border-neutral-900" title="Published to Site"></div>
+               )}
+             </div>
+             <div>
+               <h3 className="text-lg font-black uppercase italic text-white leading-tight">{coach.name || coach.profiles?.full_name}</h3>
+               <p className="text-[#EF4444] text-[10px] font-black uppercase tracking-widest">{coach.role || 'Coach'}</p>
+             </div>
+           </div>
+ 
+           <div className="space-y-4 flex-1">
+             {/* Team Selector */}
+             <div>
+               <label className="text-[9px] font-black uppercase text-gray-500 mb-1 block">Assigned Team</label>
+               <select 
+                 className="w-full bg-black border border-gray-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-[#EF4444]"
+                 value={coach.team_id || ''}
+                 onChange={(e) => handleAssignTeam(coach.id, e.target.value)}
+               >
+                 <option value="">Unassigned</option>
+                 <option value="u10">U10 Junior Academy</option>
+                 <option value="u12">U12 Competitive</option>
+                 <option value="u14">U14 Competitive</option>
+                 <option value="elite">Elite Performance</option>
+               </select>
+             </div>
+ 
+             {/* Specialization Tags */}
+             <div className="flex flex-wrap gap-2">
+               <span className="bg-blue-500/10 text-blue-400 text-[9px] font-black px-2 py-1 rounded uppercase border border-blue-500/20">Technical</span>
+               <span className="bg-purple-500/10 text-purple-400 text-[9px] font-black px-2 py-1 rounded uppercase border border-purple-500/20">Tactical</span>
+             </div>
+           </div>
+ 
+           {/* Action Footer */}
+           <div className="mt-6 pt-6 border-t border-gray-800 flex justify-between items-center">
+             <button className="text-gray-500 hover:text-white transition-colors">
+               <Mail size={18} />
+             </button>
+             <div className="flex gap-2">
+               <button className="px-4 py-2 bg-neutral-800 text-white text-[10px] font-black uppercase rounded-lg hover:bg-neutral-700 transition-all">Edit Bio</button>
+               <button className="px-4 py-2 bg-neutral-800 text-white text-[10px] font-black uppercase rounded-lg hover:bg-neutral-700 transition-all">Schedule</button>
+             </div>
+           </div>
+         </div>
+       ))}
+     </div>
+   </div>
         )}
 
         {activeTab === 'schedule' && (
@@ -200,7 +408,13 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === 'drills' && (
-          <div>
+          <div className="space-y-4">
+            <button
+              onClick={() => setIsDrillModalOpen(true)}
+              className="bg-[#EF4444] text-white px-6 py-3 rounded-lg font-black text-[10px] uppercase tracking-widest shadow-lg shadow-red-500/20 hover:bg-red-700 transition-all"
+            >
+              + Add Lab Content
+            </button>
             {data.drills.map((d: any) => (
               <div key={d.id} className="p-4 border-b font-bold text-gray-700">
                 {d.title}
@@ -261,6 +475,82 @@ export default function AdminDashboard() {
                 className="w-full bg-[#EF4444] text-white py-4 rounded-xl font-black uppercase tracking-widest hover:bg-red-700 transition-all"
               >
                 Schedule Match
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isDrillModalOpen && ( 
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md">
+          <div className="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden">
+            <div className="p-8 border-b border-gray-800 flex justify-between items-center bg-neutral-950">
+              <h2 className="text-2xl font-black uppercase italic text-white">Add Lab <span className="text-[#EF4444]">Content</span></h2>
+              <X className="text-gray-500 cursor-pointer hover:text-white" onClick={() => setIsDrillModalOpen(false)} />
+            </div>
+      
+            <form onSubmit={handleAddDrill} className="p-8 space-y-6">
+              {/* Video Link Field */}
+              <div>
+                <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">YouTube Video URL</label>
+                <input 
+                  required 
+                  placeholder="https://www.youtube.com/watch?v=..." 
+                  className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none transition-all"
+                  onChange={(e) => setNewDrill({ ...newDrill, video_url: e.target.value })} 
+                />
+              </div>
+      
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Drill Title</label>
+                  <input 
+                    required 
+                    className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none"
+                    onChange={(e) => setNewDrill({ ...newDrill, title: e.target.value })} 
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Category</label>
+                  <select 
+                    className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none appearance-none"
+                    onChange={(e) => setNewDrill({ ...newDrill, category: e.target.value })} 
+                  >
+                    <option>Dribbling</option>
+                    <option>Passing</option>
+                    <option>Shooting</option>
+                    <option>Tactical</option>
+                    <option>Physical</option>
+                  </select>
+                </div>
+              </div>
+      
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Difficulty</label>
+                  <select 
+                    className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none"
+                    onChange={(e) => setNewDrill({ ...newDrill, difficulty: e.target.value })} 
+                  >
+                    <option>Beginner</option>
+                    <option>Intermediate</option>
+                    <option>Advanced</option>
+                    <option>Pro</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Duration (Minutes)</label>
+                  <input 
+                    type="number" 
+                    placeholder="e.g. 15" 
+                    className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none"
+                    onChange={(e) => setNewDrill({ ...newDrill, duration: parseInt(e.target.value) })} 
+                  />
+                </div>
+              </div>
+      
+              <button type="submit" className="w-full bg-[#EF4444] text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-3">
+                <Upload size={20} /> Publish to Lab
               </button>
             </form>
           </div>
