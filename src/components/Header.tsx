@@ -23,7 +23,7 @@ export const Header = () => {
   };
 
   return (
-    <header className="bg-white shadow p-4 flex justify-end">
+    <header className="bg-black border-b border-gray-800 h-16 flex items-center px-4 justify-between">
       <button onClick={handleLogout} className="bg-primary px-4 py-2 rounded-md font-bold hover:bg-red-700 transition-colors text-white">
         Logout
       </button>
