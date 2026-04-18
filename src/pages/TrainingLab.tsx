@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Play, X } from 'lucide-react';
 
+export default function TrainingLab() {
   const [drills, setDrills] = useState<any[]>([]);
   const [filter, setFilter] = useState('All');
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const getYoutubeId = (url: string) => {
     const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -14,34 +16,17 @@ import { Play, X } from 'lucide-react';
 
   useEffect(() => {
     const fetchDrills = async () => {
-      let query = supabase.from('drills').select('*');
-
-      if (filter !== 'All') {
-        query = query.eq('category', filter);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching drills:', error);
-      } else {
-        setDrills(data || []);
-      }
-    };
-
-    fetchDrills();
-  }, [filter]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchDrills = async () => {
       setLoading(true);
       let query = supabase.from('drills').select('*');
       if (filter !== 'All') {
         query = query.eq('category', filter);
       }
-      const { data, error } = await query;
-      if (data) setDrills(data);
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) {
+        console.error('Error fetching drills:', error);
+      } else {
+        setDrills(data || []);
+      }
       setLoading(false);
     };
     fetchDrills();
