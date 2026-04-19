@@ -24,6 +24,8 @@ export default function ParentDetailView() {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditParentOpen, setIsEditParentOpen] = useState(false);
+  const [isAddChildOpen, setIsAddChildOpen] = useState(false);
+  const [newChild, setNewChild] = useState({ full_name: '', date_of_birth: '' });
   const [editingChild, setEditingChild] = useState<any>(null); 
 
   const fetchData = async () => {
@@ -83,6 +85,28 @@ export default function ParentDetailView() {
     }
   };
 
+  const handleAddNewChild = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !parent) return;
+
+    const { error } = await supabase
+      .from('players')
+      .insert([
+        {
+          full_name: newChild.full_name,
+          date_of_birth: newChild.date_of_birth,
+          parent_id: parent.id
+        }
+      ]);
+
+    if (!error) {
+      logAdminAction(user.id, parent.id, 'ADD_CHILD_RECORD', { newChild });
+      setIsAddChildOpen(false);
+      setNewChild({ full_name: '', date_of_birth: '' });
+      fetchData();
+    }
+  };
+
   if (loading) return <div>Loading...</div>;
   if (!parent) return <div>Parent not found.</div>;
 
@@ -99,7 +123,42 @@ export default function ParentDetailView() {
         <div className="bg-neutral-900 border border-gray-800 p-4 rounded-lg text-center">
           <div className="text-sm font-bold text-gray-500">Registration</div>
           <div className={`text-lg font-bold ${registrationStatus === 'Complete' ? 'text-green-500' : 'text-red-500'}`}>{registrationStatus}</div>
+          {/* Add Child Modal */}
+      {isAddChildOpen && (
+        <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
+          <form onSubmit={handleAddNewChild} className="bg-neutral-900 border border-gray-800 w-full max-w-lg rounded-3xl p-10 shadow-2xl">
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-2xl font-black uppercase italic text-white">Add New <span className="text-[#EF4444]">Athlete</span></h3>
+              <X className="text-gray-500 cursor-pointer" onClick={() => setIsAddChildOpen(false)} />
+            </div>
+            <div className="space-y-6">
+              <div className="relative">
+                <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Full Name</label>
+                <input
+                  className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] transition-all pl-12"
+                  value={newChild.full_name}
+                  onChange={e => setNewChild({...newChild, full_name: e.target.value})}
+                />
+                <Users className="absolute left-4 top-[42px] text-gray-600" size={18} />
+              </div>
+              <div className="relative">
+                <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Date of Birth</label>
+                <input
+                  type="date"
+                  className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] transition-all pl-12"
+                  value={newChild.date_of_birth}
+                  onChange={e => setNewChild({...newChild, date_of_birth: e.target.value})}
+                />
+                <Users className="absolute left-4 top-[42px] text-gray-600" size={18} />
+              </div>
+            </div>
+            <button type="submit" className="w-full mt-10 bg-[#EF4444] text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-3">
+              <Save size={20} /> Add Athlete
+            </button>
+          </form>
         </div>
+      )}
+    </div>
         <div className="bg-neutral-900 border border-gray-800 p-4 rounded-lg text-center">
           <div className="text-sm font-bold text-gray-500">Financials</div>
           <div className={`text-lg font-bold ${financialStatus === 'Good Standing' ? 'text-green-500' : 'text-red-500'}`}>{financialStatus}</div>
@@ -119,6 +178,33 @@ export default function ParentDetailView() {
         <div className="grid grid-cols-2 gap-4">
           <div><span className="font-bold">Email:</span> {parent.email}</div>
           <div><span className="font-bold">Phone:</span> {parent.phone}</div>
+          <div><span className="font-bold">Address:</span> {parent.address}</div>
+        </div>
+      </div>
+
+      {/* Payment Information */}
+      <div className="bg-neutral-900 border border-gray-800 p-6 rounded-lg mb-6">
+        <h2 className="text-xl font-bold mb-4">Payment Information</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div><span className="font-bold">Subscription Status:</span> {financialStatus}</div>
+        </div>
+        <div className="mt-6">
+          <h3 className="font-bold text-lg mb-2">Recent Transactions</h3>
+          {payments.length > 0 ? (
+            <ul>
+              {payments.map((payment) => (
+                <li key={payment.id} className="flex justify-between items-center mb-2">
+                  <span>{new Date(payment.created_at).toLocaleDateString()}</span>
+                  <span>${payment.amount}</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${payment.payment_status === 'paid' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                    {payment.payment_status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div>No recent transactions.</div>
+          )}
         </div>
       </div>
 
@@ -126,7 +212,7 @@ export default function ParentDetailView() {
        <section className="mt-12 bg-neutral-900 rounded-3xl border border-gray-800 overflow-hidden">
          <div className="p-8 border-b border-gray-800 flex justify-between items-center">
            <h2 className="text-2xl font-black uppercase italic text-white">Athlete <span className="text-[#EF4444]">Roster</span></h2>
-           <button className="flex items-center gap-2 text-[#EF4444] font-black uppercase italic text-xs border border-[#EF4444]/30 px-4 py-2 rounded-xl hover:bg-[#EF4444] hover:text-white transition-all">
+           <button onClick={() => setIsAddChildOpen(true)} className="flex items-center gap-2 text-[#EF4444] font-black uppercase italic text-xs border border-[#EF4444]/30 px-4 py-2 rounded-xl hover:bg-[#EF4444] hover:text-white transition-all">
              <Plus size={16} /> Add New Athlete
            </button>
          </div>
