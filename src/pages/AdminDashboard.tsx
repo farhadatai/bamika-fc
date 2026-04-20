@@ -212,6 +212,12 @@ import AdminHUD from '../components/AdminHUD';
      fetchData(); 
    }; 
  
+   const handleDeleteParent = async (id: string) => { 
+     if (!window.confirm('Are you sure you want to delete this parent and all associated data?')) return; 
+     await supabase.from('profiles').delete().eq('id', id); 
+     fetchData(); 
+   }; 
+
    const handleAssignTeam = async (coachId: string, teamId: string) => { 
      const { error } = await supabase.from('coaches').update({ team_id: teamId }).eq('id', coachId); 
      if (!error) fetchData(); 
@@ -253,7 +259,13 @@ import AdminHUD from '../components/AdminHUD';
              {data.parents.map((u: any) => ( 
                <div key={u.id} class="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center group"> 
                  <Link to={`/admin/parent/${u.id}`} class="text-white font-bold hover:text-[#EF4444] transition-colors">{u.first_name} {u.last_name}</Link> 
-                 <div class="w-4 h-4 border-2 border-gray-700 rounded-full group-hover:border-white transition-colors"></div> 
+                 <div class="flex items-center gap-4">
+                   <span class="text-gray-500 text-xs">{u.phone}</span>
+                   <Link to={`/admin/parent/${u.id}`} class="text-white font-bold hover:text-[#EF4444] transition-colors">Edit</Link>
+                   <button onClick={() => handleDeleteParent(u.id)} class="text-gray-600 hover:text-red-500">
+                     <Trash2 size={18} />
+                   </button>
+                 </div> 
                </div> 
              ))} 
            </div> 
