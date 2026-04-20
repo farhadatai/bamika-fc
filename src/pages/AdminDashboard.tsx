@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
  import { supabase } from '../lib/supabase'; 
  import { Shield, X, Trash2, Plus, Mail, Upload } from 'lucide-react'; 
  import { Link, useNavigate } from 'react-router-dom'; 
-import Announcements from './Announcements'; 
+import AdminHUD from '../components/AdminHUD'; 
  
  // --- SUB-COMPONENTS (Modals) --- 
  
@@ -229,24 +229,7 @@ import Announcements from './Announcements';
    return ( 
      <div class="space-y-8 p-6 bg-black min-h-screen"> 
        {/* 1. HEADER SECTION */} 
-       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"> 
-         <div> 
-           <h1 class="text-4xl font-black uppercase italic text-white tracking-tighter"> 
-             ADMIN <span class="text-[#EF4444]">DASHBOARD</span> 
-           </h1> 
-           <p class="text-gray-500 font-bold text-[10px] uppercase tracking-widest mt-1"> 
-             Club Command Center • {data.parents.length} Members 
-           </p> 
-         </div> 
-         <div class="flex gap-3"> 
-           <button onClick={() => setIsOnboardModalOpen(true)} class="bg-[#EF4444] text-white px-6 py-3 rounded-xl font-black uppercase italic text-xs hover:bg-red-700 transition-all"> 
-             + Onboard Coach 
-           </button> 
-           <button onClick={() => setIsDrillModalOpen(true)} class="bg-neutral-800 text-white px-6 py-3 rounded-xl font-black uppercase italic text-xs hover:bg-neutral-700 transition-all"> 
-             + New Drill 
-           </button> 
-         </div> 
-       </div> 
+       <AdminHUD />
  
        {/* 2. TAB NAVIGATION */} 
        <div class="flex gap-2 p-1 bg-neutral-900 rounded-2xl border border-gray-800 w-fit"> 
