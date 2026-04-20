@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config({ path: './.env' });
+dotenv.config();
 
 /**
  * local server entry file, for local development
