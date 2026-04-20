@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 export default function Register() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -17,12 +17,45 @@ export default function Register() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+
+    if (e.target.name === 'password') {
+      const password = e.target.value;
+      if (password.length < 8) {
+        setPasswordError('Password must be at least 8 characters long.');
+      } else if (!/[A-Z]/.test(password)) {
+        setPasswordError('Password must contain at least one uppercase letter.');
+      } else if (!/[a-z]/.test(password)) {
+        setPasswordError('Password must contain at least one lowercase letter.');
+      } else if (!/[0-9]/.test(password)) {
+        setPasswordError('Password must contain at least one number.');
+      } else if (!/[^A-Za-z0-9]/.test(password)) {
+        setPasswordError('Password must contain at least one special character.');
+      } else {
+        setPasswordError(null);
+      }
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match.');
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+    if (!/[A-Z]/.test(formData.password)) {
+      setError('Password must contain at least one uppercase letter.');
+      return;
+    }
+    if (!/[a-z]/.test(formData.password)) {
+      setError('Password must contain at least one lowercase letter.');
+      return;
+    }
+    if (!/[0-9]/.test(formData.password)) {
+      setError('Password must contain at least one number.');
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(formData.password)) {
+      setError('Password must contain at least one special character.');
       return;
     }
 
@@ -78,11 +111,12 @@ export default function Register() {
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">
-          {error && (
+          {passwordError && (
             <div className="bg-red-900 border border-red-700 text-red-300 px-4 py-3 rounded-md">
-              {error}
+              {passwordError}
             </div>
           )}
+
           <div className="grid grid-cols-2 gap-4">
             <input
               type="text"

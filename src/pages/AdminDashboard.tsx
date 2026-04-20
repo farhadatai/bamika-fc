@@ -119,7 +119,7 @@ import AdminHUD from '../components/AdminHUD';
     }
   }, [userRole, navigate]);
 
-   const [activeTab, setActiveTab] = useState('parents'); 
+   const [sortOrder, setSortOrder] = useState({ column: 'last_name', ascending: true });
    const [data, setData] = useState({ 
      parents: [], 
      coaches: [], 
@@ -139,9 +139,16 @@ import AdminHUD from '../components/AdminHUD';
    const [newCoach, setNewCoach] = useState({ first_name: '', last_name: '', email: '', role: 'Coach', bio: '', photo_url: '' }); 
    const [newDrill, setNewDrill] = useState({ title: '', video_url: '', category: 'Dribbling', difficulty: 'Beginner', duration: 15 }); 
  
-   const fetchData = async () => { 
+  const handleSort = (column: string) => {
+    setSortOrder(prev => ({
+      column,
+      ascending: prev.column === column ? !prev.ascending : true,
+    }));
+  };
+
+  const fetchData = async () => { 
      setLoading(true); 
-     const { data: p } = await supabase.from('profiles').select('*').eq('role', 'user'); 
+     const { data: p } = await supabase.from('profiles').select('*').eq('role', 'user').order(sortOrder.column, { ascending: sortOrder.ascending }); 
      const { data: c } = await supabase.from('coaches').select('*, profiles(photo_url)'); 
      const { data: pl } = await supabase.from('players').select('*'); 
      const { data: g } = await supabase.from('games').select('*').order('date', { ascending: true }); 
@@ -255,20 +262,35 @@ import AdminHUD from '../components/AdminHUD';
        {/* 3. MAIN CONTENT AREA */} 
        <div class="min-h-[400px]"> 
          {activeTab === 'parents' && ( 
-           <div class="grid gap-4"> 
-             {data.parents.map((u: any) => ( 
-               <div key={u.id} class="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center group"> 
-                 <Link to={`/admin/parent/${u.id}`} class="text-white font-bold hover:text-[#EF4444] transition-colors">{u.first_name} {u.last_name}</Link> 
-                 <div class="flex items-center gap-4">
-                   <span class="text-gray-500 text-xs">{u.phone}</span>
-                   <Link to={`/admin/parent/${u.id}`} class="text-white font-bold hover:text-[#EF4444] transition-colors">Edit</Link>
-                   <button onClick={() => handleDeleteParent(u.id)} class="text-gray-600 hover:text-red-500">
-                     <Trash2 size={18} />
-                   </button>
-                 </div> 
-               </div> 
-             ))} 
-           </div> 
+           <table className="w-full text-left">
+             <thead>
+               <tr className="border-b border-gray-800">
+                 <th onClick={() => handleSort('last_name')} className="p-4 text-left text-xs font-bold uppercase text-gray-500 tracking-wider cursor-pointer">Last Name</th>
+                 <th onClick={() => handleSort('first_name')} className="p-4 text-left text-xs font-bold uppercase text-gray-500 tracking-wider cursor-pointer">First Name</th>
+                 <th onClick={() => handleSort('email')} className="p-4 text-left text-xs font-bold uppercase text-gray-500 tracking-wider cursor-pointer">Email Address</th>
+                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 tracking-wider">Phone Number</th>
+                 <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 tracking-wider">Actions</th>
+               </tr>
+             </thead>
+             <tbody>
+               {data.parents.map((u: any) => (
+                 <tr key={u.id} className="border-b border-gray-800 hover:bg-neutral-800">
+                   <td className="p-4 text-white font-bold">{u.last_name}</td>
+                   <td className="p-4 text-white font-bold">{u.first_name}</td>
+                   <td className="p-4 text-gray-400">{u.email}</td>
+                   <td className="p-4 text-gray-400">{u.phone}</td>
+                   <td className="p-4">
+                     <div className="flex items-center gap-4">
+                       <Link to={`/admin/parent/${u.id}`} className="text-white font-bold hover:text-[#EF4444] transition-colors">Edit</Link>
+                       <button onClick={() => handleDeleteParent(u.id)} className="text-gray-600 hover:text-red-500">
+                         <Trash2 size={18} />
+                       </button>
+                     </div>
+                   </td>
+                 </tr>
+               ))}
+             </tbody>
+           </table>
          )} 
  
          {activeTab === 'coaches' && (
