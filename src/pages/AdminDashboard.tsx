@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
  import { supabase } from '../lib/supabase'; 
  import { Shield, X, Trash2, Plus, Mail, Upload } from 'lucide-react'; 
  import { Link, useNavigate } from 'react-router-dom'; 
-import { useAuthStore } from '../store/auth'; 
+import Announcements from './Announcements'; 
  
  // --- SUB-COMPONENTS (Modals) --- 
  
@@ -250,7 +250,7 @@ import { useAuthStore } from '../store/auth';
  
        {/* 2. TAB NAVIGATION */} 
        <div class="flex gap-2 p-1 bg-neutral-900 rounded-2xl border border-gray-800 w-fit"> 
-         {['parents', 'coaches', 'roster', 'schedule', 'drills'].map((tab) => ( 
+         {['parents', 'coaches', 'roster', 'schedule', 'drills', 'announcements'].map((tab) => ( 
            <button 
              key={tab} 
              onClick={() => setActiveTab(tab)} 
@@ -332,7 +332,7 @@ import { useAuthStore } from '../store/auth';
           </div>
         )}
 
-        {activeTab === 'drills' && (
+        {activeTab === 'announcements' && <Announcements />}
           <div class="grid gap-2">
             {data.drills.map((d: any) => (
               <div key={d.id} class="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
