@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
  import { supabase } from '../lib/supabase'; 
  import { Shield, X, Trash2, Plus, Mail, Upload } from 'lucide-react'; 
  import { Link, useNavigate } from 'react-router-dom'; 
-import AdminHUD from '../components/AdminHUD'; 
+import AdminHUD from '../components/AdminHUD';
+import Announcements from './Announcements'; 
  
  // --- SUB-COMPONENTS (Modals) --- 
  
@@ -283,7 +284,6 @@ import AdminHUD from '../components/AdminHUD';
               </div>
             ))}
           </div>
-        )}
 
         {activeTab === 'roster' && (
           <div class="grid gap-2">
