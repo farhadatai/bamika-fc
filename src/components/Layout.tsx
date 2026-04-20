@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { Navbar } from './Navbar';
-import { DashboardHeader } from './DashboardHeader';
+import Navbar from './Navbar';
+import DashboardHeader from './DashboardHeader';
 
 export const Layout = () => {
   const location = useLocation();
