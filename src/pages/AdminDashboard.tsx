@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
  import { Shield, X, Trash2, Plus, Mail, Upload } from 'lucide-react'; 
  import { Link, useNavigate } from 'react-router-dom'; 
 import AdminHUD from '../components/AdminHUD';
-import Announcements from './Announcements'; 
+import Announcements from './Announcements';
  
  // --- SUB-COMPONENTS (Modals) --- 
  
@@ -232,7 +232,9 @@ import Announcements from './Announcements';
        {/* 1. HEADER SECTION */} 
        <AdminHUD />
  
-       {/* 2. TAB NAVIGATION */} 
+       <AdminHUD />
+
+      {/* 2. TAB NAVIGATION */} 
        <div class="flex gap-2 p-1 bg-neutral-900 rounded-2xl border border-gray-800 w-fit"> 
          {['parents', 'coaches', 'roster', 'schedule', 'drills', 'announcements'].map((tab) => ( 
            <button 
@@ -289,7 +291,7 @@ import Announcements from './Announcements';
           <div class="grid gap-2">
             {data.roster.map((p: any) => (
               <div key={p.id} class="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
-                <span class="text-white font-bold">{p.first_name} {p.last_name}</span>
+                <Link to={`/admin/player/${p.id}`} class="text-white font-bold hover:text-[#EF4444] transition-colors">{p.first_name} {p.last_name}</Link>
                 <span class="text-[#EF4444] text-[10px] font-black uppercase">{p.team_assigned || 'UNASSIGNED'}</span>
               </div>
             ))}
@@ -316,14 +318,6 @@ import Announcements from './Announcements';
         )}
 
         {activeTab === 'announcements' && <Announcements />}
-          <div class="grid gap-2">
-            {data.drills.map((d: any) => (
-              <div key={d.id} class="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
-                <span class="text-white font-bold">{d.title}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </div> 
  
        {/* 4. MODALS */} 
