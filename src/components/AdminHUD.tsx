@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { DollarSign, Users, CheckCircle, Zap, Wifi, WifiOff } from 'lucide-react';
+import { DollarSign, Users, CheckCircle, Wifi, WifiOff } from 'lucide-react';
 
 export default function AdminHUD() {
   const [stats, setStats] = useState({
