@@ -6,6 +6,47 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 const router = express.Router()
+
+// Stripe requires the raw body to construct the event
+router.post('/webhook', express.raw({type: 'application/json'}), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig!, endpointSecret);
+  } catch (err: any) {
+    console.log(`❌ Error message: ${err.message}`);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const registrationId = session.metadata?.registration_id;
+
+    if (registrationId) {
+      try {
+        const { error } = await supabase
+          .from('registrations')
+          .update({ status: 'paid', payment_status: 'paid' })
+          .eq('id', registrationId);
+
+        if (error) {
+          console.error('Supabase update error:', error);
+          // Optionally, you could retry or flag this for manual review
+        } else {
+          console.log(`✅ Registration ${registrationId} updated to paid.`);
+        }
+      } catch (dbError) {
+        console.error('Database connection error:', dbError);
+      }
+    }
+  }
+
+  res.json({received: true});
+});
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
 })

@@ -61,7 +61,7 @@ export default function CoachDashboard() {
   const fetchProfile = async () => {
     try {
       if (!user) return;
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      const { data } = await supabase.from('profiles').select('first_name, last_name, photo_url').eq('id', user.id).single();
       if (data) setProfile(data);
     } catch (e) {
       console.error("Profile fetch error", e);
@@ -110,12 +110,31 @@ export default function CoachDashboard() {
     try {
       if (!user) return;
 
-      // FETCH ONLY PLAYERS ASSIGNED TO THIS COACH
+      // 1. Get the coach's team_id
+      const { data: coachData, error: coachError } = await supabase
+        .from('coaches')
+        .select('team_id')
+        .eq('id', user.id)
+        .single();
+
+      if (coachError || !coachData) {
+        throw new Error('Could not find coach profile.');
+      }
+
+      const teamId = coachData.team_id;
+
+      if (!teamId) {
+        setPlayers([]); // Coach is not assigned to a team
+        setLoading(false);
+        return;
+      }
+
+      // 2. Fetch players assigned to that team_id
       const { data, error } = await supabase
-        .from('players') // Use players table instead of registrations
-        .select('*, profiles:parent_id(full_name, phone)') // Fetch parent details
-        .eq('coach_id', user.id) // Filter by coach_id
-        .order('full_name', { ascending: true });
+        .from('players')
+        .select('*, profiles:parent_id(first_name, last_name, phone)') // Fetch parent details
+        .eq('team_assigned', teamId)
+        .order('last_name', { ascending: true });
 
       if (error) throw error;
 
@@ -123,10 +142,8 @@ export default function CoachDashboard() {
         // Map data safely
         const formattedData = data.map((p: any) => ({
           ...p,
-          first_name: p.full_name.split(' ')[0], // Split full_name for backward compatibility if needed
-          last_name: p.full_name.split(' ').slice(1).join(' '),
           dob: p.date_of_birth,
-          profiles: p.profiles || { full_name: 'N/A', phone: 'N/A' }
+          profiles: p.profiles || { first_name: 'N/A', last_name: '', phone: 'N/A' }
         }));
         setPlayers(formattedData);
       }
@@ -156,7 +173,7 @@ export default function CoachDashboard() {
   if (error) {
     return (
       <div className="flex justify-center items-center h-screen flex-col gap-4">
-        <div className="text-red-600 font-bold text-xl">{error}</div>
+        <div className="text-[#EF4444] font-bold text-xl">{error}</div>
         <button 
           onClick={() => window.location.reload()} 
           className="bg-primary text-white px-4 py-2 rounded font-bold"
@@ -170,11 +187,11 @@ export default function CoachDashboard() {
   return (
     <div className="space-y-6 pb-20">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Coach Dashboard</h1>
+        <h1 class="text-3xl font-black uppercase italic text-white">Coach Dashboard</h1>
         {profile && (
           <button 
             onClick={() => setShowEditProfile(!showEditProfile)}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-bold shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-black border border-gray-300 rounded-lg hover:bg-gray-900 text-gray-300 font-bold shadow-sm"
           >
             <User size={18} />
             My Profile
@@ -184,15 +201,15 @@ export default function CoachDashboard() {
 
       {/* MY PROFILE SECTION */}
       {showEditProfile && profile && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 animate-in fade-in slide-in-from-top-4">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">My Profile</h2>
+        <div className="bg-black p-6 rounded-xl shadow-sm border border-gray-200 animate-in fade-in slide-in-from-top-4">
+          <h2 class="text-xl font-black uppercase italic text-white mb-6">My Profile</h2>
           <div className="flex flex-col md:flex-row items-center gap-8">
             <div className="flex flex-col items-center gap-4">
               <div className="relative group">
                 {profile.photo_url ? (
                   <img 
                     src={profile.photo_url} 
-                    alt={profile.full_name} 
+                    alt={`${profile.first_name} ${profile.last_name}`} 
                     className="h-32 w-32 rounded-full object-cover border-4 border-gray-100 shadow-md"
                   />
                 ) : (
@@ -215,7 +232,7 @@ export default function CoachDashboard() {
                   className="hidden"
                   disabled={uploadingPhoto}
                 />
-                <div className="flex items-center gap-2 text-primary font-bold hover:text-red-700 transition-colors bg-red-50 px-4 py-2 rounded-full hover:bg-red-100">
+                <div className="flex items-center gap-2 text-primary font-bold hover:text-red-700 transition-colors bg-red-900 px-4 py-2 rounded-full hover:bg-red-100">
                   <Camera size={18} />
                   Change Profile Photo
                 </div>
@@ -224,8 +241,8 @@ export default function CoachDashboard() {
             
             <div className="flex-1 space-y-4 w-full text-center md:text-left">
               <div>
-                <label className="text-sm font-bold text-gray-500 uppercase">Full Name</label>
-                <p className="text-xl font-bold text-gray-900">{profile.full_name}</p>
+                <label className="text-sm font-bold text-gray-400 uppercase">Full Name</label>
+                <p className="text-xl font-bold text-gray-900">{profile.first_name} {profile.last_name}</p>
               </div>
               <div>
                 <label className="text-sm font-bold text-gray-500 uppercase">Email</label>
@@ -233,7 +250,7 @@ export default function CoachDashboard() {
               </div>
               <div>
                 <label className="text-sm font-bold text-gray-500 uppercase">Role</label>
-                <span className="inline-block mt-1 px-3 py-1 bg-blue-100 text-blue-800 font-bold rounded-full text-sm">
+                <span className="inline-block mt-1 px-3 py-1 bg-blue-900 text-blue-300 font-bold rounded-full text-sm">
                   Official Coach
                 </span>
               </div>
@@ -243,7 +260,7 @@ export default function CoachDashboard() {
       )}
       
       {players.length === 0 ? (
-        <div className="bg-white p-6 rounded-xl shadow-sm text-center text-gray-500">
+        <div className="bg-black p-6 rounded-xl shadow-sm text-center text-gray-500">
           No active players found.
         </div>
       ) : (
@@ -275,7 +292,7 @@ export default function CoachDashboard() {
                     </div>
                   )}
                   <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded-full ${
-                    player.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                    player.status === 'active' ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300'
                   }`}>
                     {player.status === 'active' ? 'Paid' : 'Pending'}
                   </span>
@@ -286,8 +303,8 @@ export default function CoachDashboard() {
                 <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
                   <Phone className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs font-bold text-red-800 uppercase">Emergency Contact</p>
-                    <p className="font-medium text-gray-900">{player.profiles.full_name}</p>
+                    <p className="text-xs font-bold text-red-300 uppercase">Emergency Contact</p>
+                    <p className="font-medium text-gray-900">{player.profiles.first_name} {player.profiles.last_name}</p>
                     <a href={`tel:${player.profiles.phone}`} className="text-red-600 font-bold hover:underline">
                       {player.profiles.phone}
                     </a>
@@ -295,8 +312,8 @@ export default function CoachDashboard() {
                 </div>
 
                 {player.medical_conditions && (
-                  <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg">
-                    <FileText className="h-5 w-5 text-yellow-600 mt-0.5 shrink-0" />
+                  <div className="flex items-start gap-3 p-3 bg-yellow-900 rounded-lg">
+                    <FileText className="h-5 w-5 text-yellow-400 mt-0.5 shrink-0" />
                     <div>
                       <p className="text-xs font-bold text-yellow-800 uppercase">Medical Notes</p>
                       <p className="text-sm text-gray-800">{player.medical_conditions}</p>
@@ -311,7 +328,7 @@ export default function CoachDashboard() {
 
       {/* UPCOMING GAMES SECTION */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Upcoming Games</h2>
+        <h2 class="text-2xl font-black uppercase italic text-white mb-4">Upcoming Games</h2>
         {games.length === 0 ? (
           <div className="bg-white p-6 rounded-xl shadow-sm text-center text-gray-500 border border-gray-200">
             No upcoming games scheduled.

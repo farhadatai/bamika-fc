@@ -25,7 +25,7 @@ export default function ParentDetailView() {
   const [loading, setLoading] = useState(true);
   const [isEditParentOpen, setIsEditParentOpen] = useState(false);
   const [isAddChildOpen, setIsAddChildOpen] = useState(false);
-  const [newChild, setNewChild] = useState({ full_name: '', date_of_birth: '' });
+  const [newChild, setNewChild] = useState({ first_name: '', last_name: '', date_of_birth: '' });
   const [editingChild, setEditingChild] = useState<any>(null); 
 
   const fetchData = async () => {
@@ -57,7 +57,8 @@ export default function ParentDetailView() {
     const { error } = await supabase
       .from('profiles')
       .update({ 
-        full_name: parent.full_name, 
+        first_name: parent.first_name, 
+        last_name: parent.last_name, 
         email: parent.email, 
         phone: parent.phone, 
         address: parent.address 
@@ -65,7 +66,13 @@ export default function ParentDetailView() {
       .eq('id', parent.id);
 
     if (!error) {
-      logAdminAction(user.id, parent.id, 'UPDATE_CONTACT_INFO', { updated_fields: parent });
+      logAdminAction(user.id, parent.id, 'UPDATE_CONTACT_INFO', { updated_fields: {
+        first_name: parent.first_name,
+        last_name: parent.last_name,
+        email: parent.email,
+        phone: parent.phone,
+        address: parent.address
+      } });
       setIsEditParentOpen(false);
       fetchData();
     }
@@ -93,7 +100,8 @@ export default function ParentDetailView() {
       .from('players')
       .insert([
         {
-          full_name: newChild.full_name,
+          first_name: newChild.first_name,
+          last_name: newChild.last_name,
           date_of_birth: newChild.date_of_birth,
           parent_id: parent.id
         }
@@ -102,7 +110,7 @@ export default function ParentDetailView() {
     if (!error) {
       logAdminAction(user.id, parent.id, 'ADD_CHILD_RECORD', { newChild });
       setIsAddChildOpen(false);
-      setNewChild({ full_name: '', date_of_birth: '' });
+      setNewChild({ first_name: '', last_name: '', date_of_birth: '' });
       fetchData();
     }
   };
@@ -116,7 +124,7 @@ export default function ParentDetailView() {
 
   return (
     <div className="bg-black min-h-screen p-8 text-white">
-      <h1 className="text-3xl font-bold mb-6">{parent.full_name}</h1>
+      <h1 className="text-3xl font-bold mb-6">{parent.first_name} {parent.last_name}</h1>
 
       {/* Status HUD */}
       <div className="grid grid-cols-3 gap-4 mb-6">
@@ -132,14 +140,25 @@ export default function ParentDetailView() {
               <X className="text-gray-500 cursor-pointer" onClick={() => setIsAddChildOpen(false)} />
             </div>
             <div className="space-y-6">
-              <div className="relative">
-                <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Full Name</label>
-                <input
-                  className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] transition-all pl-12"
-                  value={newChild.full_name}
-                  onChange={e => setNewChild({...newChild, full_name: e.target.value})}
-                />
-                <Users className="absolute left-4 top-[42px] text-gray-600" size={18} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="relative">
+                  <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">First Name</label>
+                  <input
+                    className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] transition-all pl-12"
+                    value={newChild.first_name}
+                    onChange={e => setNewChild({...newChild, first_name: e.target.value})}
+                  />
+                  <Users className="absolute left-4 top-[42px] text-gray-600" size={18} />
+                </div>
+                <div className="relative">
+                  <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Last Name</label>
+                  <input
+                    className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] transition-all pl-12"
+                    value={newChild.last_name}
+                    onChange={e => setNewChild({...newChild, last_name: e.target.value})}
+                  />
+                  <Users className="absolute left-4 top-[42px] text-gray-600" size={18} />
+                </div>
               </div>
               <div className="relative">
                 <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Date of Birth</label>
@@ -222,10 +241,10 @@ export default function ParentDetailView() {
              <div key={kid.id} className="bg-black/40 border border-gray-800 p-6 rounded-2xl flex items-center justify-between group hover:border-[#EF4444] transition-all">
                <div className="flex items-center gap-6">
                  <div className="h-12 w-12 rounded-full bg-neutral-800 flex items-center justify-center font-black text-[#EF4444]">
-                   {kid.full_name.charAt(0)}
+                   {kid.first_name.charAt(0)}
                  </div>
                  <div>
-                   <h4 className="text-white font-bold text-lg">{kid.full_name}</h4>
+                   <h4 className="text-white font-bold text-lg">{kid.first_name} {kid.last_name}</h4>
                    <div className="flex gap-4 mt-1">
                      <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">DOB: {kid.date_of_birth}</span>
                      <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Pos: {kid.position || 'TBD'}</span>
@@ -265,15 +284,26 @@ export default function ParentDetailView() {
              </div>
 
              <div className="space-y-6">
-               <div className="relative">
-                 <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Full Name</label>
-                 <input
-                   className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] transition-all pl-12"
-                   value={parent.full_name}
-                   onChange={e => setParent({...parent, full_name: e.target.value})}
-                 />
-                 <Users className="absolute left-4 top-[42px] text-gray-600" size={18} />
-               </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="relative">
+                        <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">First Name</label>
+                        <input
+                        className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] transition-all pl-12"
+                        value={parent.first_name}
+                        onChange={e => setParent({...parent, first_name: e.target.value})}
+                        />
+                        <Users className="absolute left-4 top-[42px] text-gray-600" size={18} />
+                    </div>
+                    <div className="relative">
+                        <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Last Name</label>
+                        <input
+                        className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] transition-all pl-12"
+                        value={parent.last_name}
+                        onChange={e => setParent({...parent, last_name: e.target.value})}
+                        />
+                        <Users className="absolute left-4 top-[42px] text-gray-600" size={18} />
+                    </div>
+                </div>
 
                <div className="grid grid-cols-2 gap-4">
                  <div className="relative">

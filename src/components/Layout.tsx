@@ -7,8 +7,7 @@ export const Layout = () => {
   const location = useLocation();
   const isDashboard = location.pathname.startsWith('/dashboard') || 
                       location.pathname.startsWith('/admin') || 
-                      location.pathname.startsWith('/coach') ||
-                      location.pathname.startsWith('/home'); // Added /home to dashboard routes
+                      location.pathname.startsWith('/coach');
 
   return (
     <div className="min-h-screen bg-black text-white">

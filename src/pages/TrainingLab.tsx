@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Play, X } from 'lucide-react';
+import { getYoutubeId } from '../lib/utils';
 
 export default function TrainingLab() {
   const [drills, setDrills] = useState<any[]>([]);
@@ -8,11 +9,6 @@ export default function TrainingLab() {
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const getYoutubeId = (url: string) => {
-    const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-  };
 
   useEffect(() => {
     const fetchDrills = async () => {
@@ -51,7 +47,7 @@ export default function TrainingLab() {
             className={`px-6 py-2 rounded-full text-[10px] font-black uppercase italic tracking-widest transition-all ${
               filter === cat
                 ? 'bg-[#EF4444] text-white shadow-lg shadow-red-500/20'
-                : 'bg-neutral-900 text-gray-500 border border-gray-800 hover:border-gray-600'
+                : 'bg-black text-gray-500 border border-gray-800 hover:border-gray-600'
             }`}
           >
             {cat}

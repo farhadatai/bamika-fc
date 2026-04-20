@@ -1,32 +1,37 @@
 import React, { useEffect, useState } from 'react'; 
  import { supabase } from '../lib/supabase'; 
  import { Shield, X, Trash2, Plus, Mail, Upload } from 'lucide-react'; 
- import { Link } from 'react-router-dom'; 
+ import { Link, useNavigate } from 'react-router-dom'; 
+import { useAuthStore } from '../store/auth'; 
  
  // --- SUB-COMPONENTS (Modals) --- 
  
  const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach }) => ( 
-   <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md"> 
-     <div className="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"> 
-       <div className="p-8 border-b border-gray-800 flex justify-between items-center sticky top-0 bg-neutral-900 z-10"> 
-         <h2 className="text-2xl font-black uppercase italic text-white">Onboard New <span className="text-[#EF4444]">Coach</span></h2> 
-         <X className="text-gray-500 cursor-pointer hover:text-white" onClick={onClose} /> 
+   <div class="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md"> 
+     <div class="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"> 
+       <div class="p-8 border-b border-gray-800 flex justify-between items-center sticky top-0 bg-neutral-900 z-10"> 
+         <h2 class="text-2xl font-black uppercase italic text-white">Onboard New <span class="text-[#EF4444]">Coach</span></h2> 
+         <X class="text-gray-500 cursor-pointer hover:text-white" onClick={onClose} /> 
        </div> 
-       <form onSubmit={onSubmit} className="p-8 space-y-6"> 
-         <div className="grid md:grid-cols-2 gap-6"> 
+       <form onSubmit={onSubmit} class="p-8 space-y-6"> 
+         <div class="grid md:grid-cols-2 gap-6"> 
            <div> 
-             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Full Name</label> 
-             <input required className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={e => setNewCoach({...newCoach, full_name: e.target.value})} /> 
+             <label class="text-[10px] font-black uppercase text-gray-500 mb-2 block">First Name</label> 
+             <input required class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={e => setNewCoach({...newCoach, first_name: e.target.value})} /> 
            </div> 
            <div> 
-             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Email Address</label> 
-             <input required type="email" className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={e => setNewCoach({...newCoach, email: e.target.value})} /> 
+             <label class="text-[10px] font-black uppercase text-gray-500 mb-2 block">Last Name</label> 
+             <input required class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={e => setNewCoach({...newCoach, last_name: e.target.value})} /> 
+           </div> 
+           <div> 
+             <label class="text-[10px] font-black uppercase text-gray-500 mb-2 block">Email Address</label> 
+             <input required type="email" class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={e => setNewCoach({...newCoach, email: e.target.value})} /> 
            </div> 
          </div> 
-         <div className="grid md:grid-cols-2 gap-6"> 
+         <div class="grid md:grid-cols-2 gap-6"> 
            <div> 
-             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Primary Role</label> 
-             <select className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none appearance-none" onChange={e => setNewCoach({...newCoach, role: e.target.value})}> 
+             <label class="text-[10px] font-black uppercase text-gray-500 mb-2 block">Primary Role</label> 
+             <select class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none appearance-none" onChange={e => setNewCoach({...newCoach, role: e.target.value})}> 
                <option>Head Coach</option> 
                <option>Assistant Coach</option> 
                <option>Goalkeeper Coach</option> 
@@ -34,15 +39,15 @@ import React, { useEffect, useState } from 'react';
              </select> 
            </div> 
            <div> 
-             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Photo URL</label> 
-             <input placeholder="https://..." className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={e => setNewCoach({...newCoach, photo_url: e.target.value})} /> 
+             <label class="text-[10px] font-black uppercase text-gray-500 mb-2 block">Photo URL</label> 
+             <input placeholder="https://..." class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={e => setNewCoach({...newCoach, photo_url: e.target.value})} /> 
            </div> 
          </div> 
          <div> 
-           <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Professional Bio</label> 
-           <textarea rows={4} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none resize-none" placeholder="Describe the coach's experience and philosophy..." onChange={e => setNewCoach({...newCoach, bio: e.target.value})} /> 
+           <label class="text-[10px] font-black uppercase text-gray-500 mb-2 block">Professional Bio</label> 
+           <textarea rows={4} class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none resize-none" placeholder="Describe the coach's experience and philosophy..." onChange={e => setNewCoach({...newCoach, bio: e.target.value})} /> 
          </div> 
-         <button type="submit" className="w-full bg-[#EF4444] text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-500/20"> 
+         <button type="submit" class="w-full bg-[#EF4444] text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-500/20"> 
            Complete Onboarding 
          </button> 
        </form> 
@@ -51,25 +56,25 @@ import React, { useEffect, useState } from 'react';
  ); 
  
  const DrillModal = ({ onClose, onSubmit, newDrill, setNewDrill }) => ( 
-   <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md"> 
-     <div className="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden"> 
-       <div className="p-8 border-b border-gray-800 flex justify-between items-center bg-neutral-950"> 
-         <h2 className="text-2xl font-black uppercase italic text-white">Add Lab <span className="text-[#EF4444]">Content</span></h2> 
-         <X className="text-gray-500 cursor-pointer hover:text-white" onClick={onClose} /> 
+   <div class="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md"> 
+     <div class="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden"> 
+       <div class="p-8 border-b border-gray-800 flex justify-between items-center bg-neutral-950"> 
+         <h2 class="text-2xl font-black uppercase italic text-white">Add Lab <span class="text-[#EF4444]">Content</span></h2> 
+         <X class="text-gray-500 cursor-pointer hover:text-white" onClick={onClose} /> 
        </div> 
-       <form onSubmit={onSubmit} className="p-8 space-y-6"> 
+       <form onSubmit={onSubmit} class="p-8 space-y-6"> 
          <div> 
-           <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">YouTube Video URL</label> 
-           <input required placeholder="https://www.youtube.com/watch?v=..." className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none transition-all" onChange={(e) => setNewDrill({ ...newDrill, video_url: e.target.value })} /> 
+           <label class="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">YouTube Video URL</label> 
+           <input required placeholder="https://www.youtube.com/watch?v=..." class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none transition-all" onChange={(e) => setNewDrill({ ...newDrill, video_url: e.target.value })} /> 
          </div> 
-         <div className="grid md:grid-cols-2 gap-6"> 
+         <div class="grid md:grid-cols-2 gap-6"> 
            <div> 
-             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Drill Title</label> 
-             <input required className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewDrill({ ...newDrill, title: e.target.value })} /> 
+             <label class="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Drill Title</label> 
+             <input required class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewDrill({ ...newDrill, title: e.target.value })} /> 
            </div> 
            <div> 
-             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Category</label> 
-             <select className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none appearance-none" onChange={(e) => setNewDrill({ ...newDrill, category: e.target.value })}> 
+             <label class="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Category</label> 
+             <select class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none appearance-none" onChange={(e) => setNewDrill({ ...newDrill, category: e.target.value })}> 
                <option>Dribbling</option> 
                <option>Passing</option> 
                <option>Shooting</option> 
@@ -78,10 +83,10 @@ import React, { useEffect, useState } from 'react';
              </select> 
            </div> 
          </div> 
-         <div className="grid md:grid-cols-2 gap-6"> 
+         <div class="grid md:grid-cols-2 gap-6"> 
            <div> 
-             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Difficulty</label> 
-             <select className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewDrill({ ...newDrill, difficulty: e.target.value })}> 
+             <label class="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Difficulty</label> 
+             <select class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewDrill({ ...newDrill, difficulty: e.target.value })}> 
                <option>Beginner</option> 
                <option>Intermediate</option> 
                <option>Advanced</option> 
@@ -89,11 +94,11 @@ import React, { useEffect, useState } from 'react';
              </select> 
            </div> 
            <div> 
-             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Duration (Minutes)</label> 
-             <input type="number" placeholder="e.g. 15" className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewDrill({ ...newDrill, duration: parseInt(e.target.value) })} /> 
+             <label class="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Duration (Minutes)</label> 
+             <input type="number" placeholder="e.g. 15" class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewDrill({ ...newDrill, duration: parseInt(e.target.value) })} /> 
            </div> 
          </div> 
-         <button type="submit" className="w-full bg-[#EF4444] text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-3"> 
+         <button type="submit" class="w-full bg-[#EF4444] text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-3"> 
            <Upload size={20} /> Publish to Lab 
          </button> 
        </form> 
@@ -104,6 +109,15 @@ import React, { useEffect, useState } from 'react';
  // --- MAIN DASHBOARD --- 
  
  export default function AdminDashboard() { 
+   const navigate = useNavigate();
+  const { userRole } = useAuthStore();
+
+  useEffect(() => {
+    if (userRole && userRole !== 'admin') {
+      navigate('/dashboard');
+    }
+  }, [userRole, navigate]);
+
    const [activeTab, setActiveTab] = useState('parents'); 
    const [data, setData] = useState({ 
      parents: [], 
@@ -121,7 +135,7 @@ import React, { useEffect, useState } from 'react';
  
    // Form State 
    const [newGame, setNewGame] = useState({ date: '', opponent: '', location: 'Home' }); 
-   const [newCoach, setNewCoach] = useState({ full_name: '', email: '', role: 'Coach', bio: '', photo_url: '' }); 
+   const [newCoach, setNewCoach] = useState({ first_name: '', last_name: '', email: '', role: 'Coach', bio: '', photo_url: '' }); 
    const [newDrill, setNewDrill] = useState({ title: '', video_url: '', category: 'Dribbling', difficulty: 'Beginner', duration: 15 }); 
  
    const fetchData = async () => { 
@@ -159,7 +173,8 @@ import React, { useEffect, useState } from 'react';
    const handleOnboardSubmit = async (e: React.FormEvent) => { 
      e.preventDefault(); 
      const { data: profile, error: pError } = await supabase.from('profiles').insert([{ 
-       full_name: newCoach.full_name, 
+       first_name: newCoach.first_name, 
+       last_name: newCoach.last_name, 
        email: newCoach.email, 
        role: 'coach', 
        photo_url: newCoach.photo_url 
@@ -169,7 +184,7 @@ import React, { useEffect, useState } from 'react';
  
      const { error: cError } = await supabase.from('coaches').insert([{ 
        id: profile.id, 
-       name: newCoach.full_name, 
+       name: `${newCoach.first_name} ${newCoach.last_name}`, 
        role: newCoach.role, 
        bio: newCoach.bio, 
        is_published: true 
@@ -203,8 +218,8 @@ import React, { useEffect, useState } from 'react';
  
    if (loading) { 
      return ( 
-       <div className="min-h-screen bg-black flex items-center justify-center"> 
-         <div className="text-[#EF4444] font-black uppercase italic animate-pulse"> 
+       <div class="min-h-screen bg-black flex items-center justify-center"> 
+         <div class="text-[#EF4444] font-black uppercase italic animate-pulse"> 
            Syncing Bamika... 
          </div> 
        </div> 
@@ -212,34 +227,34 @@ import React, { useEffect, useState } from 'react';
    } 
  
    return ( 
-     <div className="space-y-8 p-6 bg-black min-h-screen"> 
+     <div class="space-y-8 p-6 bg-black min-h-screen"> 
        {/* 1. HEADER SECTION */} 
-       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"> 
+       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"> 
          <div> 
-           <h1 className="text-4xl font-black uppercase italic text-white tracking-tighter"> 
-             ADMIN <span className="text-[#EF4444]">DASHBOARD</span> 
+           <h1 class="text-4xl font-black uppercase italic text-white tracking-tighter"> 
+             ADMIN <span class="text-[#EF4444]">DASHBOARD</span> 
            </h1> 
-           <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest mt-1"> 
+           <p class="text-gray-500 font-bold text-[10px] uppercase tracking-widest mt-1"> 
              Club Command Center • {data.parents.length} Members 
            </p> 
          </div> 
-         <div className="flex gap-3"> 
-           <button onClick={() => setIsOnboardModalOpen(true)} className="bg-[#EF4444] text-white px-6 py-3 rounded-xl font-black uppercase italic text-xs hover:bg-red-700 transition-all"> 
+         <div class="flex gap-3"> 
+           <button onClick={() => setIsOnboardModalOpen(true)} class="bg-[#EF4444] text-white px-6 py-3 rounded-xl font-black uppercase italic text-xs hover:bg-red-700 transition-all"> 
              + Onboard Coach 
            </button> 
-           <button onClick={() => setIsDrillModalOpen(true)} className="bg-neutral-800 text-white px-6 py-3 rounded-xl font-black uppercase italic text-xs hover:bg-neutral-700 transition-all"> 
+           <button onClick={() => setIsDrillModalOpen(true)} class="bg-neutral-800 text-white px-6 py-3 rounded-xl font-black uppercase italic text-xs hover:bg-neutral-700 transition-all"> 
              + New Drill 
            </button> 
          </div> 
        </div> 
  
        {/* 2. TAB NAVIGATION */} 
-       <div className="flex gap-2 p-1 bg-neutral-900 rounded-2xl border border-gray-800 w-fit"> 
+       <div class="flex gap-2 p-1 bg-neutral-900 rounded-2xl border border-gray-800 w-fit"> 
          {['parents', 'coaches', 'roster', 'schedule', 'drills'].map((tab) => ( 
            <button 
              key={tab} 
              onClick={() => setActiveTab(tab)} 
-             className={`px-8 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${ 
+             class={`px-8 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${ 
                activeTab === tab ? 'bg-white text-black' : 'text-gray-500 hover:text-white' 
              }`} 
            > 
@@ -249,32 +264,31 @@ import React, { useEffect, useState } from 'react';
        </div> 
  
        {/* 3. MAIN CONTENT AREA */} 
-       <div className="min-h-[400px]"> 
+       <div class="min-h-[400px]"> 
          {activeTab === 'parents' && ( 
-           <div className="grid gap-4"> 
+           <div class="grid gap-4"> 
              {data.parents.map((u: any) => ( 
-               <div key={u.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center group"> 
-                 <Link to={`/admin/parent/${u.id}`} className="text-white font-bold hover:text-[#EF4444] transition-colors">{u.full_name}</Link> 
-                 <div className="w-4 h-4 border-2 border-gray-700 rounded-full group-hover:border-white transition-colors"></div> 
+               <div key={u.id} class="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center group"> 
+                 <Link to={`/admin/parent/${u.id}`} class="text-white font-bold hover:text-[#EF4444] transition-colors">{u.first_name} {u.last_name}</Link> 
+                 <div class="w-4 h-4 border-2 border-gray-700 rounded-full group-hover:border-white transition-colors"></div> 
                </div> 
              ))} 
            </div> 
          )} 
  
          {activeTab === 'coaches' && (
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {data.coaches.map((coach: any) => (
-              <div key={coach.id} className="bg-neutral-900 border border-gray-800 rounded-2xl p-6 group flex flex-col">
-                <div className="flex items-center gap-4 mb-6">
-                  <img src={coach.profiles?.photo_url || "https://via.placeholder.com/150"} className="h-16 w-16 object-cover rounded-full border-2 border-gray-800" />
+              <div key={coach.id} class="bg-neutral-900 border border-gray-800 rounded-2xl p-6 group flex flex-col">
+                <div class="flex items-center gap-4 mb-6">
+                  <img src={coach.profiles?.photo_url || "https://via.placeholder.com/150"} class="h-16 w-16 object-cover rounded-full border-2 border-gray-800" />
                   <div>
-                    <h3 className="text-lg font-black uppercase italic text-white">{coach.name}</h3>
-                    <p className="text-[#EF4444] text-[10px] font-black uppercase">{coach.role}</p>
+                    <h3 class="text-lg font-black uppercase italic text-white">{coach.name}</h3>
+                    <p class="text-[#EF4444] text-[10px] font-black uppercase">{coach.role}</p>
                   </div>
                 </div>
                 <select
-                  className="w-full bg-black border border-gray-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-[#EF4444]"
+                  class="w-full bg-black border border-gray-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-[#EF4444]"
                   value={coach.team_id || ''}
                   onChange={(e) => handleAssignTeam(coach.id, e.target.value)}
                 >
@@ -289,28 +303,28 @@ import React, { useEffect, useState } from 'react';
         )}
 
         {activeTab === 'roster' && (
-          <div className="grid gap-2">
+          <div class="grid gap-2">
             {data.roster.map((p: any) => (
-              <div key={p.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
-                <span className="text-white font-bold">{p.full_name}</span>
-                <span className="text-[#EF4444] text-[10px] font-black uppercase">{p.team_assigned || 'UNASSIGNED'}</span>
+              <div key={p.id} class="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
+                <span class="text-white font-bold">{p.first_name} {p.last_name}</span>
+                <span class="text-[#EF4444] text-[10px] font-black uppercase">{p.team_assigned || 'UNASSIGNED'}</span>
               </div>
             ))}
           </div>
         )}
 
         {activeTab === 'schedule' && (
-          <div className="space-y-4">
-            <button onClick={() => setIsGameModalOpen(true)} className="bg-[#EF4444] text-white px-6 py-3 rounded-lg font-black text-xs uppercase shadow-lg hover:bg-red-700">
+          <div class="space-y-4">
+            <button onClick={() => setIsGameModalOpen(true)} class="bg-[#EF4444] text-white px-6 py-3 rounded-lg font-black text-xs uppercase shadow-lg hover:bg-red-700">
               + Schedule Match
             </button>
             {data.games.map((g: any) => (
-              <div key={g.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
+              <div key={g.id} class="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
                 <div>
-                  <div className="font-black uppercase italic text-white">{g.opponent}</div>
-                  <div className="text-[10px] text-gray-500 font-bold uppercase">{g.date} • {g.location}</div>
+                  <div class="font-black uppercase italic text-white">{g.opponent}</div>
+                  <div class="text-[10px] text-gray-500 font-bold uppercase">{g.date} • {g.location}</div>
                 </div>
-                <button onClick={() => handleDeleteGame(g.id)} className="text-gray-600 hover:text-red-500">
+                <button onClick={() => handleDeleteGame(g.id)} class="text-gray-600 hover:text-red-500">
                   <Trash2 size={18} />
                 </button>
               </div>
@@ -319,10 +333,10 @@ import React, { useEffect, useState } from 'react';
         )}
 
         {activeTab === 'drills' && (
-          <div className="grid gap-2">
+          <div class="grid gap-2">
             {data.drills.map((d: any) => (
-              <div key={d.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
-                <span className="text-white font-bold">{d.title}</span>
+              <div key={d.id} class="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
+                <span class="text-white font-bold">{d.title}</span>
               </div>
             ))}
           </div>
@@ -349,17 +363,17 @@ import React, { useEffect, useState } from 'react';
        )} 
  
        {isGameModalOpen && ( 
-         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4"> 
-           <div className="bg-neutral-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl"> 
-             <div className="p-6 border-b border-gray-800 flex justify-between items-center"> 
-               <h3 className="text-white font-black uppercase italic">New Match</h3> 
-               <X className="cursor-pointer text-gray-500" onClick={() => setIsGameModalOpen(false)} /> 
+         <div class="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4"> 
+           <div class="bg-neutral-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl"> 
+             <div class="p-6 border-b border-gray-800 flex justify-between items-center"> 
+               <h3 class="text-white font-black uppercase italic">New Match</h3> 
+               <X class="cursor-pointer text-gray-500" onClick={() => setIsGameModalOpen(false)} /> 
              </div> 
-             <form onSubmit={handleAddGame} className="p-8 space-y-4"> 
-               <input type="date" required value={newGame.date} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewGame({ ...newGame, date: e.target.value })} /> 
-               <input type="text" placeholder="Opponent Name" required value={newGame.opponent} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewGame({ ...newGame, opponent: e.target.value })} /> 
-               <input type="text" placeholder="Location" value={newGame.location} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewGame({ ...newGame, location: e.target.value })} /> 
-               <button type="submit" className="w-full bg-[#EF4444] text-white py-4 rounded-xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all"> 
+             <form onSubmit={handleAddGame} class="p-8 space-y-4"> 
+               <input type="date" required value={newGame.date} class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewGame({ ...newGame, date: e.target.value })} /> 
+               <input type="text" placeholder="Opponent Name" required value={newGame.opponent} class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewGame({ ...newGame, opponent: e.target.value })} /> 
+               <input type="text" placeholder="Location" value={newGame.location} class="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewGame({ ...newGame, location: e.target.value })} /> 
+               <button type="submit" class="w-full bg-[#EF4444] text-white py-4 rounded-xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all"> 
                  Schedule Match 
                </button> 
              </form> 
