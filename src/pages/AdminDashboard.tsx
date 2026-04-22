@@ -313,73 +313,88 @@ export default function AdminDashboard() {
     }
   };
 
-  if (loading) { 
-    return ( 
-      <div className="min-h-screen bg-black flex items-center justify-center"> 
-        <div className="flex flex-col items-center gap-4">
-          <img src="/logo.jpg" alt="Bamika FC Logo" className="h-24 w-auto" />
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
           <div className="text-[#EF4444] font-black uppercase italic animate-pulse">
-            Loading Bamika Data...
+            Syncing Bamika...
           </div>
         </div>
-      </div> 
-    ); 
-  } 
+      </div>
+    );
+  }
 
-  return ( 
-    <div className="space-y-8 p-6 bg-black min-h-screen max-w-7xl mx-auto"> 
+  if (!data.parents.length) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-white mb-4">No Parents Found in Database</h2>
+        </div>
+      </div>
+    );
+  }
 
+  return (
+    <div className="min-h-screen bg-black flex flex-col items-center p-6">
+      <div className="w-full max-w-6xl">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-4xl font-black uppercase italic text-white">Admin <span className="text-[#D4AF37]">Dashboard</span></h1>
+          <button onClick={() => setIsOnboardModalOpen(true)} className="btn-primary">
+            + Onboard Coach
+          </button>
+        </div>
 
-      {/* 2. TAB NAVIGATION */} 
-      <div className="flex gap-2 p-1 bg-neutral-900 rounded-2xl border border-gray-800 w-fit"> 
-        {['parents', 'coaches', 'roster', 'schedule', 'drills', 'announcements'].map((tab) => ( 
-          <button 
-            key={tab} 
-            onClick={() => setActiveTab(tab)} 
-            className={`px-8 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${ 
-              activeTab === tab ? 'bg-[#EF4444] text-white' : 'text-gray-500 hover:text-white' 
-            }`} 
-          > 
-            {tab} 
-          </button> 
-        ))} 
-      </div> 
+        {/* 2. TAB NAVIGATION */} 
+        <div className="flex gap-2 p-1 bg-neutral-900 rounded-2xl border border-gray-800 w-fit"> 
+          {['parents', 'coaches', 'roster', 'schedule', 'drills', 'announcements'].map((tab) => ( 
+            <button 
+              key={tab} 
+              onClick={() => setActiveTab(tab)} 
+              className={`px-8 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${ 
+                activeTab === tab ? 'bg-[#EF4444] text-white' : 'text-gray-500 hover:text-white' 
+              }`} 
+            > 
+              {tab} 
+            </button> 
+          ))} 
+        </div> 
 
-      {/* 3. MAIN CONTENT AREA */} 
-      <div className="min-h-[400px]"> 
-        {activeTab === 'parents' && ( 
-          <div className="bg-neutral-900 border border-gray-800 rounded-3xl overflow-hidden">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-neutral-900 border-b border-gray-800">
-                  <th onClick={() => handleSort('last_name')} className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider cursor-pointer">Last Name</th>
-                  <th onClick={() => handleSort('first_name')} className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider cursor-pointer">First Name</th>
-                  <th onClick={() => handleSort('email')} className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider cursor-pointer">Email Address</th>
-                  <th className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider">Phone Number</th>
-                  <th className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider">Status</th>
-                  <th className="p-4 text-right text-xs font-bold uppercase text-white tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.parents.map((u: any) => (
-                  <tr key={u.id} className="border-b border-neutral-800 hover:bg-neutral-700/50 transition-colors">
-                    <td className="p-4 text-white font-bold uppercase italic">{u.full_name || u.last_name || 'Anonymous'}</td>
-                    <td className="p-4 text-white font-bold">{u.first_name || '-'}</td>
-                    <td className="p-4 text-gray-400">{u.email}</td>
-                    <td className="p-4 text-gray-400">{u.phone}</td>
-                    <td className="p-4">
-                      {data.roster.some((player: any) => player.user_id === u.id) ? (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-900 text-green-300">Active</span>
-                      ) : (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-900 text-yellow-300">Pending</span>
-                      )}
-                    </td>
+        {/* 3. MAIN CONTENT AREA */} 
+        <div className="min-h-[400px]"> 
+          {activeTab === 'parents' && ( 
+            <div className="bg-neutral-900 border border-gray-800 rounded-3xl overflow-hidden">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-neutral-900 border-b border-gray-800">
+                    <th onClick={() => handleSort('last_name')} className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider cursor-pointer">Last Name</th>
+                    <th onClick={() => handleSort('first_name')} className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider cursor-pointer">First Name</th>
+                    <th onClick={() => handleSort('email')} className           ="p-4 text-left text-xs font-bold uppercase text-white tracking-wider cursor-pointer">Email Address</th>
+                    <th className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider">Phone Number</th>
+                    <th className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider">Status</th>
+                    <th className="p-4 text-right text-xs font-bold uppercase text-white tracking-wider">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )} 
+                </thead>
+                <tbody>
+                  {data.parents.map((u: any) => (
+                    <tr key={u.id} className="border-b border-neutral-800 hover:bg-neutral-700/50 transition-colors">
+                      <td className="p-4 text-white font-bold uppercase italic">{u.last_name || u.full_name}</td>
+                      <td className="p-4 text-white font-bold">{u.first_name || '-'}</td>
+                      <td className="p-4 text-gray-400">{u.email}</td>
+                      <td className="p-4 text-gray-400">{u.phone}</td>
+                      <td className="p-4">
+                        {data.roster.some((player: any) => player.user_id === u.id) ? (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-900 text-green-300">Active</span>
+                        ) : (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-900 text-yellow-300">Pending</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )} 
 
         {activeTab === 'coaches' && (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
