@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "check": "tsc --noEmit",
-    "server:dev": "dotenv -- .env nodemon",
+    "server:dev": "nodemon",
     "dev": "concurrently \"npm run client:dev\" \"npm run server:dev\""
   },
   "dependencies": {

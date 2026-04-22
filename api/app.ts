@@ -9,7 +9,7 @@ import express, {
 } from 'express'
 import cors from 'cors'
 import path from 'path'
-import dotenv from 'dotenv'
+
 import { fileURLToPath } from 'url'
 import authRoutes from './routes/auth.js'
 import paymentRoutes from './routes/payment.js'
@@ -20,7 +20,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // load env
-dotenv.config()
+
 
 const app: express.Application = express()
 
