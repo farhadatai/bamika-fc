@@ -241,7 +241,7 @@ import AdminHUD from '../components/AdminHUD';
    } 
  
    return ( 
-     <div class="space-y-8 p-6 bg-black min-h-screen"> 
+     <div class="space-y-8 p-6 bg-black min-h-screen max-w-7xl mx-auto"> 
        <AdminHUD />
 
       {/* 2. TAB NAVIGATION */} 
