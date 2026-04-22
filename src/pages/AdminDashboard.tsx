@@ -148,7 +148,24 @@ export default function AdminDashboard() {
 
   const fetchData = async () => { 
     setLoading(true); 
-    const { data: p } = await supabase.from('profiles').select('*').eq('role', 'user').order(sortOrder.column, { ascending: sortOrder.ascending }); 
+    const { data: p } = await supabase.from('profiles').select('*').eq('role', 'user');
+
+    if (p) {
+      p.sort((a, b) => {
+        let valA, valB;
+        if (sortOrder.column === 'last_name') {
+          valA = a.last_name || a.full_name || '';
+          valB = b.last_name || b.full_name || '';
+        } else {
+          valA = a[sortOrder.column] || '';
+          valB = b[sortOrder.column] || '';
+        }
+
+        const comparison = valA.localeCompare(valB);
+        return sortOrder.ascending ? comparison : -comparison;
+      });
+    }
+
     const { data: c } = await supabase.from('coaches').select('*, profiles(photo_url)'); 
     const { data: pl } = await supabase.from('players').select('*'); 
     const { data: g } = await supabase.from('games').select('*').order('date', { ascending: true }); 
@@ -276,8 +293,8 @@ export default function AdminDashboard() {
               <tbody>
                 {data.parents.map((u: any) => (
                   <tr key={u.id} className="border-b border-neutral-800 hover:bg-neutral-700/50 transition-colors">
-                    <td className="p-4 text-white font-bold uppercase italic">{u.last_name || u.full_name}</td>
-                    <td className="p-4 text-white font-bold">{u.first_name || ''}</td>
+                    <td className="p-4 text-white font-bold uppercase italic">{u.last_name || u.full_name || '-'}</td>
+                    <td className="p-4 text-white font-bold">{u.first_name || '-'}</td>
                     <td className="p-4 text-gray-400">{u.email}</td>
                     <td className="p-4 text-gray-400">{u.phone}</td>
                     <td className="p-4 text-right">
@@ -325,7 +342,7 @@ export default function AdminDashboard() {
           <div className="grid gap-2">
             {data.roster.map((p: any) => (
               <div key={p.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
-                <span className="text-white font-bold">{p.first_name ? `${p.first_name} ${p.last_name}` : (p.name || p.full_name)}</span>
+                <span className="text-white font-bold">{p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : (p.full_name || p.name)}</span>
                 <span className="text-[#EF4444] text-[10px] font-black uppercase">{p.team_assigned || 'UNASSIGNED'}</span>
               </div>
             ))}
