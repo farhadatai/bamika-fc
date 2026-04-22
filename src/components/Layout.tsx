@@ -11,21 +11,10 @@ export const Layout = () => {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {isDashboard ? (
-        <div className="flex flex-col">
-          <DashboardHeader />
-          <main className="p-4">
-            <Outlet />
-          </main>
-        </div>
-      ) : (
-        <>
-          <Navbar />
-          <main>
-            <Outlet />
-          </main>
-        </>
-      )}
+      <Navbar />
+      <main>
+        <Outlet />
+      </main>
     </div>
   );
 };
