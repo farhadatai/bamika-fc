@@ -42,7 +42,8 @@ export default function Login() {
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-black uppercase italic text-white">Welcome <span className="text-[#EF4444]">Back</span></h1>
+          <img src="/logo.jpg" alt="Bamika FC Logo" className="h-24 w-auto mx-auto mb-4" />
+          <h1 className="text-4xl font-black uppercase italic text-white">Welcome <span className="text-[#D4AF37]">Back</span></h1>
           <p className="text-gray-400 mt-2">Sign in to your Bamika FC account.</p>
         </div>
 
@@ -57,7 +58,7 @@ export default function Login() {
             name="email"
             placeholder="Email Address"
             onChange={handleInputChange}
-            className="w-full p-3 bg-gray-800 text-white border border-gray-700 rounded-md focus:ring-[#EF4444] focus:border-[#EF4444]"
+            className="input-primary"
             required
           />
           <input
@@ -65,13 +66,13 @@ export default function Login() {
             name="password"
             placeholder="Password"
             onChange={handleInputChange}
-            className="w-full p-3 bg-gray-800 text-white border border-gray-700 rounded-md focus:ring-[#EF4444] focus:border-[#EF4444]"
+            className="input-primary"
             required
           />
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#EF4444] text-white py-3 rounded-md font-bold uppercase hover:bg-red-700 disabled:opacity-50"
+            className="btn-primary w-full"
           >
             {loading ? 'Signing In...' : 'Sign In'}
           </button>

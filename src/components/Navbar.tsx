@@ -18,8 +18,8 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <Link to="/" className="flex items-center gap-2 text-2xl font-black uppercase italic text-white">
-              <img src="/logo.png" alt="Bamika FC Logo" className="h-10 w-auto" />
-              <span>Bamika <span className="text-[#EF4444]">FC</span></span>
+              <img src="/logo.jpg" alt="Bamika FC Logo" className="h-10 w-auto" />
+              <span>BAMIKA <span className="text-[#D4AF37]">FC</span></span>
             </Link>
           </div>
           <div className="hidden md:block">
