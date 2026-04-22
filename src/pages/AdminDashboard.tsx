@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase';
 import { Shield, X, Trash2, Plus, Mail, Upload } from 'lucide-react'; 
 import { Link, useNavigate } from 'react-router-dom'; 
 import { useAuthStore } from '../store/auth';
-import Announcements from '../components/Announcements'; // Ensure this exists
 
 // --- SUB-COMPONENTS (Modals) --- 
 
@@ -351,8 +350,7 @@ export default function AdminDashboard() {
             ))}
           </div>
         )}
-
-        {activeTab === 'announcements' && <Announcements />}
+        
 
         {activeTab === 'drills' && (
           <div className="grid gap-2">
