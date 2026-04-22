@@ -251,7 +251,7 @@ export default function AdminDashboard() {
             key={tab} 
             onClick={() => setActiveTab(tab)} 
             className={`px-8 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${ 
-              activeTab === tab ? 'bg-white text-black' : 'text-gray-500 hover:text-white' 
+              activeTab === tab ? 'bg-[#EF4444] text-white' : 'text-gray-500 hover:text-white' 
             }`} 
           > 
             {tab} 
@@ -266,18 +266,18 @@ export default function AdminDashboard() {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-gray-800 bg-neutral-800/50">
-                  <th onClick={() => handleSort('last_name')} className="p-4 text-left text-xs font-bold uppercase text-gray-500 tracking-wider cursor-pointer hover:text-white">Last Name</th>
-                  <th onClick={() => handleSort('first_name')} className="p-4 text-left text-xs font-bold uppercase text-gray-500 tracking-wider cursor-pointer hover:text-white">First Name</th>
-                  <th onClick={() => handleSort('email')} className="p-4 text-left text-xs font-bold uppercase text-gray-500 tracking-wider cursor-pointer hover:text-white">Email Address</th>
-                  <th className="p-4 text-left text-xs font-bold uppercase text-gray-500 tracking-wider">Phone Number</th>
-                  <th className="p-4 text-right text-xs font-bold uppercase text-gray-500 tracking-wider">Actions</th>
+                  <th onClick={() => handleSort('last_name')} className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider cursor-pointer hover:text-white">Last Name</th>
+                  <th onClick={() => handleSort('first_name')} className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider cursor-pointer hover:text-white">First Name</th>
+                  <th onClick={() => handleSort('email')} className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider cursor-pointer hover:text-white">Email Address</th>
+                  <th className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider">Phone Number</th>
+                  <th className="p-4 text-right text-xs font-black uppercase text-gray-400 tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {data.parents.map((u: any) => (
-                  <tr key={u.id} className="border-b border-gray-800 hover:bg-neutral-800 transition-colors">
-                    <td className="p-4 text-white font-bold uppercase italic">{u.last_name}</td>
-                    <td className="p-4 text-white font-bold">{u.first_name}</td>
+                  <tr key={u.id} className="border-b border-neutral-800 hover:bg-neutral-700/50 transition-colors">
+                    <td className="p-4 text-white font-bold uppercase italic">{u.last_name ? u.last_name : u.full_name}</td>
+                    <td className="p-4 text-white font-bold">{u.last_name ? u.first_name : ''}</td>
                     <td className="p-4 text-gray-400">{u.email}</td>
                     <td className="p-4 text-gray-400">{u.phone}</td>
                     <td className="p-4 text-right">
@@ -302,7 +302,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-4 mb-6">
                   <img src={coach.profiles?.photo_url || "https://via.placeholder.com/150"} className="h-16 w-16 object-cover rounded-full border-2 border-gray-800" />
                   <div>
-                    <h3 className="text-lg font-black uppercase italic text-white">{coach.name}</h3>
+                    <h3 className="text-lg font-black uppercase text-white">{coach.name}</h3>
                     <p className="text-[#EF4444] text-[10px] font-black uppercase">{coach.role}</p>
                   </div>
                 </div>
@@ -325,7 +325,7 @@ export default function AdminDashboard() {
           <div className="grid gap-2">
             {data.roster.map((p: any) => (
               <div key={p.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
-                <span className="text-white font-bold">{p.first_name} {p.last_name}</span>
+                <span className="text-white font-bold">{p.first_name ? `${p.first_name} ${p.last_name}` : p.full_name}</span>
                 <span className="text-[#EF4444] text-[10px] font-black uppercase">{p.team_assigned || 'UNASSIGNED'}</span>
               </div>
             ))}
