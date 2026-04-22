@@ -7,9 +7,9 @@ body {
 }
 
 .btn-primary {
-  @apply bg-[#EF4444] text-white font-bold uppercase py-2 px-4 rounded hover:bg-red-700 transition-colors;
+  @apply bg-[#EF4444] text-white font-bold uppercase py-3 px-4 rounded-xl hover:bg-red-700 transition-colors tracking-wider;
 }
 
 .input-primary {
-  @apply bg-neutral-900 border border-gray-800 rounded-xl p-4 text-white font-bold focus:border-[#EF4444] outline-none;
+  @apply bg-neutral-900/50 border border-gray-800 rounded-xl p-4 text-white font-bold focus:ring-1 focus:ring-[#EF4444] outline-none;
 }

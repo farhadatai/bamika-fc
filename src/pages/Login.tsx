@@ -40,9 +40,9 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md bg-neutral-900/50 border border-gray-800 rounded-2xl p-8">
         <div className="text-center mb-8">
-          <img src="/logo.jpg" alt="Bamika FC Logo" className="h-24 w-auto mx-auto mb-4" />
+          <img src="/logo.jpg" alt="Bamika FC Logo" className="h-24 w-auto mx-auto mb-8" />
           <h1 className="text-4xl font-black uppercase italic text-white">Welcome <span className="text-[#D4AF37]">Back</span></h1>
           <p className="text-gray-400 mt-2">Sign in to your Bamika FC account.</p>
         </div>
@@ -72,7 +72,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary w-full"
+            className="btn-primary w-full pt-4 pb-4"
           >
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
