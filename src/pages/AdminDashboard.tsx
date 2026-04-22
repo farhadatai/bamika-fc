@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase';
 import { Shield, X, Trash2, Plus, Mail, Upload } from 'lucide-react'; 
 import { Link, useNavigate } from 'react-router-dom'; 
 import { useAuthStore } from '../store/auth';
-import AdminHUD from '../components/AdminHUD'; 
 import Announcements from '../components/Announcements'; // Ensure this exists
 
 // --- SUB-COMPONENTS (Modals) --- 
@@ -244,7 +243,7 @@ export default function AdminDashboard() {
 
   return ( 
     <div className="space-y-8 p-6 bg-black min-h-screen max-w-7xl mx-auto"> 
-      <AdminHUD />
+
 
       {/* 2. TAB NAVIGATION */} 
       <div className="flex gap-2 p-1 bg-neutral-900 rounded-2xl border border-gray-800 w-fit"> 
