@@ -104,9 +104,9 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-neutral-900/50 border border-gray-800 rounded-2xl p-8">
+      <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/logo.jpg" alt="Bamika FC Logo" className="h-24 w-auto mx-auto mb-8" />
+          <img src="/logo.jpg" alt="Bamika FC Logo" className="h-24 w-auto mx-auto mb-4" />
           <h1 className="text-4xl font-black uppercase italic text-white">Join <span className="text-[#EF4444]">Bamika FC</span></h1>
           <p className="text-gray-400 mt-2">Create your parent account to get started.</p>
         </div>
@@ -171,7 +171,7 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary w-full pt-4 pb-4"
+            className="btn-primary w-full"
           >
             {loading ? 'Creating Account...' : 'Create Account'}
           </button>
