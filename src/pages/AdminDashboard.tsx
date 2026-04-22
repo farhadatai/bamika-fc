@@ -237,7 +237,7 @@ export default function AdminDashboard() {
 
   useEffect(() => { 
     fetchData(); 
-  }, [sortOrder]); 
+  }, []); 
 
   const handleAddGame = async (e: React.FormEvent) => { 
     e.preventDefault(); 
@@ -316,9 +316,12 @@ export default function AdminDashboard() {
   if (loading) { 
     return ( 
       <div className="min-h-screen bg-black flex items-center justify-center"> 
-        <div className="text-[#EF4444] font-black uppercase italic animate-pulse"> 
-          Syncing Bamika... 
-        </div> 
+        <div className="flex flex-col items-center gap-4">
+          <img src="/logo.jpg" alt="Bamika FC Logo" className="h-24 w-auto" />
+          <div className="text-[#EF4444] font-black uppercase italic animate-pulse">
+            Loading Bamika Data...
+          </div>
+        </div>
       </div> 
     ); 
   } 
@@ -360,7 +363,7 @@ export default function AdminDashboard() {
               <tbody>
                 {data.parents.map((u: any) => (
                   <tr key={u.id} className="border-b border-neutral-800 hover:bg-neutral-700/50 transition-colors">
-                    <td className="p-4 text-white font-bold uppercase italic">{u.last_name || u.full_name || '-'}</td>
+                    <td className="p-4 text-white font-bold uppercase italic">{u.full_name || u.last_name || 'Anonymous'}</td>
                     <td className="p-4 text-white font-bold">{u.first_name || '-'}</td>
                     <td className="p-4 text-gray-400">{u.email}</td>
                     <td className="p-4 text-gray-400">{u.phone}</td>
