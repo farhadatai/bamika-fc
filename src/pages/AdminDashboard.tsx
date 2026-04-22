@@ -276,8 +276,8 @@ export default function AdminDashboard() {
               <tbody>
                 {data.parents.map((u: any) => (
                   <tr key={u.id} className="border-b border-neutral-800 hover:bg-neutral-700/50 transition-colors">
-                    <td className="p-4 text-white font-bold uppercase italic">{u.last_name ? u.last_name : u.full_name}</td>
-                    <td className="p-4 text-white font-bold">{u.last_name ? u.first_name : ''}</td>
+                    <td className="p-4 text-white font-bold uppercase italic">{u.last_name || u.full_name}</td>
+                    <td className="p-4 text-white font-bold">{u.first_name || ''}</td>
                     <td className="p-4 text-gray-400">{u.email}</td>
                     <td className="p-4 text-gray-400">{u.phone}</td>
                     <td className="p-4 text-right">
@@ -325,7 +325,7 @@ export default function AdminDashboard() {
           <div className="grid gap-2">
             {data.roster.map((p: any) => (
               <div key={p.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
-                <span className="text-white font-bold">{p.first_name ? `${p.first_name} ${p.last_name}` : p.full_name}</span>
+                <span className="text-white font-bold">{p.first_name ? `${p.first_name} ${p.last_name}` : (p.name || p.full_name)}</span>
                 <span className="text-[#EF4444] text-[10px] font-black uppercase">{p.team_assigned || 'UNASSIGNED'}</span>
               </div>
             ))}
