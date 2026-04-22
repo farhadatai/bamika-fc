@@ -6,11 +6,13 @@ export default function Dashboard() {
   const { user, userRole } = useAuthStore();
 
   return (
-    <div className="p-8 bg-black min-h-screen text-white">
-      <h1 className="text-4xl font-black uppercase italic mb-4">
-        Welcome, <span className="text-[#EF4444]">{user?.user_metadata.first_name}</span>
-      </h1>
-      <p className="text-lg text-gray-400 mb-8">Here is your central hub for all things Bamika FC.</p>
+    <div className="p-8 bg-black min-h-screen text-white flex flex-col items-center">
+      <div className="text-center">
+        <h1 className="text-4xl font-black uppercase italic mb-4">
+          Welcome, <span className="text-[#EF4444]">{user?.user_metadata.first_name}</span>
+        </h1>
+        <p className="text-lg text-gray-400 mb-8">Here is your central hub for all things Bamika FC.</p>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {userRole === 'admin' && (
