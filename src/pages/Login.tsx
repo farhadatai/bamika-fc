@@ -58,7 +58,7 @@ export default function Login() {
             name="email"
             placeholder="Email Address"
             onChange={handleInputChange}
-            className="input-primary"
+            className="input-primary w-full"
             required
           />
           <input
@@ -66,7 +66,7 @@ export default function Login() {
             name="password"
             placeholder="Password"
             onChange={handleInputChange}
-            className="input-primary"
+            className="input-primary w-full"
             required
           />
           <button

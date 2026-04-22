@@ -118,30 +118,29 @@ export default function Register() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <input
-              type="text"
-              name="firstName"
-              placeholder="First Name"
-              onChange={handleInputChange}
-              className="input-primary"
-              required
-            />
-            <input
-              type="text"
-              name="lastName"
-              placeholder="Last Name"
-              onChange={handleInputChange}
-              className="input-primary"
-              required
-            />
-          </div>
+          <input
+            type="text"
+            name="firstName"
+            placeholder="First Name"
+            onChange={handleInputChange}
+            className="input-primary w-full"
+            required
+          />
+          <input
+            type="text"
+            name="lastName"
+            placeholder="Last Name"
+            onChange={handleInputChange}
+            className="input-primary w-full"
+            required
+          />
+
           <input
             type="email"
             name="email"
             placeholder="Email Address"
             onChange={handleInputChange}
-            className="input-primary"
+            className="input-primary w-full"
             required
           />
           <input
