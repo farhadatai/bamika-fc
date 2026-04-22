@@ -55,6 +55,59 @@ const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach }) => (
   </div> 
 ); 
 
+const EditParentModal = ({ isOpen, onClose, parent, onSave }) => {
+  const [formData, setFormData] = useState(parent);
+
+  useEffect(() => {
+    setFormData(parent);
+  }, [parent]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md">
+      <div className="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="p-8 border-b border-gray-800 flex justify-between items-center sticky top-0 bg-neutral-900 z-10">
+          <h2 className="text-2xl font-black uppercase italic text-white">Edit Parent</h2>
+          <X className="text-gray-500 cursor-pointer hover:text-white" onClick={onClose} />
+        </div>
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">First Name</label>
+              <input required name="first_name" value={formData?.first_name || ''} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={handleInputChange} />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Last Name</label>
+              <input required name="last_name" value={formData?.last_name || ''} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={handleInputChange} />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Email Address</label>
+              <input required type="email" name="email" value={formData?.email || ''} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={handleInputChange} />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Phone Number</label>
+              <input name="phone" value={formData?.phone || ''} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={handleInputChange} />
+            </div>
+          </div>
+          <button type="submit" className="w-full bg-[#EF4444] text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-500/20">
+            Save Changes
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const DrillModal = ({ onClose, onSubmit, newDrill, setNewDrill }) => ( 
   <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md"> 
     <div className="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden"> 
@@ -104,7 +157,7 @@ const DrillModal = ({ onClose, onSubmit, newDrill, setNewDrill }) => (
       </form> 
     </div> 
   </div> 
-); 
+);  
 
 // --- MAIN DASHBOARD --- 
 
@@ -132,7 +185,8 @@ export default function AdminDashboard() {
   // Modal Visibility 
   const [isGameModalOpen, setIsGameModalOpen] = useState(false); 
   const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false); 
-  const [isDrillModalOpen, setIsDrillModalOpen] = useState(false); 
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedParent, setSelectedParent] = useState<any>(null);
 
   // Form State 
   const [newGame, setNewGame] = useState({ date: '', opponent: '', location: 'Home' }); 
@@ -242,10 +296,22 @@ export default function AdminDashboard() {
     fetchData(); 
   }; 
 
-  const handleAssignTeam = async (coachId: string, teamId: string) => { 
-    const { error } = await supabase.from('coaches').update({ team_id: teamId }).eq('id', coachId); 
-    if (!error) fetchData(); 
-  }; 
+  const openEditModal = (parent: any) => {
+    setSelectedParent(parent);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveParent = async (updatedParent: any) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update(updatedParent)
+      .eq('id', updatedParent.id);
+
+    if (!error) {
+      setIsEditModalOpen(false);
+      fetchData();
+    }
+  };
 
   if (loading) { 
     return ( 
@@ -287,7 +353,7 @@ export default function AdminDashboard() {
                   <th onClick={() => handleSort('first_name')} className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider cursor-pointer hover:text-white">First Name</th>
                   <th onClick={() => handleSort('email')} className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider cursor-pointer hover:text-white">Email Address</th>
                   <th className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider">Phone Number</th>
-                  <th className="p-4 text-right text-xs font-black uppercase text-gray-400 tracking-wider">Actions</th>
+                  <th className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -297,13 +363,12 @@ export default function AdminDashboard() {
                     <td className="p-4 text-white font-bold">{u.first_name || '-'}</td>
                     <td className="p-4 text-gray-400">{u.email}</td>
                     <td className="p-4 text-gray-400">{u.phone}</td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-4">
-                        <Link to={`/admin/parent/${u.id}`} className="text-white font-bold hover:text-[#EF4444] transition-colors">Edit</Link>
-                        <button onClick={() => handleDeleteParent(u.id)} className="text-gray-600 hover:text-red-500">
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
+                    <td className="p-4">
+                      {data.roster.some((player: any) => player.user_id === u.id) ? (
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-900 text-green-300">Active</span>
+                      ) : (
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-900 text-yellow-300">Pending</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -398,6 +463,15 @@ export default function AdminDashboard() {
           setNewDrill={setNewDrill} 
         /> 
       )} 
+
+      {isEditModalOpen && (
+        <EditParentModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          parent={selectedParent}
+          onSave={handleSaveParent}
+        />
+      )}
 
       {isGameModalOpen && ( 
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4"> 
