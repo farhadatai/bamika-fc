@@ -123,7 +123,7 @@ export default function Register() {
               name="firstName"
               placeholder="First Name"
               onChange={handleInputChange}
-              className="w-full p-3 bg-gray-800 text-white border border-gray-700 rounded-md focus:ring-[#EF4444] focus:border-[#EF4444]"
+              className="input-primary"
               required
             />
             <input
@@ -131,7 +131,7 @@ export default function Register() {
               name="lastName"
               placeholder="Last Name"
               onChange={handleInputChange}
-              className="w-full p-3 bg-gray-800 text-white border border-gray-700 rounded-md focus:ring-[#EF4444] focus:border-[#EF4444]"
+              className="input-primary"
               required
             />
           </div>
@@ -140,7 +140,7 @@ export default function Register() {
             name="email"
             placeholder="Email Address"
             onChange={handleInputChange}
-            className="w-full p-3 bg-gray-800 text-white border border-gray-700 rounded-md focus:ring-[#EF4444] focus:border-[#EF4444]"
+            className="input-primary"
             required
           />
           <input
@@ -148,7 +148,7 @@ export default function Register() {
             name="phone"
             placeholder="Phone Number"
             onChange={handleInputChange}
-            className="w-full p-3 bg-gray-800 text-white border border-gray-700 rounded-md focus:ring-[#EF4444] focus:border-[#EF4444]"
+            className="input-primary"
             required
           />
           <input
@@ -156,7 +156,7 @@ export default function Register() {
             name="password"
             placeholder="Password"
             onChange={handleInputChange}
-            className="w-full p-3 bg-gray-800 text-white border border-gray-700 rounded-md focus:ring-[#EF4444] focus:border-[#EF4444]"
+            className="input-primary"
             required
           />
           <input
@@ -164,13 +164,13 @@ export default function Register() {
             name="confirmPassword"
             placeholder="Confirm Password"
             onChange={handleInputChange}
-            className="w-full p-3 bg-gray-800 text-white border border-gray-700 rounded-md focus:ring-[#EF4444] focus:border-[#EF4444]"
+            className="input-primary"
             required
           />
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#EF4444] text-white py-3 rounded-md font-bold uppercase hover:bg-red-700 disabled:opacity-50"
+            className="btn-primary w-full"
           >
             {loading ? 'Creating Account...' : 'Create Account'}
           </button>

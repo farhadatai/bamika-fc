@@ -2,17 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
-  background-color: #000000 !important;
+body {
+  @apply bg-black;
 }
 
-:root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-  line-height: 1.5;
-  font-weight: 400;
+.btn-primary {
+  @apply bg-[#EF4444] text-white font-bold uppercase py-2 px-4 rounded hover:bg-red-700 transition-colors;
+}
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.input-primary {
+  @apply bg-neutral-900 border border-gray-800 rounded-xl p-4 text-white font-bold focus:border-[#EF4444] outline-none;
 }

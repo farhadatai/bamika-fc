@@ -17,38 +17,38 @@ const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach }) => (
         <div className="grid md:grid-cols-2 gap-6"> 
           <div> 
             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">First Name</label> 
-            <input required className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={e => setNewCoach({...newCoach, first_name: e.target.value})} /> 
+            <input required className="input-primary" onChange={e => setNewCoach({...newCoach, first_name: e.target.value})} /> 
           </div> 
           <div> 
             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Last Name</label> 
-            <input required className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={e => setNewCoach({...newCoach, last_name: e.target.value})} /> 
-          </div> 
-          <div> 
-            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Email Address</label> 
-            <input required type="email" className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={e => setNewCoach({...newCoach, email: e.target.value})} /> 
-          </div> 
-        </div> 
-        <div className="grid md:grid-cols-2 gap-6"> 
-          <div> 
-            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Primary Role</label> 
-            <select className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none appearance-none" onChange={e => setNewCoach({...newCoach, role: e.target.value})}> 
-              <option>Head Coach</option> 
-              <option>Assistant Coach</option> 
-              <option>Goalkeeper Coach</option> 
-              <option>Technical Director</option> 
-            </select> 
-          </div> 
-          <div> 
-            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Photo URL</label> 
-            <input placeholder="https://..." className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={e => setNewCoach({...newCoach, photo_url: e.target.value})} /> 
-          </div> 
-        </div> 
-        <div> 
-          <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Professional Bio</label> 
-          <textarea rows={4} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none resize-none" placeholder="Describe the coach's experience and philosophy..." onChange={e => setNewCoach({...newCoach, bio: e.target.value})} /> 
-        </div> 
-        <button type="submit" className="w-full bg-[#EF4444] text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-500/20"> 
-          Complete Onboarding 
+            <input required className="input-primary" onChange={e => setNewCoach({...newCoach, last_name: e.target.value})} />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Email Address</label>
+            <input required type="email" className="input-primary" onChange={e => setNewCoach({...newCoach, email: e.target.value})} />
+          </div>
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div>
+            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Primary Role</label>
+            <select className="input-primary appearance-none" onChange={e => setNewCoach({...newCoach, role: e.target.value})}>
+              <option>Head Coach</option>
+              <option>Assistant Coach</option>
+              <option>Goalkeeper Coach</option>
+              <option>Technical Director</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Photo URL</label>
+            <input placeholder="https://..." className="input-primary" onChange={e => setNewCoach({...newCoach, photo_url: e.target.value})} />
+          </div>
+        </div>
+        <div>
+          <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Professional Bio</label>
+          <textarea rows={4} className="input-primary resize-none" placeholder="Describe the coach's experience and philosophy..." onChange={e => setNewCoach({...newCoach, bio: e.target.value})} />
+        </div>
+        <button type="submit" className="btn-primary w-full">
+          Complete Onboarding
         </button> 
       </form> 
     </div> 
@@ -84,22 +84,22 @@ const EditParentModal = ({ isOpen, onClose, parent, onSave }) => {
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">First Name</label>
-              <input required name="first_name" value={formData?.first_name || ''} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={handleInputChange} />
+              <input required name="first_name" value={formData?.first_name || ''} className="input-primary" onChange={handleInputChange} />
             </div>
             <div>
               <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Last Name</label>
-              <input required name="last_name" value={formData?.last_name || ''} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={handleInputChange} />
+              <input required name="last_name" value={formData?.last_name || ''} className="input-primary" onChange={handleInputChange} />
             </div>
             <div>
               <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Email Address</label>
-              <input required type="email" name="email" value={formData?.email || ''} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={handleInputChange} />
+              <input required type="email" name="email" value={formData?.email || ''} className="input-primary" onChange={handleInputChange} />
             </div>
             <div>
               <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Phone Number</label>
-              <input name="phone" value={formData?.phone || ''} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={handleInputChange} />
+              <input name="phone" value={formData?.phone || ''} className="input-primary" onChange={handleInputChange} />
             </div>
           </div>
-          <button type="submit" className="w-full bg-[#EF4444] text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-500/20">
+          <button type="submit" className="btn-primary w-full">
             Save Changes
           </button>
         </form>
@@ -117,43 +117,43 @@ const DrillModal = ({ onClose, onSubmit, newDrill, setNewDrill }) => (
       </div> 
       <form onSubmit={onSubmit} className="p-8 space-y-6"> 
         <div> 
-          <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">YouTube Video URL</label> 
-          <input required placeholder="https://www.youtube.com/watch?v=..." className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none transition-all" onChange={(e) => setNewDrill({ ...newDrill, video_url: e.target.value })} /> 
-        </div> 
-        <div className="grid md:grid-cols-2 gap-6"> 
-          <div> 
-            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Drill Title</label> 
-            <input required className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewDrill({ ...newDrill, title: e.target.value })} /> 
-          </div> 
-          <div> 
-            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Category</label> 
-            <select className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none appearance-none" onChange={(e) => setNewDrill({ ...newDrill, category: e.target.value })}> 
-              <option>Dribbling</option> 
-              <option>Passing</option> 
-              <option>Shooting</option> 
-              <option>Tactical</option> 
-              <option>Physical</option> 
-            </select> 
-          </div> 
-        </div> 
-        <div className="grid md:grid-cols-2 gap-6"> 
-          <div> 
-            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Difficulty</label> 
-            <select className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewDrill({ ...newDrill, difficulty: e.target.value })}> 
-              <option>Beginner</option> 
-              <option>Intermediate</option> 
-              <option>Advanced</option> 
-              <option>Pro</option> 
-            </select> 
-          </div> 
-          <div> 
-            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Duration (Minutes)</label> 
-            <input type="number" placeholder="e.g. 15" className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewDrill({ ...newDrill, duration: parseInt(e.target.value) })} /> 
-          </div> 
-        </div> 
-        <button type="submit" className="w-full bg-[#EF4444] text-white py-5 rounded-2xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-3"> 
-          <Upload size={20} /> Publish to Lab 
-        </button> 
+           <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">YouTube Video URL</label> 
+           <input required placeholder="https://www.youtube.com/watch?v=..." className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, video_url: e.target.value })} /> 
+         </div> 
+         <div className="grid md:grid-cols-2 gap-6"> 
+           <div> 
+             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Drill Title</label> 
+             <input required className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, title: e.target.value })} /> 
+           </div> 
+           <div> 
+             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Category</label> 
+             <select className="input-primary appearance-none" onChange={(e) => setNewDrill({ ...newDrill, category: e.target.value })}> 
+               <option>Dribbling</option> 
+               <option>Passing</option> 
+               <option>Shooting</option> 
+               <option>Tactical</option> 
+               <option>Physical</option> 
+             </select> 
+           </div> 
+         </div> 
+         <div className="grid md:grid-cols-2 gap-6"> 
+           <div> 
+             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Difficulty</label> 
+             <select className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, difficulty: e.target.value })}> 
+               <option>Beginner</option> 
+               <option>Intermediate</option> 
+               <option>Advanced</option> 
+               <option>Pro</option> 
+             </select> 
+           </div> 
+           <div> 
+             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Duration (Minutes)</label> 
+             <input type="number" placeholder="e.g. 15" className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, duration: parseInt(e.target.value) })} /> 
+           </div> 
+         </div> 
+         <button type="submit" className="btn-primary w-full flex items-center justify-center gap-3"> 
+           <Upload size={20} /> Publish to Lab 
+         </button> 
       </form> 
     </div> 
   </div> 
@@ -348,12 +348,13 @@ export default function AdminDashboard() {
           <div className="bg-neutral-900 border border-gray-800 rounded-3xl overflow-hidden">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-gray-800 bg-neutral-800/50">
-                  <th onClick={() => handleSort('last_name')} className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider cursor-pointer hover:text-white">Last Name</th>
-                  <th onClick={() => handleSort('first_name')} className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider cursor-pointer hover:text-white">First Name</th>
-                  <th onClick={() => handleSort('email')} className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider cursor-pointer hover:text-white">Email Address</th>
-                  <th className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider">Phone Number</th>
-                  <th className="p-4 text-left text-xs font-black uppercase text-gray-400 tracking-wider">Status</th>
+                <tr className="bg-neutral-900 border-b border-gray-800">
+                  <th onClick={() => handleSort('last_name')} className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider cursor-pointer">Last Name</th>
+                  <th onClick={() => handleSort('first_name')} className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider cursor-pointer">First Name</th>
+                  <th onClick={() => handleSort('email')} className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider cursor-pointer">Email Address</th>
+                  <th className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider">Phone Number</th>
+                  <th className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider">Status</th>
+                  <th className="p-4 text-right text-xs font-bold uppercase text-white tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -481,12 +482,12 @@ export default function AdminDashboard() {
               <X className="cursor-pointer text-gray-500" onClick={() => setIsGameModalOpen(false)} /> 
             </div> 
             <form onSubmit={handleAddGame} className="p-8 space-y-4"> 
-              <input type="date" required value={newGame.date} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewGame({ ...newGame, date: e.target.value })} /> 
-              <input type="text" placeholder="Opponent Name" required value={newGame.opponent} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewGame({ ...newGame, opponent: e.target.value })} /> 
-              <input type="text" placeholder="Location" value={newGame.location} className="w-full bg-black border border-gray-800 p-4 rounded-xl text-white font-bold focus:border-[#EF4444] outline-none" onChange={(e) => setNewGame({ ...newGame, location: e.target.value })} /> 
-              <button type="submit" className="w-full bg-[#EF4444] text-white py-4 rounded-xl font-black uppercase italic tracking-widest hover:bg-red-700 transition-all"> 
-                Schedule Match 
-              </button> 
+              <input type="date" required value={newGame.date} className="input-primary" onChange={(e) => setNewGame({ ...newGame, date: e.target.value })} /> 
+               <input type="text" placeholder="Opponent Name" required value={newGame.opponent} className="input-primary" onChange={(e) => setNewGame({ ...newGame, opponent: e.target.value })} /> 
+               <input type="text" placeholder="Location" value={newGame.location} className="input-primary" onChange={(e) => setNewGame({ ...newGame, location: e.target.value })} /> 
+               <button type="submit" className="btn-primary w-full"> 
+                 Schedule Match 
+               </button> 
             </form> 
           </div> 
         </div> 
