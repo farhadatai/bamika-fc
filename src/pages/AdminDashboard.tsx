@@ -389,6 +389,14 @@ export default function AdminDashboard() {
                           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-900 text-yellow-300">Pending</span>
                         )}
                       </td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-4">
+                          <button onClick={() => openEditModal(u)} className="text-white font-bold hover:text-[#EF4444] transition-colors">Edit</button>
+                          <button onClick={() => handleDeleteParent(u.id)} className="text-gray-600 hover:text-red-500">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

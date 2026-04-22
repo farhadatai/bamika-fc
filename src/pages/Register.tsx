@@ -15,47 +15,17 @@ export default function Register() {
     confirmPassword: '',
   });
 
+  const [error, setError] = useState<string | null>(null);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-
-    if (e.target.name === 'password') {
-      const password = e.target.value;
-      if (password.length < 8) {
-        setPasswordError('Password must be at least 8 characters long.');
-      } else if (!/[A-Z]/.test(password)) {
-        setPasswordError('Password must contain at least one uppercase letter.');
-      } else if (!/[a-z]/.test(password)) {
-        setPasswordError('Password must contain at least one lowercase letter.');
-      } else if (!/[0-9]/.test(password)) {
-        setPasswordError('Password must contain at least one number.');
-      } else if (!/[^A-Za-z0-9]/.test(password)) {
-        setPasswordError('Password must contain at least one special character.');
-      } else {
-        setPasswordError(null);
-      }
-    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long.');
-      return;
-    }
-    if (!/[A-Z]/.test(formData.password)) {
-      setError('Password must contain at least one uppercase letter.');
-      return;
-    }
-    if (!/[a-z]/.test(formData.password)) {
-      setError('Password must contain at least one lowercase letter.');
-      return;
-    }
-    if (!/[0-9]/.test(formData.password)) {
-      setError('Password must contain at least one number.');
-      return;
-    }
-    if (!/[^A-Za-z0-9]/.test(formData.password)) {
-      setError('Password must contain at least one special character.');
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
 
@@ -112,9 +82,9 @@ export default function Register() {
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">
-          {passwordError && (
+          {error && (
             <div className="bg-red-900 border border-red-700 text-red-300 px-4 py-3 rounded-md">
-              {passwordError}
+              {error}
             </div>
           )}
 
@@ -148,7 +118,7 @@ export default function Register() {
             name="phone"
             placeholder="Phone Number"
             onChange={handleInputChange}
-            className="input-primary"
+            className="input-primary w-full"
             required
           />
           <input
@@ -156,7 +126,7 @@ export default function Register() {
             name="password"
             placeholder="Password"
             onChange={handleInputChange}
-            className="input-primary"
+            className="input-primary w-full"
             required
           />
           <input
@@ -164,7 +134,7 @@ export default function Register() {
             name="confirmPassword"
             placeholder="Confirm Password"
             onChange={handleInputChange}
-            className="input-primary"
+            className="input-primary w-full"
             required
           />
           <button
