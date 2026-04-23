@@ -104,7 +104,6 @@ const EditParentModal = ({ isOpen, onClose, parent, onSave }) => {
             Save Changes
           </button>
         </form>
-      </form>
     </div>
   </div>
 );
