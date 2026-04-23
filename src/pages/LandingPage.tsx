@@ -9,8 +9,17 @@ import {
   Instagram,
   MapPin,
   Clock,
+  Play,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+
+// UTILS
+const getYoutubeId = (url: string) => {
+  const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+};
+
 
 interface Game {
   id: string
@@ -26,6 +35,30 @@ interface Coach {
   bio: string
   image: string
 }
+
+interface Drill {
+  id: string;
+  title: string;
+  video_url: string;
+  thumbnail_url: string;
+  duration: number;
+  difficulty: string;
+  description: string;
+}
+
+interface TrainingSession {
+  day: string;
+  time: string;
+  ageGroup: string;
+  location: string;
+}
+
+const trainingSchedule: TrainingSession[] = [
+  { day: 'Monday & Wednesday', time: '6:00 PM - 7:30 PM', ageGroup: 'U8-U10', location: 'Elk Grove Park' },
+  { day: 'Tuesday & Thursday', time: '6:00 PM - 7:30 PM', ageGroup: 'U12-U14', location: 'Bartholomew Sports Park' },
+  { day: 'Friday', time: '7:00 PM - 8:30 PM', ageGroup: 'U16+', location: 'Hal Bartholomew Sports Park' },
+];
+
 
 const coachesData: Coach[] = [
   {
@@ -123,11 +156,77 @@ const CoachCard = ({ coach }: { coach: Coach }) => {
   )
 }
 
+const DrillCard = ({ drill, onPlay }: { drill: Drill, onPlay: (url: string) => void }) => (
+  <div className="bg-neutral-900 rounded-3xl overflow-hidden border border-gray-800 group hover:border-[#EF4444] transition-all">
+    <div className="relative aspect-video bg-black overflow-hidden cursor-pointer" onClick={() => onPlay(drill.video_url)}>
+      <img src={drill.thumbnail_url} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-12 h-12 bg-[#EF4444] rounded-full flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-transform">
+          <Play size={20} fill="white" />
+        </div>
+      </div>
+      <span className="absolute bottom-4 left-4 bg-black/80 text-[9px] font-black uppercase text-white px-3 py-1 rounded-md border border-white/10">
+        {drill.duration} MIN
+      </span>
+    </div>
+    <div className="p-6">
+      <div className="flex justify-between items-start mb-3">
+        <h3 className="text-xl font-black uppercase italic text-white leading-tight">
+          {drill.title}
+        </h3>
+        <span className="text-[9px] font-black text-[#EF4444] uppercase tracking-tighter">
+          {drill.difficulty}
+        </span>
+      </div>
+      <p className="text-gray-500 text-sm line-clamp-2 mb-6">
+        {drill.description}
+      </p>
+      <button 
+         onClick={() => onPlay(drill.video_url)} 
+         className="w-full py-3 bg-[#EF4444] text-white rounded-xl text-[10px] font-black uppercase italic hover:bg-red-700 transition-all shadow-lg shadow-red-500/20" 
+       > 
+         Watch Drill
+       </button> 
+     </div> 
+   </div> 
+)
+
+const VideoModal = ({ videoUrl, onClose }) => {
+  if (!videoUrl) return null;
+  const videoId = getYoutubeId(videoUrl);
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 md:p-10" onClick={onClose}>
+      <div className="relative w-full max-w-5xl aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl border border-gray-800">
+        <button 
+          onClick={onClose} 
+          className="absolute top-4 right-4 z-10 bg-black/50 hover:bg-[#EF4444] text-white p-2 rounded-full transition-all"
+        > 
+          <X size={24} /> 
+        </button> 
+        <iframe 
+          className="w-full h-full" 
+          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} 
+          title="Training Drill" 
+          frameBorder="0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+          allowFullScreen 
+        ></iframe> 
+      </div> 
+    </div>
+  );
+};
+
+
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [games, setGames] = useState<Game[]>([])
   const [loadingGames, setLoadingGames] = useState(true)
+  const [drills, setDrills] = useState<Drill[]>([])
+  const [loadingDrills, setLoadingDrills] = useState(true)
+  const [activeVideo, setActiveVideo] = useState<string | null>(null);
+
 
   useEffect(() => {
     const handleScroll = () => {
@@ -140,6 +239,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     fetchUpcomingGames()
+    fetchDrills()
   }, [])
 
   const fetchUpcomingGames = async () => {
@@ -161,6 +261,19 @@ export default function LandingPage() {
       setLoadingGames(false)
     }
   }
+
+  const fetchDrills = async () => {
+    setLoadingDrills(true);
+    try {
+      const { data, error } = await supabase.from('drills').select('*').order('created_at', { ascending: false }).limit(6);
+      if (error) throw error;
+      setDrills(data || []);
+    } catch (error) {
+      console.error('Error fetching drills:', error);
+    } finally {
+      setLoadingDrills(false);
+    }
+  };
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id)
@@ -282,6 +395,58 @@ export default function LandingPage() {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* TRAINING SCHEDULE */}
+      <section id="schedule" className="py-24 bg-neutral-900 w-full">
+        <div className="w-full px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-extrabold text-white uppercase tracking-tight mb-4">
+              Training <span className="text-[#EF4444]">Schedule</span>
+            </h2>
+            <div className="h-1 w-24 bg-[#EF4444] mx-auto"></div>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
+            {trainingSchedule.map((session, index) => (
+              <div key={index} className="bg-black border border-gray-800 rounded-2xl p-6 text-center hover:border-[#EF4444] hover:scale-105 transition-all duration-300 group flex flex-col items-center h-full shadow-lg hover:shadow-red-900/20">
+                <h3 className="text-xl font-bold text-white mb-2">{session.ageGroup}</h3>
+                <p className="text-[#EF4444] font-bold uppercase text-xs tracking-wider mb-4">{session.day}</p>
+                <p className="text-gray-400 leading-relaxed text-sm">{session.time}</p>
+                <p className="text-gray-400 leading-relaxed text-sm mt-2">{session.location}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      
+      {/* TRAINING LAB */}
+      <section id="training-lab" className="py-24 bg-black w-full">
+        <div className="w-full px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-extrabold text-white uppercase tracking-tight mb-4">
+              Training <span className="text-[#EF4444]">Lab</span>
+            </h2>
+            <p className="text-gray-400 max-w-2xl mx-auto">Hone your skills with our curated collection of training drills and tutorials.</p>
+            <div className="h-1 w-24 bg-[#EF4444] mx-auto mt-4"></div>
+          </div>
+          {loadingDrills ? (
+            <div className="text-center text-gray-400">Loading drills...</div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+              {drills.map((drill) => (
+                <DrillCard key={drill.id} drill={drill} onPlay={setActiveVideo} />
+              ))}
+            </div>
+          )}
+           <div className="text-center mt-12">
+            <Link
+              to="/login"
+              className="px-8 py-3 bg-transparent border-2 border-[#EF4444] hover:bg-[#EF4444] text-white font-black italic uppercase tracking-wider skew-x-[-12deg] transition-all transform hover:scale-105"
+            >
+              <span className="block skew-x-[12deg]">Access Full Lab</span>
+            </Link>
           </div>
         </div>
       </section>
@@ -412,6 +577,9 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+      
+      <VideoModal videoUrl={activeVideo} onClose={() => setActiveVideo(null)} />
+
     </div>
   )
 }

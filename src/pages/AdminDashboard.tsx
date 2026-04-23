@@ -56,10 +56,30 @@ const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach }) => (
 );
 
 const EditParentModal = ({ isOpen, onClose, parent, onSave }) => {
-  const [formData, setFormData] = useState(parent);
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: ''
+  });
 
   useEffect(() => {
-    setFormData(parent);
+    if (parent) {
+      setFormData({
+        id: parent.id,
+        first_name: parent.first_name || '',
+        last_name: parent.last_name || '',
+        email: parent.email || '',
+        phone: parent.phone || '',
+      });
+    } else {
+      setFormData({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: ''
+      });
+    }
   }, [parent]);
 
   const handleInputChange = (e) => {
@@ -190,7 +210,7 @@ export default function AdminDashboard() {
   const [selectedParent, setSelectedParent] = useState(null);
 
   // Form State
-  const [newGame, setNewGame] = useState({ date: '', opponent: '', location: 'Home' });
+  const [newGame, setNewGame] = useState({ date: '', time: '', opponent: '', location: 'Home' });
   const [newCoach, setNewCoach] = useState({ first_name: '', last_name: '', email: '', role: 'Coach', bio: '', photo_url: '' });
   const [newDrill, setNewDrill] = useState({ title: '', video_url: '', category: 'Dribbling', difficulty: 'Beginner', duration: 15 });
 
@@ -244,7 +264,7 @@ export default function AdminDashboard() {
     e.preventDefault();
     const { error } = await supabase.from('games').insert([newGame]);
     if (!error) {
-      setNewGame({ date: '', opponent: '', location: 'Home' });
+      setNewGame({ date: '', time: '', opponent: '', location: 'Home' });
       setIsGameModalOpen(false);
       fetchData();
     }
@@ -252,26 +272,62 @@ export default function AdminDashboard() {
 
   const handleOnboardSubmit = async (e) => {
     e.preventDefault();
-    const { data: profile, error: pError } = await supabase.from('profiles').insert([{
-      full_name: `${newCoach.first_name} ${newCoach.last_name}`,
+    
+    // Generate a temporary password for the new coach
+    const tempPassword = Math.random().toString(36).slice(-8);
+
+    // 1. Create a new user in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: newCoach.email,
-      role: 'coach',
-      photo_url: newCoach.photo_url
-    }]).select().single();
+      password: tempPassword,
+      options: {
+        data: {
+          first_name: newCoach.first_name,
+          last_name: newCoach.last_name,
+          role: 'coach',
+        }
+      }
+    });
 
-    if (pError) return alert(pError.message);
+    if (authError) {
+      return alert(`Error creating auth user: ${authError.message}`);
+    }
+    
+    const user = authData.user;
 
-    const { error: cError } = await supabase.from('coaches').insert([{
-      id: profile.id,
-      name: `${newCoach.first_name} ${newCoach.last_name}`,
-      role: newCoach.role,
-      bio: newCoach.bio,
-      is_published: true
-    }]);
+    if (user) {
+      // 2. Insert into 'profiles' table
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: user.id,
+        first_name: newCoach.first_name,
+        last_name: newCoach.last_name,
+        email: newCoach.email,
+        role: 'coach',
+        photo_url: newCoach.photo_url
+      });
 
-    if (!cError) {
-      setIsOnboardModalOpen(false);
-      fetchData();
+      if (profileError) {
+        // TODO: Handle user deletion if profile creation fails
+        return alert(`Error creating profile: ${profileError.message}`);
+      }
+
+      // 3. Insert into 'coaches' table
+      const { error: cError } = await supabase.from('coaches').insert([{
+        id: user.id, // Use the same ID from auth user
+        name: `${newCoach.first_name} ${newCoach.last_name}`,
+        role: newCoach.role,
+        bio: newCoach.bio,
+        is_published: true
+      }]);
+
+      if (!cError) {
+        setIsOnboardModalOpen(false);
+        fetchData();
+        alert(`Coach onboarded! Temporary Password: ${tempPassword}`);
+      } else {
+        // TODO: Handle user/profile deletion if coach creation fails
+        alert(cError.message);
+      }
     }
   };
   
@@ -508,6 +564,7 @@ export default function AdminDashboard() {
               </div>
               <form onSubmit={handleAddGame} className="p-8 space-y-4">
                 <input type="date" required value={newGame.date} className="input-primary" onChange={(e) => setNewGame({ ...newGame, date: e.target.value })} />
+                <input type="time" required value={newGame.time} className="input-primary" onChange={(e) => setNewGame({ ...newGame, time: e.target.value })} />
                 <input type="text" placeholder="Opponent Name" required value={newGame.opponent} className="input-primary" onChange={(e) => setNewGame({ ...newGame, opponent: e.target.value })} />
                 <input type="text" placeholder="Location" value={newGame.location} className="input-primary" onChange={(e) => setNewGame({ ...newGame, location: e.target.value })} />
                 <button type="submit" className="btn-primary w-full">
