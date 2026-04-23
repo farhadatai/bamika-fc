@@ -12,7 +12,7 @@ export const Layout = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
-      <main>
+      <main className="flex flex-col items-center w-full max-w-7xl mx-auto px-4">
         <Outlet />
       </main>
     </div>

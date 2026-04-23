@@ -17,7 +17,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           <div className="flex items-center">
-            <Link to="/" className="flex items-center gap-4 text-2xl font-black uppercase italic text-white">
+            <Link to="/" className="flex items-center gap-4 text-2xl heading-bamika">
               <img src="/logo.jpg" alt="Bamika FC Logo" className="h-12 w-auto" />
               <span>BAMIKA <span className="text-[#D4AF37]">FC</span></span>
             </Link>
