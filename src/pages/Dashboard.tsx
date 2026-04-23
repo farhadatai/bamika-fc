@@ -29,7 +29,7 @@ export default function Dashboard() {
           </Link>
         )}
 
-        <Link to="/register-new-athlete" className="bg-gray-800 p-6 rounded-lg hover:bg-gray-700 transition-colors">
+        <Link to="/register/new-athlete" className="bg-gray-800 p-6 rounded-lg hover:bg-gray-700 transition-colors">
           <h2 class="text-2xl font-black uppercase italic text-white mb-2">Register a New Athlete</h2>
           <p className="text-gray-400">Add a new player to your family's account.</p>
         </Link>

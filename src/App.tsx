@@ -75,7 +75,7 @@ function App() {
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/register/new" element={<RegisterNewAthlete />} />
+          <Route path="/register-new-athlete" element={<RegisterNewAthlete />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/parent/:id" element={<ParentDetailView />} />
           <Route path="/coach" element={<CoachDashboard />} />
