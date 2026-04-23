@@ -12,6 +12,7 @@ const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach }) => (
       <div className="p-8 border-b border-gray-800 flex justify-between items-center sticky top-0 bg-neutral-900 z-10"> 
         <h2 className="text-2xl font-black uppercase italic text-white">Onboard New <span className="text-[#D4AF37]">Coach</span></h2> 
         <X className="text-gray-500 cursor-pointer hover:text-white" onClick={onClose} /> 
+  
       </div> 
       <form onSubmit={onSubmit} className="p-8 space-y-6"> 
         <div className="grid md:grid-cols-2 gap-6"> 
@@ -518,6 +519,5 @@ export default function AdminDashboard() {
           </div> 
         </div> 
       )} 
-    </div> 
   ); 
 }
