@@ -293,9 +293,7 @@ export default function LandingPage() {
         </div>
 
         <div className="relative z-10 w-full px-6 text-center text-white space-y-8 max-w-5xl mx-auto">
-          <h1 className="text-6xl md:text-8xl font-extrabold tracking-tight uppercase leading-none drop-shadow-2xl">
-            BAMIKA <span className="text-[#EF4444]">FC</span>
-          </h1>
+          <img src="/logo.png" alt="Bamika FC Logo" className="w-auto h-48 mx-auto" />
 
           <p className="text-xl md:text-3xl text-gray-200 font-medium max-w-3xl mx-auto">
             Elk Grove’s Premier Youth Soccer Academy.
