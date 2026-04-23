@@ -119,7 +119,7 @@ router.post('/create-portal-session', async (req, res) => {
   const { customerId } = req.body;
 
   const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VITE_BASE_URL || 'https://bamika-fc.vercel.app';
-  const baseUrl = rawBaseUrl.endsWith('/') ? rawCBaseUrl.slice(0, -1) : rawBaseUrl;
+  const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
 
   try {
     const session = await stripe.billingPortal.sessions.create({
