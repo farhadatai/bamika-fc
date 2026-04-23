@@ -253,8 +253,7 @@ export default function AdminDashboard() {
   const handleOnboardSubmit = async (e) => {
     e.preventDefault();
     const { data: profile, error: pError } = await supabase.from('profiles').insert([{
-      first_name: newCoach.first_name,
-      last_name: newCoach.last_name,
+      full_name: `${newCoach.first_name} ${newCoach.last_name}`,
       email: newCoach.email,
       role: 'coach',
       photo_url: newCoach.photo_url
@@ -417,26 +416,15 @@ export default function AdminDashboard() {
           )}
 
           {activeTab === 'coaches' && (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4">
               {data.coaches.map((coach) => (
-                <div key={coach.id} className="bg-neutral-900 border border-gray-800 rounded-2xl p-6 group flex flex-col">
-                  <div className="flex items-center gap-4 mb-6">
-                    <img src={coach.profiles?.photo_url || "https://via.placeholder.com/150"} className="h-16 w-16 object-cover rounded-full border-2 border-gray-800" />
-                    <div>
-                      <h3 className="text-lg font-black uppercase text-white">{coach.name}</h3>
-                      <p className="text-[#EF4444] text-[10px] font-black uppercase">{coach.role}</p>
-                    </div>
-                  </div>
-                  <select
-                    className="w-full bg-black border border-gray-800 p-3 rounded-xl text-xs text-white font-bold outline-none focus:border-[#EF4444]"
-                    value={coach.team_id || ''}
-                    onChange={(e) => handleAssignTeam(coach.id, e.target.value)}
-                  >
-                    <option value="">Unassigned</option>
-                    <option value="u10">U10 Junior Academy</option>
-                    <option value="u12">U12 Competitive</option>
-                    <option value="elite">Elite Performance</option>
-                  </select>
+                <div key={coach.id} className="bg-neutral-900 border border-gray-800 rounded-xl p-4 group flex flex-col text-center items-center">
+                  <img src={coach.profiles?.photo_url || "https://via.placeholder.com/150"} className="h-20 w-20 object-cover rounded-full border-2 border-gray-800 mb-4" />
+                  <h3 className="text-md font-bold uppercase text-white">{coach.name}</h3>
+                  <p className="text-[#D4AF37] text-[10px] font-bold uppercase mb-2">{coach.role}</p>
+                  {!coach.team_id && (
+                    <span className="bg-red-900 text-red-300 text-xs font-bold px-2 py-1 rounded-full">Unassigned</span>
+                  )}
                 </div>
               ))}
             </div>
