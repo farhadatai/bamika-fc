@@ -104,10 +104,10 @@ const EditParentModal = ({ isOpen, onClose, parent, onSave }) => {
             Save Changes
           </button>
         </form>
-      </div>
+      </form>
     </div>
-  );
-};
+  </div>
+);
 
 const DrillModal = ({ onClose, onSubmit, newDrill, setNewDrill }) => ( 
   <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md"> 
