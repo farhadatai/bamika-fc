@@ -30,6 +30,13 @@ alter table public.coaches add column if not exists team_id text;
 alter table public.coaches add column if not exists bio text;
 alter table public.coaches add column if not exists is_published boolean default true;
 
+alter table public.players add column if not exists parent_id uuid references public.profiles(id) on delete cascade;
+alter table public.players add column if not exists first_name text;
+alter table public.players add column if not exists last_name text;
+alter table public.players add column if not exists date_of_birth date;
+alter table public.players add column if not exists gender text;
+alter table public.players add column if not exists medical_conditions text;
+alter table public.players add column if not exists photo_url text;
 alter table public.players add column if not exists team_assigned text default 'Unassigned';
 alter table public.players add column if not exists position text default 'TBD';
 alter table public.players add column if not exists jersey_number text;
@@ -119,4 +126,4 @@ create policy "Admins can delete announcements" on public.announcements
 grant select on public.announcements to anon, authenticated;
 grant insert, update, delete on public.announcements to authenticated;
 grant select, update on public.coaches to authenticated;
-grant select, update on public.players to authenticated;
+grant select, insert, update on public.players to authenticated;

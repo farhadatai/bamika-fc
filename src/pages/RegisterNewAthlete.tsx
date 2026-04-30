@@ -20,6 +20,19 @@ const steps = ['Athlete', 'Photo', 'Waiver', 'Payment'];
 const fieldClass = 'w-full rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-[#EF4444] focus:ring-2 focus:ring-[#EF4444]/20';
 const labelClass = 'mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-500';
 const jerseySizes = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'S', 'M', 'L', 'XL', '2XL'];
+const playerSchemaMessage = 'Player registration needs the latest Supabase database update. Run the newest players registration fields SQL migration, then try this step again.';
+
+const isMissingPlayerSchemaError = (message: string) => (
+  (message.includes('players') && (
+    message.includes('first_name')
+    || message.includes('last_name')
+    || message.includes('parent_id')
+    || message.includes('jersey_size')
+    || message.includes('payment_status')
+  ))
+  || message.includes('row-level security policy')
+  || message.includes('permission denied')
+);
 
 export default function RegisterNewAthlete() {
   const { user } = useAuthStore();
@@ -120,7 +133,9 @@ export default function RegisterNewAthlete() {
         .eq('first_name', formData.firstName.trim())
         .eq('last_name', formData.lastName.trim());
 
-      if (existingPlayerError) throw new Error(existingPlayerError.message);
+      if (existingPlayerError) {
+        throw new Error(isMissingPlayerSchemaError(existingPlayerError.message) ? playerSchemaMessage : existingPlayerError.message);
+      }
 
       if (existingPlayer && existingPlayer.length > 0) {
         setError('You have already registered a player with this name. Please check your dashboard.');
@@ -150,7 +165,9 @@ export default function RegisterNewAthlete() {
         .select('id')
         .single();
 
-      if (playerError) throw playerError;
+      if (playerError) {
+        throw new Error(isMissingPlayerSchemaError(playerError.message) ? playerSchemaMessage : playerError.message);
+      }
       if (!newPlayer?.id) throw new Error('Unable to create player profile.');
 
       const payload = {
