@@ -1,6 +1,13 @@
 -- Required schema for the Bamika FC admin dashboard.
 -- Safe to run more than once in Supabase SQL Editor.
 
+alter table public.profiles add column if not exists first_name text;
+alter table public.profiles add column if not exists last_name text;
+alter table public.profiles add column if not exists email text;
+alter table public.profiles add column if not exists phone text;
+alter table public.profiles add column if not exists role text default 'user';
+alter table public.profiles add column if not exists photo_url text;
+
 create table if not exists public.announcements (
   id uuid default gen_random_uuid() primary key,
   title text not null,

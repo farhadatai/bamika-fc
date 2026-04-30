@@ -23,6 +23,12 @@ export default function Register() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const firstName = formData.firstName.trim();
+    const lastName = formData.lastName.trim();
+    const email = formData.email.trim();
+    const phone = formData.phone.trim();
+    const fullName = `${firstName} ${lastName}`.trim();
+
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match.');
       return;
@@ -33,13 +39,14 @@ export default function Register() {
 
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
+        email,
         password: formData.password,
         options: {
           data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            phone: formData.phone,
+            first_name: firstName,
+            last_name: lastName,
+            full_name: fullName,
+            phone,
           },
         },
       });
@@ -51,12 +58,15 @@ export default function Register() {
       if (authData.user) {
         const { error: profileError } = await supabase
           .from('profiles')
-          .insert({
+          .upsert({
             id: authData.user.id,
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            phone: formData.phone,
-          });
+            first_name: firstName,
+            last_name: lastName,
+            full_name: fullName,
+            email,
+            phone,
+            role: 'user',
+          }, { onConflict: 'id' });
 
         if (profileError) {
           throw new Error(profileError.message);
