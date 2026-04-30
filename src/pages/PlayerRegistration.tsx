@@ -125,7 +125,7 @@ export default function PlayerRegistration() {
     <div className="max-w-3xl mx-auto py-8">
       {/* Logo */}
       <div className="flex justify-center mb-6">
-        <img src="/Logo.png" alt="Bamika FC Logo" className="h-24 w-auto" />
+        <img src="/logo.png" alt="Bamika FC Logo" className="h-24 w-auto" />
       </div>
 
       {/* Progress Bar */}

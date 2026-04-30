@@ -23,7 +23,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-20">
           <div className="flex items-center">
             <Link to="/" onClick={closeMobileMenu} className="flex items-center gap-4 text-2xl heading-bamika">
-              <img src="/Logo.png" alt="Bamika FC Logo" className="h-10 w-auto" />
+              <img src="/logo.png" alt="Bamika FC Logo" className="h-10 w-auto" />
               <span>BAMIKA <span className="text-[#D4AF37]">FC</span></span>
             </Link>
           </div>

@@ -446,7 +446,7 @@ export default function LandingPage() {
               Elk Grove youth soccer academy
             </div>
 
-            <img src="/Logo.png" alt="Bamika FC Logo" className="mb-7 h-20 w-auto sm:h-32" />
+            <img src="/logo.png" alt="Bamika FC Logo" className="mb-7 h-20 w-auto sm:h-32" />
 
             <h1 className="heading-bamika max-w-4xl text-4xl leading-[0.95] sm:text-7xl lg:text-8xl">
               Build Skill. <span className="text-[#EF4444]">Play Brave.</span>
@@ -974,7 +974,7 @@ export default function LandingPage() {
           <div className="flex flex-col md:flex-row justify-between items-center gap-8 max-w-7xl mx-auto">
             <div className="text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
-                <img src="/Logo.png" alt="Bamika FC" className="h-8 w-auto" />
+                <img src="/logo.png" alt="Bamika FC" className="h-8 w-auto" />
                 <span className="text-xl font-bold tracking-tighter uppercase">
                   Bamika <span className="text-[#EF4444]">FC</span>
                 </span>

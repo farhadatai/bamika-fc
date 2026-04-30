@@ -75,7 +75,7 @@ export default function Register() {
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-neutral-900/50 border border-gray-800 rounded-2xl p-5 sm:p-8">
         <div className="text-center mb-8">
-          <img src="/Logo.png" alt="Bamika FC Logo" className="h-20 w-auto mx-auto mb-6 sm:h-24 sm:mb-8" />
+          <img src="/logo.png" alt="Bamika FC Logo" className="h-20 w-auto mx-auto mb-6 sm:h-24 sm:mb-8" />
           <h1 className="text-3xl font-black uppercase italic text-white sm:text-4xl">Join <span className="text-[#EF4444]">Bamika FC</span></h1>
           <p className="text-gray-400 mt-2">Create your parent account to get started.</p>
         </div>
