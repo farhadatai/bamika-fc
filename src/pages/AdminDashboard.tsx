@@ -1299,7 +1299,7 @@ export default function AdminDashboard() {
                           <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-400">{announcement.body}</p>
                           <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-gray-600">
                             {new Date(announcement.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            {announcement.expires_at ? ` - expires ${new Date(announcement.expires_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                            {announcement.expires_at ? ` - reference ${new Date(announcement.expires_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
                           </p>
                         </div>
                         <div className="flex shrink-0 flex-col gap-2">
