@@ -5,7 +5,6 @@ import { supabase } from '../lib/supabase';
 export default function Register() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -65,8 +64,8 @@ export default function Register() {
 
         navigate('/dashboard');
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to create your account.');
     } finally {
       setLoading(false);
     }
@@ -74,10 +73,10 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-neutral-900/50 border border-gray-800 rounded-2xl p-8">
+      <div className="w-full max-w-md bg-neutral-900/50 border border-gray-800 rounded-2xl p-5 sm:p-8">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Bamika FC Logo" className="h-24 w-auto mx-auto mb-8" />
-          <h1 className="text-4xl font-black uppercase italic text-white">Join <span className="text-[#EF4444]">Bamika FC</span></h1>
+          <img src="/Logo.png" alt="Bamika FC Logo" className="h-20 w-auto mx-auto mb-6 sm:h-24 sm:mb-8" />
+          <h1 className="text-3xl font-black uppercase italic text-white sm:text-4xl">Join <span className="text-[#EF4444]">Bamika FC</span></h1>
           <p className="text-gray-400 mt-2">Create your parent account to get started.</p>
         </div>
 

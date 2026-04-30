@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { uploadPhoto } from '../lib/upload';
 import { useAuthStore } from '../store/auth';
@@ -7,7 +6,6 @@ import { Upload, CheckCircle, ChevronRight, ChevronLeft, AlertCircle, Camera } f
 
 export default function PlayerRegistration() {
   const { user } = useAuthStore();
-  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,8 +108,8 @@ export default function PlayerRegistration() {
       if (data.url) {
         window.location.href = data.url;
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to start checkout.');
       setLoading(false);
     }
   };
@@ -127,7 +125,7 @@ export default function PlayerRegistration() {
     <div className="max-w-3xl mx-auto py-8">
       {/* Logo */}
       <div className="flex justify-center mb-6">
-        <img src="/logo.png" alt="Bamika FC Logo" className="h-24 w-auto" />
+        <img src="/Logo.png" alt="Bamika FC Logo" className="h-24 w-auto" />
       </div>
 
       {/* Progress Bar */}
@@ -426,8 +424,18 @@ export default function PlayerRegistration() {
               </div>
               <div className="flex justify-between pt-2">
                 <span className="text-lg font-bold">Monthly Membership</span>
-                <span className="text-lg font-bold text-primary">$50.00/mo</span>
+                <span className="text-lg font-bold text-primary">$50.00/mo promo</span>
               </div>
+              <div className="flex justify-between pt-2">
+                <span className="text-lg font-bold">Registration Fee</span>
+                <span className="text-lg font-bold text-green-600">Waived through June 30</span>
+              </div>
+              <div className="flex justify-between pt-2">
+                <span className="text-lg font-bold">Uniform Package</span>
+                <span className="text-lg font-bold text-primary">$100.00</span>
+              </div>
+              <p className="text-xs text-gray-500">Uniform includes game jersey, shorts, socks, and practice jersey.</p>
+              <p className="text-xs text-gray-500">Starting July 1, new signups pay the registration fee and regular monthly rate.</p>
             </div>
 
             <p className="text-sm text-gray-500 text-center">

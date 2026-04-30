@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth';
@@ -16,19 +16,50 @@ const logAdminAction = async (admin_id: string, parent_id: string, action: strin
   ]);
 };
 
+interface ParentProfile {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+}
+
+interface ChildRecord {
+  id: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth?: string;
+  position?: string;
+  status?: string;
+  parent_id?: string | null;
+}
+
+interface PaymentRecord {
+  id: string;
+  created_at: string;
+  amount?: number;
+  payment_status?: string;
+  waiver_signed_at?: string | null;
+}
+
+interface ParentProfileResponse extends ParentProfile {
+  players?: ChildRecord[];
+  registrations?: PaymentRecord[];
+}
+
 export default function ParentDetailView() {
   const { id } = useParams();
   const { user } = useAuthStore();
-  const [parent, setParent] = useState<any>(null);
-  const [children, setChildren] = useState<any[]>([]);
-  const [payments, setPayments] = useState<any[]>([]);
+  const [parent, setParent] = useState<ParentProfile | null>(null);
+  const [children, setChildren] = useState<ChildRecord[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditParentOpen, setIsEditParentOpen] = useState(false);
   const [isAddChildOpen, setIsAddChildOpen] = useState(false);
   const [newChild, setNewChild] = useState({ first_name: '', last_name: '', date_of_birth: '' });
-  const [editingChild, setEditingChild] = useState<any>(null); 
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!id) return;
     setLoading(true);
 
@@ -40,15 +71,16 @@ export default function ParentDetailView() {
 
     if (error) throw error;
 
-    setParent(data);
-    setChildren(data.players || []);
-    setPayments(data.registrations || []);
+    const profileData = data as ParentProfileResponse;
+    setParent(profileData);
+    setChildren(profileData.players || []);
+    setPayments(profileData.registrations || []);
     setLoading(false);
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchData();
-  }, [id]);
+  }, [fetchData]);
 
   const handleUpdateContact = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,24 +155,24 @@ export default function ParentDetailView() {
   const documentStatus = payments.every(p => p.waiver_signed_at) ? 'Waivers Signed' : 'Missing';
 
   return (
-    <div className="bg-black min-h-screen p-8 text-white">
-      <h1 className="text-3xl font-bold mb-6">{parent.first_name} {parent.last_name}</h1>
+    <div className="bg-black min-h-screen p-4 text-white sm:p-6 lg:p-8">
+      <h1 className="mb-6 text-2xl font-bold sm:text-3xl">{parent.first_name} {parent.last_name}</h1>
 
       {/* Status HUD */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="bg-neutral-900 border border-gray-800 p-4 rounded-lg text-center">
           <div className="text-sm font-bold text-gray-500">Registration</div>
           <div className={`text-lg font-bold ${registrationStatus === 'Complete' ? 'text-green-500' : 'text-red-500'}`}>{registrationStatus}</div>
           {/* Add Child Modal */}
       {isAddChildOpen && (
         <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
-          <form onSubmit={handleAddNewChild} className="bg-neutral-900 border border-gray-800 w-full max-w-lg rounded-3xl p-10 shadow-2xl">
-            <div className="flex justify-between items-center mb-8">
+          <form onSubmit={handleAddNewChild} className="bg-neutral-900 border border-gray-800 w-full max-w-lg rounded-3xl p-5 shadow-2xl sm:p-10">
+            <div className="mb-8 flex items-start justify-between gap-4">
               <h3 className="text-2xl font-black uppercase italic text-white">Add New <span className="text-[#EF4444]">Athlete</span></h3>
               <X className="text-gray-500 cursor-pointer" onClick={() => setIsAddChildOpen(false)} />
             </div>
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="relative">
                   <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">First Name</label>
                   <input
@@ -190,11 +222,11 @@ export default function ParentDetailView() {
 
       {/* Contact Info */}
       <div className="bg-neutral-900 border border-gray-800 p-6 rounded-lg mb-6">
-        <div className="flex justify-between items-center mb-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-xl font-bold">Contact Information</h2>
           <button onClick={() => setIsEditParentOpen(true)} className="bg-blue-500 text-white px-4 py-2 rounded-md font-bold">Edit</button>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div><span className="font-bold">Email:</span> {parent.email}</div>
           <div><span className="font-bold">Phone:</span> {parent.phone}</div>
           <div><span className="font-bold">Address:</span> {parent.address}</div>
@@ -204,7 +236,7 @@ export default function ParentDetailView() {
       {/* Payment Information */}
       <div className="bg-neutral-900 border border-gray-800 p-6 rounded-lg mb-6">
         <h2 className="text-xl font-bold mb-4">Payment Information</h2>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div><span className="font-bold">Subscription Status:</span> {financialStatus}</div>
         </div>
         <div className="mt-6">
@@ -229,30 +261,30 @@ export default function ParentDetailView() {
 
       {/* Child Management */}
        <section className="mt-12 bg-neutral-900 rounded-3xl border border-gray-800 overflow-hidden">
-         <div className="p-8 border-b border-gray-800 flex justify-between items-center">
+         <div className="flex flex-col gap-4 border-b border-gray-800 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-8">
            <h2 className="text-2xl font-black uppercase italic text-white">Athlete <span className="text-[#EF4444]">Roster</span></h2>
            <button onClick={() => setIsAddChildOpen(true)} className="flex items-center gap-2 text-[#EF4444] font-black uppercase italic text-xs border border-[#EF4444]/30 px-4 py-2 rounded-xl hover:bg-[#EF4444] hover:text-white transition-all">
              <Plus size={16} /> Add New Athlete
            </button>
          </div>
 
-         <div className="p-8 grid gap-4">
-           {children.map((kid: any) => (
-             <div key={kid.id} className="bg-black/40 border border-gray-800 p-6 rounded-2xl flex items-center justify-between group hover:border-[#EF4444] transition-all">
-               <div className="flex items-center gap-6">
+         <div className="grid gap-4 p-5 sm:p-8">
+           {children.map((kid) => (
+             <div key={kid.id} className="flex flex-col gap-4 rounded-2xl border border-gray-800 bg-black/40 p-5 transition-all hover:border-[#EF4444] sm:flex-row sm:items-center sm:justify-between sm:p-6">
+               <div className="flex items-center gap-4 sm:gap-6">
                  <div className="h-12 w-12 rounded-full bg-neutral-800 flex items-center justify-center font-black text-[#EF4444]">
                    {kid.first_name.charAt(0)}
                  </div>
                  <div>
                    <h4 className="text-white font-bold text-lg">{kid.first_name} {kid.last_name}</h4>
-                   <div className="flex gap-4 mt-1">
+                   <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:gap-4">
                      <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">DOB: {kid.date_of_birth}</span>
                      <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Pos: {kid.position || 'TBD'}</span>
                    </div>
                  </div>
                </div>
 
-               <div className="flex items-center gap-4">
+               <div className="flex items-center justify-between gap-4 sm:justify-end">
                  <select
                    className="bg-neutral-800 text-white text-[10px] p-2 rounded-lg font-black uppercase border-none outline-none"
                    value={kid.status}
@@ -277,14 +309,14 @@ export default function ParentDetailView() {
       {/* Edit Contact Modal */}
       {isEditParentOpen && (
          <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
-           <form onSubmit={handleUpdateContact} className="bg-neutral-900 border border-gray-800 w-full max-w-lg rounded-3xl p-10 shadow-2xl">
-             <div className="flex justify-between items-center mb-8">
+           <form onSubmit={handleUpdateContact} className="bg-neutral-900 border border-gray-800 w-full max-w-lg rounded-3xl p-5 shadow-2xl sm:p-10">
+             <div className="mb-8 flex items-start justify-between gap-4">
                <h3 className="text-2xl font-black uppercase italic text-white">Edit <span className="text-[#EF4444]">Contact</span></h3>
                <X className="text-gray-500 cursor-pointer" onClick={() => setIsEditParentOpen(false)} />
              </div>
 
              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="relative">
                         <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">First Name</label>
                         <input
@@ -305,7 +337,7 @@ export default function ParentDetailView() {
                     </div>
                 </div>
 
-               <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                  <div className="relative">
                    <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Email</label>
                    <input

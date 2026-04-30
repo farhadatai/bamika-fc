@@ -2,8 +2,7 @@ import express from 'express';
 import Stripe from 'stripe';
 import { supabase } from '../lib/supabase.js';
 
-
-
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Webhook processing failed';
 
 const router = express.Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -23,16 +22,18 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
     } else {
       event = req.body;
     }
-  } catch (err: any) {
-    console.error(`Webhook Error: ${err.message}`);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+  } catch (err: unknown) {
+    const message = getErrorMessage(err);
+    console.error(`Webhook Error: ${message}`);
+    return res.status(400).send(`Webhook Error: ${message}`);
   }
 
   // Handle the event
   switch (event.type) {
-    case 'checkout.session.completed':
+    case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
-      const playerId = session.client_reference_id;
+      const playerId = session.metadata?.player_id || session.client_reference_id;
+      const registrationId = session.metadata?.registration_id;
       const subscriptionId = session.subscription as string;
       const customerId = session.customer as string;
 
@@ -45,13 +46,13 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
         // Update Player status to Active
         const { error: playerError } = await supabase
           .from('players')
-          .update({ status: 'Active' })
+          .update({ status: 'active', payment_status: 'paid' })
           .eq('id', playerId);
 
         if (playerError) {
           console.error(`Error updating player ${playerId} to active:`, playerError);
         } else {
-          console.log(`Player ${playerId} status updated to Active.`);
+          console.log(`Player ${playerId} status updated to active.`);
         }
 
         // Find and update the corresponding registration log
@@ -63,7 +64,7 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
             stripe_subscription_id: subscriptionId,
             stripe_customer_id: customerId,
           })
-          .eq('player_id', playerId); 
+          .eq(registrationId ? 'id' : 'player_id', registrationId || playerId);
 
         if (regError) {
           console.error(`Error updating registration for player ${playerId}:`, regError);
@@ -71,13 +72,14 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
           console.log(`Registration for player ${playerId} updated.`);
         }
 
-      } catch (error: any) {
-        console.error('Error processing checkout.session.completed:', error.message);
+      } catch (error: unknown) {
+        console.error('Error processing checkout.session.completed:', getErrorMessage(error));
       }
       break;
+    }
 
     case 'customer.subscription.created':
-    case 'customer.subscription.updated':
+    case 'customer.subscription.updated': {
       const subscription = event.data.object as Stripe.Subscription;
       const subPlayerId = subscription.metadata.player_id;
 
@@ -90,7 +92,7 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
         try {
           const { error: playerError } = await supabase
             .from('players')
-            .update({ status: 'Active' })
+            .update({ status: 'active', payment_status: 'paid' })
             .eq('id', subPlayerId);
 
           if (playerError) {
@@ -98,11 +100,12 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
           } else {
             console.log(`Player ${subPlayerId} activated via subscription ${subscription.id}.`);
           }
-        } catch (error: any) {
-          console.error('Error processing subscription event:', error.message);
+        } catch (error: unknown) {
+          console.error('Error processing subscription event:', getErrorMessage(error));
         }
       }
       break;
+    }
 
     default:
       console.log(`Unhandled event type ${event.type}`);

@@ -1,37 +1,100 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Shield, X, Trash2, Plus, Mail, Upload } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
+import { TEAM_OPTIONS, getYoutubeId, getYoutubeThumbnail } from '../lib/utils';
 
 // --- SUB-COMPONENTS (Modals) ---
+
+const getInitials = (firstName = '', lastName = '') => {
+  const first = firstName?.trim()?.[0] || '';
+  const last = lastName?.trim()?.[0] || '';
+  return `${first}${last}`.toUpperCase() || 'FC';
+};
+
+const formatAge = (dateOfBirth) => {
+  if (!dateOfBirth) return 'Age TBA';
+
+  const birthDate = new Date(dateOfBirth);
+  if (Number.isNaN(birthDate.getTime())) return 'Age TBA';
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
+
+  return `${age} years old`;
+};
+
+const PlayerPhoto = ({ player, size = 'large' }) => {
+  const [hasImageError, setHasImageError] = useState(false);
+  const initials = getInitials(player.first_name, player.last_name);
+  const sizeClass = size === 'small' ? 'h-10 w-10 text-xs' : 'h-20 w-20 text-xl';
+
+  if (!player.photo_url || hasImageError) {
+    return (
+      <div className={`${sizeClass} flex shrink-0 items-center justify-center rounded-2xl border border-gray-800 bg-neutral-800 font-black text-[#EF4444]`}>
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={player.photo_url}
+      alt={`${player.first_name || 'Player'} ${player.last_name || ''}`}
+      className={`${sizeClass} shrink-0 rounded-2xl border border-gray-800 object-cover`}
+      onError={() => setHasImageError(true)}
+    />
+  );
+};
+
+const isMissingColumnError = (error, columnName) => {
+  const message = `${error?.message || ''} ${error?.details || ''}`;
+  return message.includes(columnName) && (message.includes('schema cache') || message.includes('column'));
+};
+
+const isMissingTableError = (error, tableName) => {
+  const message = `${error?.message || ''} ${error?.details || ''}`;
+  return message.includes(tableName) && (message.includes('schema cache') || message.includes('table'));
+};
+
+const POSITION_OPTIONS = ['TBD', 'Forward', 'Midfielder', 'Defender', 'Goalkeeper'];
+const JERSEY_SIZE_OPTIONS = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'S', 'M', 'L', 'XL', '2XL'];
 
 const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach }) => (
   <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md">
     <div className="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-      <div className="p-8 border-b border-gray-800 flex justify-between items-center sticky top-0 bg-neutral-900 z-10">
-        <h2 className="text-2xl font-black uppercase italic text-white">Onboard New <span className="text-[#D4AF37]">Coach</span></h2>
+      <div className="p-5 border-b border-gray-800 flex justify-between items-start gap-4 sticky top-0 bg-neutral-900 z-10 sm:p-8">
+        <div>
+          <h2 className="text-2xl font-black uppercase italic text-white">Onboard New <span className="text-[#D4AF37]">Coach</span></h2>
+          <p className="mt-2 text-xs font-bold uppercase tracking-widest text-gray-500">An email invite will let the coach set their password.</p>
+        </div>
         <X className="text-gray-500 cursor-pointer hover:text-white" onClick={onClose} />
       </div>
-      <form onSubmit={onSubmit} className="p-8 space-y-6">
+      <form onSubmit={onSubmit} className="p-5 space-y-6 sm:p-8">
         <div className="grid md:grid-cols-2 gap-6">
           <div>
             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">First Name</label>
-            <input required className="input-primary" onChange={e => setNewCoach({...newCoach, first_name: e.target.value})} />
+            <input required className="input-primary" value={newCoach.first_name} onChange={e => setNewCoach({...newCoach, first_name: e.target.value})} />
           </div>
           <div>
             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Last Name</label>
-            <input required className="input-primary" onChange={e => setNewCoach({...newCoach, last_name: e.target.value})} />
+            <input required className="input-primary" value={newCoach.last_name} onChange={e => setNewCoach({...newCoach, last_name: e.target.value})} />
           </div>
           <div>
             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Email Address</label>
-            <input required type="email" className="input-primary" onChange={e => setNewCoach({...newCoach, email: e.target.value})} />
+            <input required type="email" className="input-primary" value={newCoach.email} onChange={e => setNewCoach({...newCoach, email: e.target.value})} />
           </div>
         </div>
         <div className="grid md:grid-cols-2 gap-6">
           <div>
             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Primary Role</label>
-            <select className="input-primary appearance-none" onChange={e => setNewCoach({...newCoach, role: e.target.value})}>
+            <select className="input-primary appearance-none" value={newCoach.role} onChange={e => setNewCoach({...newCoach, role: e.target.value})}>
               <option>Head Coach</option>
               <option>Assistant Coach</option>
               <option>Goalkeeper Coach</option>
@@ -40,15 +103,15 @@ const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach }) => (
           </div>
           <div>
             <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Photo URL</label>
-            <input placeholder="https://..." className="input-primary" onChange={e => setNewCoach({...newCoach, photo_url: e.target.value})} />
+            <input placeholder="https://..." className="input-primary" value={newCoach.photo_url} onChange={e => setNewCoach({...newCoach, photo_url: e.target.value})} />
           </div>
         </div>
         <div>
           <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Professional Bio</label>
-          <textarea rows={4} className="input-primary resize-none" placeholder="Describe the coach's experience and philosophy..." onChange={e => setNewCoach({...newCoach, bio: e.target.value})} />
+          <textarea rows={4} className="input-primary resize-none" placeholder="Describe the coach's experience and philosophy..." value={newCoach.bio} onChange={e => setNewCoach({...newCoach, bio: e.target.value})} />
         </div>
         <button type="submit" className="btn-primary w-full">
-          Complete Onboarding
+          Send Coach Invite
         </button>
       </form>
     </div>
@@ -96,11 +159,11 @@ const EditParentModal = ({ isOpen, onClose, parent, onSave }) => {
   return (
     <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md">
       <div className="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="p-8 border-b border-gray-800 flex justify-between items-center sticky top-0 bg-neutral-900 z-10">
+        <div className="p-5 border-b border-gray-800 flex justify-between items-start gap-4 sticky top-0 bg-neutral-900 z-10 sm:p-8">
           <h2 className="text-2xl font-black uppercase italic text-white">Edit Parent</h2>
           <X className="text-gray-500 cursor-pointer hover:text-white" onClick={onClose} />
         </div>
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        <form onSubmit={handleSubmit} className="p-5 space-y-6 sm:p-8">
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">First Name</label>
@@ -128,38 +191,46 @@ const EditParentModal = ({ isOpen, onClose, parent, onSave }) => {
   );
 };
 
-const DrillModal = ({ onClose, onSubmit, newDrill, setNewDrill }) => (
+const DrillModal = ({ onClose, onSubmit, newDrill, setNewDrill }) => {
+  const thumbnailPreview = newDrill.thumbnail_url || getYoutubeThumbnail(newDrill.video_url);
+
+  return (
   <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md">
-    <div className="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden">
-      <div className="p-8 border-b border-gray-800 flex justify-between items-center bg-neutral-950">
-        <h2 className="text-2xl font-black uppercase italic text-white">Add Lab <span className="text-[#EF4444]">Content</span></h2>
+    <div className="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+      <div className="p-5 border-b border-gray-800 flex justify-between items-start gap-4 bg-neutral-950 sm:p-8">
+        <div>
+          <h2 className="text-2xl font-black uppercase italic text-white">Add YouTube <span className="text-[#EF4444]">Tutorial</span></h2>
+          <p className="mt-1 text-sm text-gray-500">Paste a YouTube link and publish it to the Training Lab.</p>
+        </div>
         <X className="text-gray-500 cursor-pointer hover:text-white" onClick={onClose} />
       </div>
-      <form onSubmit={onSubmit} className="p-8 space-y-6">
+      <form onSubmit={onSubmit} className="p-5 space-y-6 sm:p-8">
         <div>
            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">YouTube Video URL</label>
-           <input required placeholder="https://www.youtube.com/watch?v=..." className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, video_url: e.target.value })} />
+           <input required value={newDrill.video_url} placeholder="https://www.youtube.com/watch?v=..." className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, video_url: e.target.value, thumbnail_url: newDrill.thumbnail_url || getYoutubeThumbnail(e.target.value) })} />
          </div>
          <div className="grid md:grid-cols-2 gap-6">
            <div>
              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Drill Title</label>
-             <input required className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, title: e.target.value })} />
+             <input required value={newDrill.title} placeholder="First touch passing pattern" className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, title: e.target.value })} />
            </div>
            <div>
              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Category</label>
-             <select className="input-primary appearance-none" onChange={(e) => setNewDrill({ ...newDrill, category: e.target.value })}>
+             <select value={newDrill.category} className="input-primary appearance-none" onChange={(e) => setNewDrill({ ...newDrill, category: e.target.value })}>
                <option>Dribbling</option>
                <option>Passing</option>
                <option>Shooting</option>
                <option>Tactical</option>
                <option>Physical</option>
+               <option>Goalkeeping</option>
+               <option>Warmup</option>
              </select>
            </div>
          </div>
          <div className="grid md:grid-cols-2 gap-6">
            <div>
              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Difficulty</label>
-             <select className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, difficulty: e.target.value })}>
+             <select value={newDrill.difficulty} className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, difficulty: e.target.value })}>
                <option>Beginner</option>
                <option>Intermediate</option>
                <option>Advanced</option>
@@ -168,12 +239,150 @@ const DrillModal = ({ onClose, onSubmit, newDrill, setNewDrill }) => (
            </div>
            <div>
              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Duration (Minutes)</label>
-             <input type="number" placeholder="e.g. 15" className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, duration: parseInt(e.target.value) })} />
+             <input type="number" min="1" value={newDrill.duration} placeholder="e.g. 15" className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, duration: parseInt(e.target.value) || 1 })} />
            </div>
          </div>
+         <div>
+           <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Tutorial Description</label>
+           <textarea rows={4} value={newDrill.description} className="input-primary resize-none" placeholder="What players should focus on, setup notes, coaching points..." onChange={(e) => setNewDrill({ ...newDrill, description: e.target.value })} />
+         </div>
+         <div>
+           <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block tracking-widest">Thumbnail URL</label>
+           <input value={newDrill.thumbnail_url} placeholder="Auto-filled from YouTube, or paste a custom thumbnail" className="input-primary" onChange={(e) => setNewDrill({ ...newDrill, thumbnail_url: e.target.value })} />
+         </div>
+         {thumbnailPreview && (
+           <div className="overflow-hidden rounded-2xl border border-gray-800 bg-black">
+             <img src={thumbnailPreview} alt="Tutorial thumbnail preview" className="aspect-video w-full object-cover opacity-80" />
+           </div>
+         )}
          <button type="submit" className="btn-primary w-full flex items-center justify-center gap-3">
            <Upload size={20} /> Publish to Lab
          </button>
+      </form>
+    </div>
+  </div>
+  );
+};
+
+const PracticeModal = ({ onClose, onSubmit, newPractice, setNewPractice }) => (
+  <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
+    <div className="bg-neutral-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl">
+      <div className="p-5 border-b border-gray-800 flex justify-between items-start gap-4 sm:p-6">
+        <h3 className="text-white font-black uppercase italic">New Practice</h3>
+        <X className="cursor-pointer text-gray-500 hover:text-white" onClick={onClose} />
+      </div>
+      <form onSubmit={onSubmit} className="p-5 space-y-4 sm:p-8">
+        <input
+          type="text"
+          placeholder="Practice title, e.g. U10 Team Practice"
+          required
+          value={newPractice.title}
+          className="input-primary"
+          onChange={(e) => setNewPractice({ ...newPractice, title: e.target.value })}
+        />
+        <div className="grid grid-cols-2 gap-4">
+          <input
+            type="date"
+            required
+            value={newPractice.date}
+            className="input-primary"
+            onChange={(e) => setNewPractice({ ...newPractice, date: e.target.value })}
+          />
+          <input
+            type="time"
+            required
+            value={newPractice.time}
+            className="input-primary"
+            onChange={(e) => setNewPractice({ ...newPractice, time: e.target.value })}
+          />
+        </div>
+        <input
+          type="text"
+          placeholder="Field / location"
+          required
+          value={newPractice.location}
+          className="input-primary"
+          onChange={(e) => setNewPractice({ ...newPractice, location: e.target.value })}
+        />
+        <textarea
+          rows={3}
+          placeholder="Notes, age group, field space, or equipment needed"
+          value={newPractice.description}
+          className="input-primary resize-none"
+          onChange={(e) => setNewPractice({ ...newPractice, description: e.target.value })}
+        />
+        <button type="submit" className="btn-primary w-full">
+          Publish Practice
+        </button>
+      </form>
+    </div>
+  </div>
+);
+
+const AnnouncementModal = ({ onClose, onSubmit, newAnnouncement, setNewAnnouncement }) => (
+  <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
+    <div className="bg-neutral-900 border border-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl">
+      <div className="p-5 border-b border-gray-800 flex justify-between items-start gap-4 sm:p-6">
+        <div>
+          <h3 className="text-white font-black uppercase italic">New Announcement</h3>
+          <p className="mt-1 text-sm text-gray-500">Publish club news for visitors, parents, or coaches.</p>
+        </div>
+        <X className="cursor-pointer text-gray-500 hover:text-white" onClick={onClose} />
+      </div>
+      <form onSubmit={onSubmit} className="p-5 space-y-5 sm:p-8">
+        <input
+          type="text"
+          placeholder="Announcement title"
+          required
+          value={newAnnouncement.title}
+          className="input-primary"
+          onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
+        />
+        <textarea
+          rows={5}
+          placeholder="Write the update parents and players need to know..."
+          required
+          value={newAnnouncement.body}
+          className="input-primary resize-none"
+          onChange={(e) => setNewAnnouncement({ ...newAnnouncement, body: e.target.value })}
+        />
+        <div className="grid gap-4 sm:grid-cols-3">
+          <select
+            value={newAnnouncement.audience}
+            className="input-primary"
+            onChange={(e) => setNewAnnouncement({ ...newAnnouncement, audience: e.target.value })}
+          >
+            <option value="everyone">Homepage + All Dashboards</option>
+            <option value="public">Homepage Only</option>
+            <option value="parents">Parent Dashboards Only</option>
+            <option value="coaches">Coach Dashboards Only</option>
+          </select>
+          <select
+            value={newAnnouncement.priority}
+            className="input-primary"
+            onChange={(e) => setNewAnnouncement({ ...newAnnouncement, priority: e.target.value })}
+          >
+            <option value="normal">Normal</option>
+            <option value="important">Important</option>
+          </select>
+          <input
+            type="date"
+            value={newAnnouncement.expires_at}
+            className="input-primary"
+            onChange={(e) => setNewAnnouncement({ ...newAnnouncement, expires_at: e.target.value })}
+          />
+        </div>
+        <label className="flex items-center gap-3 rounded-xl border border-gray-800 bg-black p-4 text-sm font-bold text-gray-300">
+          <input
+            type="checkbox"
+            checked={newAnnouncement.is_pinned}
+            onChange={(e) => setNewAnnouncement({ ...newAnnouncement, is_pinned: e.target.checked })}
+          />
+          Pin this announcement to the top
+        </label>
+        <button type="submit" className="btn-primary w-full">
+          Publish Announcement
+        </button>
       </form>
     </div>
   </div>
@@ -198,21 +407,31 @@ export default function AdminDashboard() {
     coaches: [],
     roster: [],
     games: [],
+    events: [],
     drills: [],
+    announcements: [],
   });
   const [loading, setLoading] = useState(true);
 
   // Modal Visibility
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
+  const [isPracticeModalOpen, setIsPracticeModalOpen] = useState(false);
   const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDrillModalOpen, setIsDrillModalOpen] = useState(false);
+  const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
   const [selectedParent, setSelectedParent] = useState(null);
 
   // Form State
   const [newGame, setNewGame] = useState({ date: '', time: '', opponent: '', location: 'Home' });
-  const [newCoach, setNewCoach] = useState({ first_name: '', last_name: '', email: '', role: 'Coach', bio: '', photo_url: '' });
-  const [newDrill, setNewDrill] = useState({ title: '', video_url: '', category: 'Dribbling', difficulty: 'Beginner', duration: 15 });
+  const [newPractice, setNewPractice] = useState({ title: '', date: '', time: '', location: '', description: '' });
+  const emptyCoach = { first_name: '', last_name: '', email: '', role: 'Head Coach', bio: '', photo_url: '' };
+  const [newCoach, setNewCoach] = useState(emptyCoach);
+  const emptyDrill = { title: '', video_url: '', thumbnail_url: '', category: 'Dribbling', difficulty: 'Beginner', duration: 15, description: '' };
+  const [newDrill, setNewDrill] = useState(emptyDrill);
+  const emptyAnnouncement = { title: '', body: '', audience: 'everyone', priority: 'normal', expires_at: '', is_pinned: false };
+  const [newAnnouncement, setNewAnnouncement] = useState(emptyAnnouncement);
+  const [databaseNotice, setDatabaseNotice] = useState('');
 
   const handleSort = (column) => {
     setSortOrder(prev => ({
@@ -221,7 +440,7 @@ export default function AdminDashboard() {
     }));
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const { data: p } = await supabase.from('profiles').select('*').eq('role', 'user');
 
@@ -241,24 +460,49 @@ export default function AdminDashboard() {
       });
     }
 
+    const notices = [];
     const { data: c } = await supabase.from('coaches').select('*, profiles(photo_url)');
-    const { data: pl } = await supabase.from('players').select('*');
+    let players = [];
+    const { data: playersWithParents, error: playersWithParentsError } = await supabase
+      .from('players')
+      .select('*, profiles:parent_id(first_name, last_name, email, phone)');
+
+    if (playersWithParentsError) {
+      const { data: basicPlayers } = await supabase.from('players').select('*');
+      players = basicPlayers || [];
+    } else {
+      players = playersWithParents || [];
+    }
+
     const { data: g } = await supabase.from('games').select('*').order('date', { ascending: true });
+    const { data: e } = await supabase.from('events').select('*').order('date', { ascending: true }).order('time', { ascending: true });
     const { data: d } = await supabase.from('drills').select('*');
+    const { data: a, error: announcementsError } = await supabase
+      .from('announcements')
+      .select('*')
+      .order('is_pinned', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (announcementsError && isMissingTableError(announcementsError, 'announcements')) {
+      notices.push('Announcements need the latest Supabase schema update.');
+    }
 
     setData({
       parents: p || [],
       coaches: c || [],
-      roster: pl || [],
+      roster: players,
       games: g || [],
+      events: e || [],
       drills: d || [],
+      announcements: announcementsError ? [] : a || [],
     });
+    setDatabaseNotice(notices.join(' '));
     setLoading(false);
-  };
+  }, [sortOrder]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const handleAddGame = async (e) => {
     e.preventDefault();
@@ -270,90 +514,235 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleAddPractice = async (e) => {
+    e.preventDefault();
+    const { error } = await supabase.from('events').insert([newPractice]);
+    if (!error) {
+      setNewPractice({ title: '', date: '', time: '', location: '', description: '' });
+      setIsPracticeModalOpen(false);
+      fetchData();
+    } else {
+      alert(error.message);
+    }
+  };
+
   const handleOnboardSubmit = async (e) => {
     e.preventDefault();
-    
-    // Generate a temporary password for the new coach
-    const tempPassword = Math.random().toString(36).slice(-8);
 
-    // 1. Create a new user in Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: newCoach.email,
-      password: tempPassword,
-      options: {
-        data: {
-          first_name: newCoach.first_name,
-          last_name: newCoach.last_name,
-          role: 'coach',
-        }
-      }
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+
+    if (!token) {
+      alert('Please log in as an admin again before sending a coach invite.');
+      return;
+    }
+
+    const response = await fetch('/api/auth/invite-coach', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(newCoach),
     });
 
-    if (authError) {
-      return alert(`Error creating auth user: ${authError.message}`);
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      alert(result.error || 'Unable to send coach invite.');
+      return;
     }
-    
-    const user = authData.user;
 
-    if (user) {
-      // 2. Insert into 'profiles' table
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: user.id,
-        first_name: newCoach.first_name,
-        last_name: newCoach.last_name,
-        email: newCoach.email,
-        role: 'coach',
-        photo_url: newCoach.photo_url
-      });
-
-      if (profileError) {
-        // TODO: Handle user deletion if profile creation fails
-        return alert(`Error creating profile: ${profileError.message}`);
-      }
-
-      // 3. Insert into 'coaches' table
-      const { error: cError } = await supabase.from('coaches').insert([{
-        id: user.id, // Use the same ID from auth user
-        name: `${newCoach.first_name} ${newCoach.last_name}`,
-        role: newCoach.role,
-        bio: newCoach.bio,
-        is_published: true
-      }]);
-
-      if (!cError) {
-        setIsOnboardModalOpen(false);
-        fetchData();
-        alert(`Coach onboarded! Temporary Password: ${tempPassword}`);
-      } else {
-        // TODO: Handle user/profile deletion if coach creation fails
-        alert(cError.message);
-      }
-    }
+    setNewCoach(emptyCoach);
+    setIsOnboardModalOpen(false);
+    fetchData();
+    alert(result.message || `Coach invite sent to ${newCoach.email}.`);
   };
   
-  const handleAssignTeam = async (coachId, teamId) => {
-    const { error } = await supabase
-      .from('coaches')
-      .update({ team_id: teamId })
-      .eq('id', coachId);
-    
+  const handleAddDrill = async (e) => {
+    e.preventDefault();
+    const videoId = getYoutubeId(newDrill.video_url);
+    if (!videoId) {
+      alert('Please enter a valid YouTube video URL.');
+      return;
+    }
+
+    const drillPayload = {
+      ...newDrill,
+      thumbnail_url: newDrill.thumbnail_url || getYoutubeThumbnail(newDrill.video_url),
+      description: newDrill.description || 'Training tutorial for Bamika FC players.',
+    };
+
+    const { error } = await supabase.from('drills').insert([drillPayload]);
     if (!error) {
+      setNewDrill(emptyDrill);
+      setIsDrillModalOpen(false);
       fetchData();
+    } else {
+      alert(error.message);
     }
   };
 
-  const handleAddDrill = async (e) => {
-    e.preventDefault();
-    const { error } = await supabase.from('drills').insert([newDrill]);
-    if (!error) {
-      setIsDrillModalOpen(false);
-      fetchData();
-    }
+  const handleDeleteDrill = async (id) => {
+    if (!window.confirm('Delete tutorial?')) return;
+    await supabase.from('drills').delete().eq('id', id);
+    fetchData();
   };
 
   const handleDeleteGame = async (id) => {
     if (!window.confirm('Delete match?')) return;
     await supabase.from('games').delete().eq('id', id);
+    fetchData();
+  };
+
+  const handleDeletePractice = async (id) => {
+    if (!window.confirm('Delete practice?')) return;
+    await supabase.from('events').delete().eq('id', id);
+    fetchData();
+  };
+
+  const handleAssignCoachTeam = async (coachId, teamId) => {
+    const normalizedTeam = teamId === 'Unassigned' ? null : teamId;
+    const { error } = await supabase.from('coaches').update({ team_id: normalizedTeam }).eq('id', coachId);
+    if (!error) {
+      fetchData();
+    } else {
+      if (isMissingColumnError(error, 'team_id')) {
+        setDatabaseNotice('Team assignments need the latest Supabase schema update.');
+        return;
+      }
+      alert(error.message);
+    }
+  };
+
+  const handleAssignPlayerTeam = async (playerId, teamId) => {
+    const { error } = await supabase.from('players').update({ team_assigned: teamId }).eq('id', playerId);
+    if (!error) {
+      fetchData();
+    } else {
+      if (isMissingColumnError(error, 'team_assigned')) {
+        alert('Player team assignment is not ready in Supabase yet. Please apply the latest database migrations so the players table has a team_assigned column.');
+        return;
+      }
+      alert(error.message);
+    }
+  };
+
+  const handleUpdatePlayer = async (playerId, updates) => {
+    const { error } = await supabase.from('players').update(updates).eq('id', playerId);
+    if (!error) {
+      fetchData();
+    } else {
+      alert(error.message);
+    }
+  };
+
+  const handleWaivePlayerFees = async (player) => {
+    if (!window.confirm(`Waive fees and mark ${player.first_name || 'this player'} as active?`)) return;
+
+    const playerUpdate = {
+      payment_status: 'waived',
+      status: 'active',
+    };
+
+    const { error: playerError } = await supabase.from('players').update(playerUpdate).eq('id', player.id);
+    if (playerError) {
+      if (isMissingColumnError(playerError, 'payment_status') || isMissingColumnError(playerError, 'status')) {
+        alert('Fee waiver needs the latest registration/payment migration applied in Supabase.');
+        return;
+      }
+      alert(playerError.message);
+      return;
+    }
+
+    const { error: registrationError } = await supabase
+      .from('registrations')
+      .update({ payment_status: 'waived', status: 'active' })
+      .eq('player_id', player.id);
+
+    if (registrationError && isMissingColumnError(registrationError, 'player_id')) {
+      await supabase
+        .from('registrations')
+        .update({ payment_status: 'waived', status: 'active' })
+        .eq('parent_id', player.parent_id)
+        .eq('first_name', player.first_name)
+        .eq('last_name', player.last_name);
+    }
+
+    fetchData();
+  };
+
+  const handleAssignParentAsCoach = async (parent) => {
+    const parentName = `${parent.first_name || ''} ${parent.last_name || ''}`.trim() || parent.full_name || 'Coach';
+    if (!window.confirm(`Make ${parentName} a coach account?`)) return;
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ role: 'coach' })
+      .eq('id', parent.id);
+
+    if (profileError) {
+      alert(profileError.message);
+      return;
+    }
+
+    const { error: coachError } = await supabase
+      .from('coaches')
+      .upsert([{
+        id: parent.id,
+        name: parentName,
+        role: 'Coach',
+        bio: 'Bamika FC coach and parent volunteer.',
+        is_published: true,
+      }], { onConflict: 'id' });
+
+    if (coachError) {
+      alert(coachError.message);
+      return;
+    }
+
+    fetchData();
+    setActiveTab('coaches');
+  };
+
+  const handleAddAnnouncement = async (e) => {
+    e.preventDefault();
+    const payload = {
+      ...newAnnouncement,
+      expires_at: newAnnouncement.expires_at || null,
+    };
+
+    const { error } = await supabase.from('announcements').insert([payload]);
+    if (!error) {
+      setNewAnnouncement(emptyAnnouncement);
+      setIsAnnouncementModalOpen(false);
+      fetchData();
+    } else {
+      if (isMissingTableError(error, 'announcements')) {
+        setDatabaseNotice('Announcements need the latest Supabase schema update.');
+        return;
+      }
+      alert(error.message);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id) => {
+    if (!window.confirm('Delete announcement?')) return;
+    await supabase.from('announcements').delete().eq('id', id);
+    fetchData();
+  };
+
+  const handleShowAnnouncementOnHomepage = async (id) => {
+    const { error } = await supabase
+      .from('announcements')
+      .update({ audience: 'everyone' })
+      .eq('id', id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
     fetchData();
   };
 
@@ -392,50 +781,93 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!data.parents.length) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-white mb-4">No Parents Found in Database</h2>
-        </div>
-      </div>
-    );
-  }
+  const stats = [
+    { label: 'Parents', value: data.parents.length },
+    { label: 'Players', value: data.roster.length },
+    { label: 'Coaches', value: data.coaches.length },
+    { label: 'News', value: data.announcements.length },
+  ];
 
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center p-6">
-      <div className="w-full max-w-6xl">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-black uppercase italic text-white">Admin <span className="text-[#D4AF37]">Dashboard</span></h1>
-          <button onClick={() => setIsOnboardModalOpen(true)} className="btn-primary">
-            + Onboard Coach
+    <div className="min-h-screen w-full bg-black px-4 py-6 text-white sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <div className="flex flex-col gap-4 rounded-2xl border border-gray-800 bg-neutral-950/80 p-5 shadow-2xl shadow-black/30 md:flex-row md:items-center md:justify-between md:p-6">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+              <Shield size={14} className="text-[#EF4444]" />
+              Club operations
+            </div>
+            <h1 className="text-3xl font-black uppercase italic leading-tight text-white sm:text-4xl">
+              Admin <span className="text-[#D4AF37]">Dashboard</span>
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-gray-400">
+              Manage families, coaches, rosters, matches, and training content from one place.
+            </p>
+          </div>
+          <button onClick={() => setIsOnboardModalOpen(true)} className="btn-primary inline-flex items-center justify-center gap-2 md:w-auto">
+            <Plus size={18} />
+            Onboard Coach
           </button>
         </div>
 
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {stats.map((stat) => (
+            <div key={stat.label} className="rounded-xl border border-gray-800 bg-neutral-900 p-4">
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">{stat.label}</div>
+              <div className="mt-2 text-3xl font-black text-white">{stat.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {databaseNotice && (
+          <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-100">
+            <div className="font-black uppercase tracking-widest text-yellow-300">Database update needed</div>
+            <p className="mt-1 text-yellow-100/90">
+              {databaseNotice} Apply the latest SQL migrations in Supabase, then refresh this page.
+            </p>
+          </div>
+        )}
+
         {/* 2. TAB NAVIGATION */}
-        <div className="flex gap-2 p-1 bg-neutral-900 rounded-2xl border border-gray-800 w-fit"> 
-          {['parents', 'coaches', 'roster', 'schedule', 'drills', 'announcements'].map((tab) => ( 
-            <button 
-              key={tab} 
-              onClick={() => setActiveTab(tab)} 
-              className={`px-8 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${ 
-                activeTab === tab ? 'bg-[#EF4444] text-white' : 'text-gray-500 hover:text-white' 
-              }`} 
-            > 
-              {tab} 
-            </button> 
-          ))} 
+        <div className="overflow-x-auto rounded-2xl border border-gray-800 bg-neutral-900 p-1"> 
+          <div className="flex min-w-max gap-2">
+            {['parents', 'coaches', 'roster', 'schedule', 'drills', 'announcements'].map((tab) => ( 
+              <button 
+                key={tab} 
+                onClick={() => setActiveTab(tab)} 
+                className={`whitespace-nowrap rounded-xl px-5 py-3 text-[10px] font-black uppercase tracking-widest transition-all sm:px-7 ${ 
+                  activeTab === tab ? 'bg-[#EF4444] text-white' : 'text-gray-500 hover:text-white' 
+                }`} 
+              > 
+                {tab} 
+              </button> 
+            ))} 
+          </div>
         </div> 
 
         {/* 3. MAIN CONTENT AREA */}
         <div className="min-h-[400px]"> 
           {activeTab === 'parents' && (
-            <div className="bg-neutral-900 border border-gray-800 rounded-3xl overflow-hidden">
-              <table className="w-full text-left">
+            <div className="overflow-hidden rounded-2xl border border-gray-800 bg-neutral-900">
+              <div className="flex flex-col gap-2 border-b border-gray-800 bg-neutral-950 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black uppercase italic text-white">Parent Accounts</h2>
+                  <p className="text-sm text-gray-500">Review family accounts and registration status.</p>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  {data.parents.length} total
+                </span>
+              </div>
+              {data.parents.length === 0 ? (
+                <div className="p-10 text-center text-gray-500">No parent accounts found yet.</div>
+              ) : (
+              <div className="overflow-x-auto">
+              <table className="min-w-[980px] w-full text-left">
                 <thead>
                   <tr className="bg-neutral-900 border-b border-gray-800">
                     <th onClick={() => handleSort('last_name')} className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider cursor-pointer">Last Name</th>
                     <th onClick={() => handleSort('first_name')} className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider cursor-pointer">First Name</th>
+                    <th className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider">Athletes</th>
                     <th onClick={() => handleSort('email')} className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider cursor-pointer">Email Address</th>
                     <th className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider">Phone Number</th>
                     <th className="p-4 text-left text-xs font-bold uppercase text-white tracking-wider">Status</th>
@@ -443,86 +875,448 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.parents.map((u) => (
-                    <tr key={u.id} className="border-b border-neutral-800 hover:bg-neutral-700/50 transition-colors">
-                      <td className="p-4 text-white font-bold uppercase italic">{u.last_name || u.full_name}</td>
-                      <td className="p-4 text-white font-bold">{u.first_name || '-'}</td>
-                      <td className="p-4 text-gray-400">{u.email}</td>
-                      <td className="p-4 text-gray-400">{u.phone}</td>
-                      <td className="p-4">
-                        {data.roster.some((player) => player.user_id === u.id) ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-900 text-green-300">Active</span>
-                        ) : (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-900 text-yellow-300">Pending</span>
-                        )}
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-4">
-                          <button onClick={() => openEditModal(u)} className="text-white font-bold hover:text-[#EF4444] transition-colors">Edit</button>
-                          <button onClick={() => handleDeleteParent(u.id)} className="text-gray-600 hover:text-red-500">
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {data.parents.map((u) => {
+                    const familyPlayers = data.roster.filter((player) => player.parent_id === u.id || player.user_id === u.id);
+
+                    return (
+                      <tr key={u.id} className="border-b border-neutral-800 hover:bg-neutral-700/50 transition-colors">
+                        <td className="p-4 text-white font-bold uppercase italic">{u.last_name || u.full_name}</td>
+                        <td className="p-4 text-white font-bold">{u.first_name || '-'}</td>
+                        <td className="p-4">
+                          {familyPlayers.length > 0 ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex -space-x-3">
+                                {familyPlayers.slice(0, 3).map((player) => (
+                                  <div key={player.id} className="rounded-2xl border-2 border-neutral-900 bg-neutral-900">
+                                    <PlayerPhoto player={player} size="small" />
+                                  </div>
+                                ))}
+                              </div>
+                              <span className="text-xs font-bold text-gray-400">
+                                {familyPlayers.length} player{familyPlayers.length === 1 ? '' : 's'}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-600">No athletes</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-gray-400">{u.email}</td>
+                        <td className="p-4 text-gray-400">{u.phone}</td>
+                        <td className="p-4">
+                          {familyPlayers.length > 0 ? (
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-900 text-green-300">Active</span>
+                          ) : (
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-900 text-yellow-300">Pending</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-right">
+                          <div className="flex items-center justify-end gap-4">
+                            <button onClick={() => openEditModal(u)} className="text-white font-bold hover:text-[#EF4444] transition-colors">Edit</button>
+                            <button onClick={() => handleAssignParentAsCoach(u)} className="text-xs font-black uppercase text-[#D4AF37] hover:text-white transition-colors">Make Coach</button>
+                            <button onClick={() => handleDeleteParent(u.id)} className="text-gray-600 hover:text-red-500">
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+              </div>
+              )}
             </div>
           )}
 
           {activeTab === 'coaches' && (
-            <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black uppercase italic text-white">Coaching Staff</h2>
+                  <p className="text-sm text-gray-500">Published coaches and team assignment status.</p>
+                </div>
+                <button onClick={() => setIsOnboardModalOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-2 text-xs font-black uppercase text-white hover:bg-red-700">
+                  <Plus size={16} />
+                  Add Coach
+                </button>
+              </div>
+              {data.coaches.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">No coaches have been added yet.</div>
+              ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {data.coaches.map((coach) => (
-                <div key={coach.id} className="bg-neutral-900 border border-gray-800 rounded-xl p-4 group flex flex-col text-center items-center">
-                  <img src={coach.profiles?.photo_url || "https://via.placeholder.com/150"} className="h-20 w-20 object-cover rounded-full border-2 border-gray-800 mb-4" />
+                <div key={coach.id} className="bg-black border border-gray-800 rounded-xl p-4 group flex flex-col text-center items-center">
+                  <img src={coach.profiles?.photo_url || "https://via.placeholder.com/150"} alt={coach.name} className="h-20 w-20 object-cover rounded-full border-2 border-gray-800 mb-4" />
                   <h3 className="text-md font-bold uppercase text-white">{coach.name}</h3>
-                  <p className="text-[#D4AF37] text-[10px] font-bold uppercase mb-2">{coach.role}</p>
-                  {!coach.team_id && (
-                    <span className="bg-red-900 text-red-300 text-xs font-bold px-2 py-1 rounded-full">Unassigned</span>
-                  )}
+                  <p className="text-[#D4AF37] text-[10px] font-bold uppercase mb-3">{coach.role}</p>
+                  <label className="mb-2 text-[9px] font-black uppercase tracking-widest text-gray-600">Assigned Team</label>
+                  <select
+                    value={coach.team_id || 'Unassigned'}
+                    onChange={(e) => handleAssignCoachTeam(coach.id, e.target.value)}
+                    className="w-full rounded-lg border border-gray-800 bg-neutral-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#EF4444]"
+                  >
+                    {TEAM_OPTIONS.map((team) => (
+                      <option key={team} value={team}>{team}</option>
+                    ))}
+                  </select>
+                  <span className={`mt-3 rounded-full px-2 py-1 text-xs font-bold ${coach.team_id ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
+                    {coach.team_id || 'Unassigned'}
+                  </span>
                 </div>
               ))}
+              </div>
+              )}
             </div>
           )}
 
           {activeTab === 'roster' && (
-            <div className="grid gap-2">
-              {data.roster.map((p) => (
-                <div key={p.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
-                  <span className="text-white font-bold">{p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : (p.full_name || p.name)}</span>
-                  <span className="text-[#EF4444] text-[10px] font-black uppercase">{p.team_assigned || 'UNASSIGNED'}</span>
+            <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
+              <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black uppercase italic text-white">Player Roster</h2>
+                  <p className="text-sm text-gray-500">All registered athletes with photos, age, teams, and parent contact.</p>
                 </div>
-              ))}
+                <span className="rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  {data.roster.length} players
+                </span>
+              </div>
+              {data.roster.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">No players have been registered yet.</div>
+              ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {data.roster.map((p) => {
+                const linkedParent =
+                  p.profiles ||
+                  data.parents.find((parent) => parent.id === p.parent_id || parent.id === p.user_id);
+
+                return (
+                  <div key={p.id} className="bg-black border border-gray-800 rounded-2xl p-4 flex gap-4 transition-colors hover:border-[#EF4444]/70">
+                    <PlayerPhoto player={p} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-lg font-black uppercase italic text-white">
+                            {p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : (p.full_name || p.name || 'Unnamed Player')}
+                          </h3>
+                          <p className="text-xs font-bold uppercase text-gray-500">
+                            {formatAge(p.date_of_birth || p.dob)}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-[#EF4444]/10 px-2 py-1 text-[9px] font-black uppercase text-[#EF4444]">
+                          {p.team_assigned || 'Unassigned'}
+                        </span>
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="mb-2 block text-[9px] font-black uppercase tracking-widest text-gray-600">Team Assignment</label>
+                        <select
+                          value={p.team_assigned || 'Unassigned'}
+                          onChange={(e) => handleAssignPlayerTeam(p.id, e.target.value)}
+                          className="w-full rounded-lg border border-gray-800 bg-neutral-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#EF4444]"
+                        >
+                          {TEAM_OPTIONS.map((team) => (
+                            <option key={team} value={team}>{team}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                        <div className="rounded-lg border border-gray-800 bg-neutral-950 p-2">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</div>
+                          <select
+                            value={p.position || 'TBD'}
+                            onChange={(e) => handleUpdatePlayer(p.id, { position: e.target.value })}
+                            className="mt-1 w-full rounded-md border border-gray-800 bg-black px-2 py-1 font-bold text-gray-300 outline-none focus:border-[#EF4444]"
+                          >
+                            {POSITION_OPTIONS.map((position) => (
+                              <option key={position} value={position}>{position}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="rounded-lg border border-gray-800 bg-neutral-950 p-2">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Number</div>
+                          <input
+                            defaultValue={p.jersey_number || ''}
+                            placeholder="-"
+                            onBlur={(e) => handleUpdatePlayer(p.id, { jersey_number: e.target.value || '-' })}
+                            className="mt-1 w-full rounded-md border border-gray-800 bg-black px-2 py-1 font-bold text-gray-300 outline-none focus:border-[#EF4444]"
+                          />
+                        </div>
+                        <div className="rounded-lg border border-gray-800 bg-neutral-950 p-2">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Size</div>
+                          <select
+                            value={p.jersey_size || 'YM'}
+                            onChange={(e) => handleUpdatePlayer(p.id, { jersey_size: e.target.value })}
+                            className="mt-1 w-full rounded-md border border-gray-800 bg-black px-2 py-1 font-bold text-gray-300 outline-none focus:border-[#EF4444]"
+                          >
+                            {JERSEY_SIZE_OPTIONS.map((size) => (
+                              <option key={size} value={size}>{size}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 rounded-lg border border-gray-800 bg-neutral-950 p-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Fees</div>
+                            <div className={`mt-1 text-xs font-black uppercase ${p.payment_status === 'waived' ? 'text-green-400' : p.payment_status === 'paid' ? 'text-green-300' : 'text-yellow-300'}`}>
+                              {p.payment_status === 'waived' ? 'Waived' : p.payment_status || 'Pending'}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleWaivePlayerFees(p)}
+                            className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-400"
+                          >
+                            Waive
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 border-t border-gray-800 pt-3">
+                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Parent</div>
+                        <div className="mt-1 truncate text-sm font-bold text-gray-300">
+                          {linkedParent?.first_name || linkedParent?.last_name
+                            ? `${linkedParent?.first_name || ''} ${linkedParent?.last_name || ''}`.trim()
+                            : linkedParent?.full_name || 'Parent not linked'}
+                        </div>
+                        <div className="mt-1 truncate text-xs text-gray-500">
+                          {linkedParent?.phone || linkedParent?.email || 'No contact listed'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              </div>
+              )}
             </div>
           )}
 
           {activeTab === 'schedule' && (
-            <div className="space-y-4">
-              <button onClick={() => setIsGameModalOpen(true)} className="bg-[#EF4444] text-white px-6 py-3 rounded-lg font-black text-xs uppercase shadow-lg hover:bg-red-700">
-                + Schedule Match
-              </button>
-              {data.games.map((g) => (
-                <div key={g.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
-                  <div>
-                    <div className="font-black uppercase italic text-white">{g.opponent}</div>
-                    <div className="text-[10px] text-gray-500 font-bold uppercase">{g.date} • {g.location}</div>
-                  </div>
-                  <button onClick={() => handleDeleteGame(g.id)} className="text-gray-600 hover:text-red-500">
-                    <Trash2 size={18} />
+            <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black uppercase italic text-white">Public Schedule</h2>
+                  <p className="text-sm text-gray-500">Create practices and matches that show on the public homepage.</p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button onClick={() => setIsPracticeModalOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-700 bg-black px-4 py-2 text-xs font-black uppercase text-white hover:border-[#EF4444]">
+                    <Plus size={16} />
+                    Add Practice
+                  </button>
+                  <button onClick={() => setIsGameModalOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-2 text-xs font-black uppercase text-white shadow-lg hover:bg-red-700">
+                    <Plus size={16} />
+                    Add Match
                   </button>
                 </div>
-              ))}
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-gray-800 bg-black p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="font-black uppercase italic text-white">Practices</h3>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">{data.events.length} listed</span>
+                  </div>
+                  {data.events.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-gray-800 p-6 text-center text-sm text-gray-500">No practices are scheduled yet.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {data.events.map((event) => (
+                        <div key={event.id} className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <div className="font-black uppercase italic text-white">{event.title}</div>
+                              <div className="mt-1 text-[10px] font-bold uppercase text-gray-500">{event.date} - {event.time} - {event.location}</div>
+                              {event.description && <p className="mt-2 text-sm text-gray-500">{event.description}</p>}
+                            </div>
+                            <button onClick={() => handleDeletePractice(event.id)} className="text-gray-600 hover:text-red-500">
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-gray-800 bg-black p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="font-black uppercase italic text-white">Matches</h3>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">{data.games.length} listed</span>
+                  </div>
+                  {data.games.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-gray-800 p-6 text-center text-sm text-gray-500">No matches are scheduled yet.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {data.games.map((g) => (
+                        <div key={g.id} className="p-4 bg-neutral-950 border border-gray-800 rounded-xl flex justify-between items-center gap-4">
+                          <div>
+                            <div className="font-black uppercase italic text-white">vs. {g.opponent}</div>
+                            <div className="text-[10px] text-gray-500 font-bold uppercase">{g.date} - {g.time} - {g.location}</div>
+                          </div>
+                          <button onClick={() => handleDeleteGame(g.id)} className="text-gray-600 hover:text-red-500">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
           {activeTab === 'drills' && (
-            <div className="grid gap-2">
-              {data.drills.map((d) => (
-                <div key={d.id} className="p-4 bg-neutral-900 border border-gray-800 rounded-xl flex justify-between items-center">
-                  <span className="text-white font-bold">{d.title}</span>
+            <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black uppercase italic text-white">Training Lab</h2>
+                  <p className="text-sm text-gray-500">Videos and drills available to players.</p>
                 </div>
-              ))}
+                <button onClick={() => setIsDrillModalOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-2 text-xs font-black uppercase text-white hover:bg-red-700">
+                  <Upload size={16} />
+                  Add Drill
+                </button>
+              </div>
+              {data.drills.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">No training drills have been published yet.</div>
+              ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {data.drills.map((d) => {
+                  const thumbnail = d.thumbnail_url || getYoutubeThumbnail(d.video_url);
+                  const videoId = getYoutubeId(d.video_url || '');
+
+                  return (
+                    <div key={d.id} className="overflow-hidden rounded-2xl border border-gray-800 bg-black">
+                      <div className="relative aspect-video bg-neutral-950">
+                        {thumbnail ? (
+                          <img src={thumbnail} alt={d.title} className="h-full w-full object-cover opacity-75" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-xs font-black uppercase text-gray-600">
+                            No thumbnail
+                          </div>
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EF4444] text-white shadow-xl">
+                            <Play size={18} fill="white" />
+                          </div>
+                        </div>
+                        <span className="absolute left-3 top-3 rounded-md border border-white/10 bg-black/80 px-2 py-1 text-[9px] font-black uppercase text-white">
+                          {d.category || 'Training'}
+                        </span>
+                      </div>
+                      <div className="space-y-4 p-4">
+                        <div>
+                          <h3 className="line-clamp-2 text-base font-black uppercase italic text-white">{d.title}</h3>
+                          <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                            {d.difficulty || 'Beginner'} • {d.duration || 15} min
+                          </p>
+                        </div>
+                        <p className="line-clamp-2 min-h-[40px] text-sm text-gray-500">
+                          {d.description || 'Training tutorial for Bamika FC players.'}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {videoId && (
+                            <a
+                              href={d.video_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-white"
+                            >
+                              <ExternalLink size={14} />
+                              Open Video
+                            </a>
+                          )}
+                          <button onClick={() => handleDeleteDrill(d.id)} className="rounded-lg border border-gray-800 p-2 text-gray-500 hover:border-red-500 hover:text-red-500">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'announcements' && (
+            <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black uppercase italic text-white">Announcements</h2>
+                  <p className="text-sm text-gray-500">Publish club updates to the homepage and member dashboards.</p>
+                </div>
+                <button onClick={() => setIsAnnouncementModalOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-2 text-xs font-black uppercase text-white hover:bg-red-700">
+                  <Megaphone size={16} />
+                  Add Announcement
+                </button>
+              </div>
+
+              {data.announcements.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-800 bg-black p-8 text-center">
+                  <Mail className="mx-auto mb-4 text-[#EF4444]" size={36} />
+                  <h3 className="text-lg font-black uppercase italic text-white">No announcements yet</h3>
+                  <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500">
+                    Create updates for weather cancellations, tryouts, registration deadlines, or team news.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {data.announcements.map((announcement) => (
+                    <div key={announcement.id} className={`rounded-2xl border p-5 ${announcement.priority === 'important' ? 'border-[#EF4444]/70 bg-[#EF4444]/10' : 'border-gray-800 bg-black'}`}>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="mb-3 flex flex-wrap gap-2">
+                            <span className="rounded-full border border-gray-700 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-gray-400">
+                              {announcement.audience === 'everyone'
+                                ? 'Homepage + dashboards'
+                                : announcement.audience === 'public'
+                                  ? 'Homepage only'
+                                  : `${announcement.audience} only`}
+                            </span>
+                            {['public', 'everyone'].includes(announcement.audience) && (
+                              <span className="rounded-full bg-green-500/15 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-green-300">
+                                Homepage
+                              </span>
+                            )}
+                            {announcement.is_pinned && (
+                              <span className="rounded-full bg-[#D4AF37]/15 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-[#D4AF37]">
+                                Pinned
+                              </span>
+                            )}
+                            {announcement.priority === 'important' && (
+                              <span className="rounded-full bg-[#EF4444] px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white">
+                                Important
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="text-lg font-black uppercase italic text-white">{announcement.title}</h3>
+                          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-400">{announcement.body}</p>
+                          <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-gray-600">
+                            {new Date(announcement.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {announcement.expires_at ? ` - expires ${new Date(announcement.expires_at + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-col gap-2">
+                          {!['public', 'everyone'].includes(announcement.audience) && (
+                            <button
+                              onClick={() => handleShowAnnouncementOnHomepage(announcement.id)}
+                              className="rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-300"
+                            >
+                              Show on homepage
+                            </button>
+                          )}
+                          <button onClick={() => handleDeleteAnnouncement(announcement.id)} className="rounded-lg border border-gray-800 p-2 text-gray-500 hover:border-red-500 hover:text-red-500">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -546,6 +1340,24 @@ export default function AdminDashboard() {
           />
         )}
 
+        {isPracticeModalOpen && (
+          <PracticeModal
+            onClose={() => setIsPracticeModalOpen(false)}
+            onSubmit={handleAddPractice}
+            newPractice={newPractice}
+            setNewPractice={setNewPractice}
+          />
+        )}
+
+        {isAnnouncementModalOpen && (
+          <AnnouncementModal
+            onClose={() => setIsAnnouncementModalOpen(false)}
+            onSubmit={handleAddAnnouncement}
+            newAnnouncement={newAnnouncement}
+            setNewAnnouncement={setNewAnnouncement}
+          />
+        )}
+
         {isEditModalOpen && (
           <EditParentModal
             isOpen={isEditModalOpen}
@@ -558,11 +1370,11 @@ export default function AdminDashboard() {
         {isGameModalOpen && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
             <div className="bg-neutral-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl">
-              <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+              <div className="p-5 border-b border-gray-800 flex justify-between items-start gap-4 sm:p-6">
                 <h3 className="text-white font-black uppercase italic">New Match</h3>
                 <X className="cursor-pointer text-gray-500" onClick={() => setIsGameModalOpen(false)} />
               </div>
-              <form onSubmit={handleAddGame} className="p-8 space-y-4">
+              <form onSubmit={handleAddGame} className="p-5 space-y-4 sm:p-8">
                 <input type="date" required value={newGame.date} className="input-primary" onChange={(e) => setNewGame({ ...newGame, date: e.target.value })} />
                 <input type="time" required value={newGame.time} className="input-primary" onChange={(e) => setNewGame({ ...newGame, time: e.target.value })} />
                 <input type="text" placeholder="Opponent Name" required value={newGame.opponent} className="input-primary" onChange={(e) => setNewGame({ ...newGame, opponent: e.target.value })} />

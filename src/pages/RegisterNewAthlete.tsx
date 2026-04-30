@@ -1,9 +1,25 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  AlertCircle,
+  Camera,
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  FileText,
+  Shield,
+  Shirt,
+  Upload,
+  User,
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { uploadPhoto } from '../lib/upload';
 import { useAuthStore } from '../store/auth';
-import { Upload, CheckCircle, ChevronRight, ChevronLeft, AlertCircle, Camera, Shield, CreditCard } from 'lucide-react';
+
+const steps = ['Athlete', 'Photo', 'Waiver', 'Payment'];
+const fieldClass = 'w-full rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-[#EF4444] focus:ring-2 focus:ring-[#EF4444]/20';
+const labelClass = 'mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-500';
+const jerseySizes = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'S', 'M', 'L', 'XL', '2XL'];
 
 export default function RegisterNewAthlete() {
   const { user } = useAuthStore();
@@ -33,23 +49,21 @@ export default function RegisterNewAthlete() {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
-    const fileName = `${Date.now()}_${file.name}`; // Unique filename, no folders
+    const fileName = `${Date.now()}_${file.name}`;
 
     setLoading(true);
     setError(null);
 
     try {
-      // 1. Upload directly to 'player-photos' bucket
       const { error: uploadError } = await supabase.storage
         .from('player-photos')
         .upload(fileName, file, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
         });
 
       if (uploadError) throw uploadError;
 
-      // 2. Get Public URL
       const { data } = supabase.storage
         .from('player-photos')
         .getPublicUrl(fileName);
@@ -59,8 +73,7 @@ export default function RegisterNewAthlete() {
       } else {
         throw new Error('Failed to retrieve public URL');
       }
-
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Photo upload error:', err);
       setError('Failed to upload photo. Please try again.');
     } finally {
@@ -73,30 +86,25 @@ export default function RegisterNewAthlete() {
     const file = e.target.files[0];
     const fileExt = file.name.split('.').pop();
     const fileName = `${user?.id}/${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
 
     setLoading(true);
     setError(null);
 
     const { error: uploadError } = await supabase.storage
       .from('birth_certificates')
-      .upload(filePath, file);
+      .upload(fileName, file);
 
     if (uploadError) {
       setError('Failed to upload document. Please try again.');
       console.error(uploadError);
     } else {
-      setFormData({ ...formData, birthCertPath: filePath });
+      setFormData({ ...formData, birthCertPath: fileName });
     }
     setLoading(false);
   };
 
   const handleWaiverSign = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setFormData({ ...formData, waiverSignedAt: new Date().toISOString() });
-    } else {
-      setFormData({ ...formData, waiverSignedAt: '' });
-    }
+    setFormData({ ...formData, waiverSignedAt: e.target.checked ? new Date().toISOString() : '' });
   };
 
   const handleSubmit = async () => {
@@ -105,7 +113,6 @@ export default function RegisterNewAthlete() {
     setError(null);
 
     try {
-      // 1. Check for duplicates before proceeding
       const { data: existingPlayer, error: existingPlayerError } = await supabase
         .from('players')
         .select('id')
@@ -113,9 +120,7 @@ export default function RegisterNewAthlete() {
         .eq('first_name', formData.firstName.trim())
         .eq('last_name', formData.lastName.trim());
 
-      if (existingPlayerError) {
-        throw new Error(existingPlayerError.message);
-      }
+      if (existingPlayerError) throw new Error(existingPlayerError.message);
 
       if (existingPlayer && existingPlayer.length > 0) {
         setError('You have already registered a player with this name. Please check your dashboard.');
@@ -123,28 +128,9 @@ export default function RegisterNewAthlete() {
         return;
       }
 
-      // We convert to ISO string to ensure it's a standard format for the DB
-      // Fix: Strictly append T12:00:00 to prevent timezone shifts
       const safeDob = formData.dob ? new Date(`${formData.dob}T12:00:00`).toISOString() : null;
 
-      const payload = {
-        parent_id: user.id,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        dob: safeDob,
-        gender: formData.gender,
-        position: formData.position,
-        jersey_size: formData.jerseySize,
-        medical_conditions: formData.medicalConditions,
-        birth_cert_path: formData.birthCertPath,
-        photo_url: formData.photoUrl,
-        waiver_signed_at: formData.waiverSignedAt,
-        status: 'pending_payment', // Set initial status to pending
-        payment_status: 'pending' // Set initial status to pending
-      };
-
-      // Insert directly into players table first to bypass webhook latency
-      const { error: playerError } = await supabase
+      const { data: newPlayer, error: playerError } = await supabase
         .from('players')
         .insert({
           parent_id: user.id,
@@ -157,10 +143,32 @@ export default function RegisterNewAthlete() {
           medical_conditions: formData.medicalConditions,
           photo_url: formData.photoUrl,
           team_assigned: 'Unassigned',
-          jersey_number: '-'
-        });
+          jersey_number: '-',
+          status: 'pending_payment',
+          payment_status: 'pending',
+        })
+        .select('id')
+        .single();
 
       if (playerError) throw playerError;
+      if (!newPlayer?.id) throw new Error('Unable to create player profile.');
+
+      const payload = {
+        player_id: newPlayer.id,
+        parent_id: user.id,
+        first_name: formData.firstName.trim(),
+        last_name: formData.lastName.trim(),
+        dob: safeDob,
+        gender: formData.gender,
+        position: formData.position,
+        jersey_size: formData.jerseySize,
+        medical_conditions: formData.medicalConditions,
+        birth_cert_path: formData.birthCertPath || 'not_provided',
+        photo_url: formData.photoUrl,
+        waiver_signed_at: formData.waiverSignedAt,
+        status: 'pending_payment',
+        payment_status: 'pending',
+      };
 
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
@@ -172,15 +180,13 @@ export default function RegisterNewAthlete() {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create checkout session');
-      }
+      if (!response.ok) throw new Error(data.error || 'Failed to create checkout session');
 
       if (data.url) {
         window.location.href = data.url;
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to complete registration.');
       setLoading(false);
     }
   };
@@ -189,351 +195,332 @@ export default function RegisterNewAthlete() {
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
 
   const isStep1Valid = formData.firstName && formData.lastName && formData.dob;
-  const isStep2Valid = formData.photoUrl; // Require photo as per instructions "Step 2: Photo Upload"
+  const isStep2Valid = formData.photoUrl;
   const isStep3Valid = formData.waiverSignedAt && signature.trim().length > 0;
 
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4 bg-black text-white">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-black uppercase italic text-white">New Athlete Registration</h1>
-        <button onClick={() => navigate('/dashboard')} className="text-gray-400 hover:text-gray-200">Cancel</button>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="mb-8">
-        <div className="flex justify-between mb-2">
-          {['Athlete Info', 'Photo & Docs', 'Waiver', 'Payment'].map((label, idx) => (
-            <div key={idx} className={`text-sm font-bold ${step > idx ? 'text-[#EF4444]' : step === idx + 1 ? 'text-[#EF4444]' : 'text-gray-500'}`}>
-              {idx + 1}. {label}
-            </div>
-          ))}
-        </div>
-        <div className="h-2 bg-gray-800 rounded-full">
-          <div 
-            className="h-full bg-[#EF4444] rounded-full transition-all duration-300"
-            style={{ width: `${((step - 1) / 3) * 100}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="bg-black p-8 rounded-xl shadow-lg border border-zinc-700">
-        {error && (
-          <div className="bg-red-900 border border-red-700 text-red-300 px-4 py-3 rounded mb-6 flex items-center gap-2">
-            <AlertCircle size={20} />
-            {error}
-          </div>
-        )}
-
-        {/* Step 1: Athlete Info */}
-        {step === 1 && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-black uppercase italic text-white flex items-center gap-2">
-               Athlete Information
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-300 mb-1">First Name *</label>
-                <input
-                  type="text"
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleInputChange}
-                  className="w-full border bg-black border-gray-700 rounded-md p-2 focus:ring-[#EF4444] focus:border-[#EF4444]"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-300 mb-1">Last Name *</label>
-                <input
-                  type="text"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleInputChange}
-                  className="w-full border bg-black border-gray-700 rounded-md p-2 focus:ring-[#EF4444] focus:border-[#EF4444]"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-300 mb-1">Date of Birth *</label>
-                <input
-                  type="date"
-                  name="dob"
-                  value={formData.dob}
-                  onChange={handleInputChange}
-                  className="w-full border bg-black border-gray-700 rounded-md p-2 focus:ring-[#EF4444] focus:border-[#EF4444]"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-300 mb-1">Gender *</label>
-                <select
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleInputChange}
-                  className="w-full border bg-black border-gray-700 rounded-md p-2 focus:ring-[#EF4444] focus:border-[#EF4444]"
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-300 mb-1">Preferred Position</label>
-                <select
-                  name="position"
-                  value={formData.position}
-                  onChange={handleInputChange}
-                  className="w-full border bg-black border-gray-700 rounded-md p-2 focus:ring-[#EF4444] focus:border-[#EF4444]"
-                >
-                  <option value="TBD">TBD</option>
-                  <option value="Forward">Forward</option>
-                  <option value="Midfielder">Midfielder</option>
-                  <option value="Defender">Defender</option>
-                  <option value="Goalkeeper">Goalkeeper</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-300 mb-1">Jersey Size</label>
-                <select
-                  name="jerseySize"
-                  value={formData.jerseySize}
-                  onChange={handleInputChange}
-                  className="w-full border bg-black border-gray-700 rounded-md p-2 focus:ring-[#EF4444] focus:border-[#EF4444]"
-                >
-                  <option value="YS">Youth Small (YS)</option>
-                  <option value="YM">Youth Medium (YM)</option>
-                  <option value="YL">Youth Large (YL)</option>
-                  <option value="S">Small (S)</option>
-                  <option value="M">Medium (M)</option>
-                  <option value="L">Large (L)</option>
-                  <option value="XL">Extra Large (XL)</option>
-                </select>
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-bold text-gray-300 mb-1">Medical Conditions (Optional)</label>
-                <textarea
-                  name="medicalConditions"
-                  value={formData.medicalConditions}
-                  onChange={handleInputChange}
-                  rows={3}
-                  className="w-full border bg-black border-gray-700 rounded-md p-2 focus:ring-[#EF4444] focus:border-[#EF4444]"
-                  placeholder="Allergies, asthma, previous injuries, etc."
-                />
-              </div>
-            </div>
-            <div className="flex justify-end mt-6">
-              <button
-                onClick={nextStep}
-                disabled={!isStep1Valid}
-                className="bg-[#EF4444] text-white px-6 py-2 rounded-md font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                Next: Photos & Docs <ChevronRight size={20} />
+    <div className="w-full py-6 text-white sm:py-8">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-6 overflow-hidden rounded-2xl border border-gray-800 bg-neutral-950">
+          <div className="grid gap-0 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="p-6 sm:p-8">
+              <button onClick={() => navigate('/dashboard')} className="mb-6 text-xs font-black uppercase tracking-widest text-gray-500 hover:text-white">
+                Back to dashboard
               </button>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#EF4444]/40 bg-[#EF4444]/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#FCA5A5]">
+                Player registration
+              </div>
+              <h1 className="mt-4 text-3xl font-black uppercase italic leading-tight text-white sm:text-5xl">
+                New Athlete <span className="text-[#D4AF37]">Registration</span>
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-gray-400 sm:text-base">
+                Add your player, upload a roster photo, sign the waiver, and complete the Bamika FC uniform and monthly membership checkout.
+              </p>
+            </div>
+
+            <div className="border-t border-gray-800 bg-black p-6 sm:p-8 lg:border-l lg:border-t-0">
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Checkout summary</div>
+              <div className="mt-5 space-y-3">
+                <div className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
+                  <div className="text-sm font-bold text-gray-300">June promo monthly fee</div>
+                  <div className="mt-1 text-3xl font-black text-[#EF4444]">$50/mo</div>
+                </div>
+                <div className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
+                  <div className="text-sm font-bold text-gray-300">Full uniform package</div>
+                  <div className="mt-1 text-3xl font-black text-white">$100</div>
+                  <p className="mt-2 text-xs leading-5 text-gray-500">Game jersey, shorts, socks, and practice jersey.</p>
+                </div>
+                <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-sm font-black uppercase tracking-widest text-green-300">
+                  Registration fee waived through June 30
+                </div>
+              </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Step 2: Photo Upload */}
-        {step === 2 && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-black uppercase italic text-white flex items-center gap-2">
-              <Camera className="text-[#EF4444]" /> Athlete Photo
-            </h2>
-            <p className="text-gray-400">Please upload a clear headshot of the player for their roster card.</p>
-            
-            <div className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:bg-gray-900 transition-colors mb-6">
-              <input
-                type="file"
-                id="playerPhoto"
-                accept="image/*"
-                className="hidden"
-                onChange={handlePhotoUpload}
-              />
-              <label htmlFor="playerPhoto" className="cursor-pointer block">
-                {formData.photoUrl ? (
-                  <div className="flex flex-col items-center animate-fade-in">
-                    <img 
-                      src={formData.photoUrl} 
-                      alt="Player Preview" 
-                      className="w-32 h-32 rounded-full object-cover mb-2 border-4 border-green-700 shadow-lg"
-                    />
-                    <span className="text-green-400 font-bold flex items-center gap-1">
-                      <CheckCircle size={16} /> Photo Uploaded
-                    </span>
-                    <span className="text-xs text-gray-500 mt-1">Click to replace</span>
+        <div className="mb-6 rounded-2xl border border-gray-800 bg-neutral-900 p-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {steps.map((label, idx) => {
+              const current = idx + 1;
+              const active = step >= current;
+              return (
+                <div key={label} className={`rounded-xl border px-2 py-3 sm:px-3 ${active ? 'border-[#EF4444]/60 bg-[#EF4444]/10' : 'border-gray-800 bg-black'}`}>
+                  <div className={`mb-1 flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ${active ? 'bg-[#EF4444] text-white' : 'bg-neutral-800 text-gray-500'}`}>
+                    {current}
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center text-gray-500">
-                    <div className="bg-gray-800 p-4 rounded-full mb-2">
-                      <Camera size={32} />
-                    </div>
-                    <span className="font-bold">Upload Player Photo *</span>
-                    <span className="text-sm mt-1">JPG or PNG</span>
-                  </div>
-                )}
-              </label>
+                  <div className={`text-[10px] font-black uppercase tracking-widest ${active ? 'text-white' : 'text-gray-600'}`}>{label}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5 shadow-2xl shadow-black/30 sm:p-8">
+          {error && (
+            <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200">
+              <AlertCircle size={20} className="mt-0.5 shrink-0" />
+              {error}
             </div>
+          )}
 
-            <div className="border-t border-gray-700 pt-6">
-               <h3 className="font-bold text-lg mb-2">Birth Certificate (Optional)</h3>
-               <div className="flex items-center gap-4">
-                  <input
-                    type="file"
-                    id="birthCert"
-                    accept="image/*,.pdf"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                  />
-                  <label htmlFor="birthCert" className="cursor-pointer bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded font-bold flex items-center gap-2">
-                    <Upload size={18} /> Upload Document
+          {step === 1 && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EF4444]">
+                  <User size={21} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black uppercase italic">Athlete Information</h2>
+                  <p className="text-sm text-gray-500">Basic player details and uniform sizing.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2">
+                <div>
+                  <label className={labelClass}>First Name *</label>
+                  <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className={fieldClass} required />
+                </div>
+                <div>
+                  <label className={labelClass}>Last Name *</label>
+                  <input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} className={fieldClass} required />
+                </div>
+                <div>
+                  <label className={labelClass}>Date of Birth *</label>
+                  <input type="date" name="dob" value={formData.dob} onChange={handleInputChange} className={fieldClass} required />
+                </div>
+                <div>
+                  <label className={labelClass}>Gender *</label>
+                  <select name="gender" value={formData.gender} onChange={handleInputChange} className={fieldClass}>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Preferred Position</label>
+                  <select name="position" value={formData.position} onChange={handleInputChange} className={fieldClass}>
+                    <option value="TBD">TBD</option>
+                    <option value="Forward">Forward</option>
+                    <option value="Midfielder">Midfielder</option>
+                    <option value="Defender">Defender</option>
+                    <option value="Goalkeeper">Goalkeeper</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Jersey Size</label>
+                  <select name="jerseySize" value={formData.jerseySize} onChange={handleInputChange} className={fieldClass}>
+                    {jerseySizes.map((size) => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className={labelClass}>Medical Conditions</label>
+                  <textarea name="medicalConditions" value={formData.medicalConditions} onChange={handleInputChange} rows={4} className={fieldClass} placeholder="Allergies, asthma, previous injuries, medications, or anything coaches should know." />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button onClick={nextStep} disabled={!isStep1Valid} className="inline-flex items-center gap-2 rounded-xl bg-[#EF4444] px-5 py-3 text-sm font-black uppercase text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
+                  Photo Upload <ChevronRight size={18} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EF4444]">
+                  <Camera size={21} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black uppercase italic">Photo & Documents</h2>
+                  <p className="text-sm text-gray-500">A clear roster photo helps coaches and admins identify players.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+                <div className="rounded-2xl border border-gray-800 bg-black p-5">
+                  <input type="file" id="playerPhoto" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                  <label htmlFor="playerPhoto" className="flex min-h-[280px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-gray-700 bg-neutral-950 p-6 text-center transition hover:border-[#EF4444]">
+                    {formData.photoUrl ? (
+                      <>
+                        <img src={formData.photoUrl} alt="Player preview" className="h-36 w-36 rounded-2xl border-2 border-green-500/60 object-cover shadow-xl" />
+                        <span className="mt-4 inline-flex items-center gap-2 text-sm font-black uppercase text-green-300"><CheckCircle size={16} /> Photo uploaded</span>
+                        <span className="mt-1 text-xs text-gray-500">Click to replace</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-neutral-900 text-gray-400">
+                          <Camera size={32} />
+                        </div>
+                        <span className="font-black uppercase tracking-widest text-white">Upload player photo *</span>
+                        <span className="mt-2 text-sm text-gray-500">JPG or PNG works best</span>
+                      </>
+                    )}
                   </label>
-                  {formData.birthCertPath && (
-                    <span className="text-green-400 font-bold flex items-center gap-1">
-                      <CheckCircle size={16} /> Uploaded
-                    </span>
-                  )}
-               </div>
-            </div>
+                </div>
 
-            <div className="flex justify-between mt-8">
-              <button onClick={prevStep} className="text-gray-300 font-bold hover:text-white flex items-center gap-2">
-                <ChevronLeft size={20} /> Back
-              </button>
-              <button
-                onClick={nextStep}
-                disabled={!isStep2Valid || loading}
-                className="bg-[#EF4444] text-white px-6 py-2 rounded-md font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                Next: Waiver <ChevronRight size={20} />
-              </button>
-            </div>
-          </div>
-        )}
+                <div className="rounded-2xl border border-gray-800 bg-black p-5">
+                  <div className="flex items-center gap-3">
+                    <FileText className="text-[#D4AF37]" size={24} />
+                    <div>
+                      <h3 className="font-black uppercase italic">Birth Certificate</h3>
+                      <p className="text-sm text-gray-500">Optional, but useful for age verification.</p>
+                    </div>
+                  </div>
+                  <div className="mt-5 flex flex-col gap-3 rounded-xl border border-gray-800 bg-neutral-950 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <input type="file" id="birthCert" accept="image/*,.pdf" className="hidden" onChange={handleFileUpload} />
+                    <label htmlFor="birthCert" className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-gray-700 px-4 py-3 text-sm font-black uppercase text-gray-300 transition hover:border-[#EF4444] hover:text-white">
+                      <Upload size={18} /> Upload document
+                    </label>
+                    {formData.birthCertPath ? (
+                      <span className="inline-flex items-center gap-2 text-sm font-black uppercase text-green-300"><CheckCircle size={16} /> Uploaded</span>
+                    ) : (
+                      <span className="text-sm text-gray-500">No document selected</span>
+                    )}
+                  </div>
+                  <div className="mt-5 rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 p-4 text-sm leading-6 text-[#FDE68A]">
+                    The player photo is required because it appears on roster cards and coach dashboards.
+                  </div>
+                </div>
+              </div>
 
-        {/* Step 3: Waiver */}
-        {step === 3 && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-black uppercase italic text-white flex items-center gap-2">
-              <Shield className="text-[#EF4444]" /> Liability Waiver
-            </h2>
-            
-            <div className="h-[300px] overflow-y-scroll border border-gray-700 p-4 rounded bg-gray-900 text-sm text-gray-300 leading-relaxed shadow-inner">
-              <h3 className="font-bold mb-4 text-center uppercase">RELEASE OF LIABILITY FOR MINOR PARTICIPANTS</h3>
-              <p className="font-bold mb-4 text-center">READ BEFORE SIGNING</p>
-              
-              <p className="mb-4">
-                IN CONSIDERATION OF my child, <span className="font-bold text-white">{formData.firstName} {formData.lastName}</span>, being allowed to participate in any way in BAMIKA FC related events and activities, the undersigned acknowledges, appreciates, and agrees that:
+              <div className="flex justify-between">
+                <button onClick={prevStep} className="inline-flex items-center gap-2 text-sm font-black uppercase text-gray-400 hover:text-white">
+                  <ChevronLeft size={18} /> Back
+                </button>
+                <button onClick={nextStep} disabled={!isStep2Valid || loading} className="inline-flex items-center gap-2 rounded-xl bg-[#EF4444] px-5 py-3 text-sm font-black uppercase text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
+                  Waiver <ChevronRight size={18} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EF4444]">
+                  <Shield size={21} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black uppercase italic">Liability Waiver</h2>
+                  <p className="text-sm text-gray-500">Review and sign before checkout.</p>
+                </div>
+              </div>
+
+              <div className="max-h-[320px] overflow-y-auto rounded-2xl border border-gray-800 bg-black p-5 text-sm leading-7 text-gray-300">
+                <h3 className="mb-4 text-center font-black uppercase tracking-widest text-white">Release of Liability for Minor Participants</h3>
+                <p className="mb-4">
+                  In consideration of my child, <span className="font-black text-white">{formData.firstName} {formData.lastName}</span>, being allowed to participate in Bamika FC activities, I acknowledge and accept the risks connected with soccer training, games, travel, and club events.
+                </p>
+                <p className="mb-4">
+                  I release and hold harmless Bamika FC, its coaches, volunteers, staff, facilities, and partners from claims related to injury, illness, or loss connected to participation, except where prohibited by law.
+                </p>
+                <p className="font-black uppercase text-white">
+                  I have read this agreement, understand its terms, and sign it freely as the parent or legal guardian.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 p-5">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input type="checkbox" checked={!!formData.waiverSignedAt} onChange={handleWaiverSign} className="mt-1 h-5 w-5 rounded border-gray-700 bg-black text-[#EF4444] focus:ring-[#EF4444]" />
+                  <span className="text-sm font-bold text-white">I agree to the waiver terms above.</span>
+                </label>
+
+                <div className="mt-5">
+                  <label className={labelClass}>Parent/Guardian Signature</label>
+                  <input type="text" value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="Type full legal name" className={`${fieldClass} text-lg italic`} />
+                </div>
+              </div>
+
+              <div className="flex justify-between">
+                <button onClick={prevStep} className="inline-flex items-center gap-2 text-sm font-black uppercase text-gray-400 hover:text-white">
+                  <ChevronLeft size={18} /> Back
+                </button>
+                <button onClick={nextStep} disabled={!isStep3Valid} className="inline-flex items-center gap-2 rounded-xl bg-[#EF4444] px-5 py-3 text-sm font-black uppercase text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
+                  Review & Pay <ChevronRight size={18} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EF4444]">
+                  <CreditCard size={21} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black uppercase italic">Review & Pay</h2>
+                  <p className="text-sm text-gray-500">Confirm registration details before secure checkout.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-[1fr_0.85fr]">
+                <div className="rounded-2xl border border-gray-800 bg-black p-5">
+                  <h3 className="mb-4 font-black uppercase italic">Player Summary</h3>
+                  <div className="space-y-3">
+                    {[
+                      ['Player Name', `${formData.firstName} ${formData.lastName}`],
+                      ['Position', formData.position],
+                      ['Jersey Size', formData.jerseySize],
+                      ['Waiver', `Signed by ${signature}`],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between gap-4 border-b border-gray-800 pb-3 text-sm">
+                        <span className="font-bold text-gray-500">{label}</span>
+                        <span className="text-right font-black text-white">{value}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between gap-4 border-b border-gray-800 pb-3 text-sm">
+                      <span className="font-bold text-gray-500">Photo</span>
+                      <span className="inline-flex items-center gap-2 font-black text-green-300"><CheckCircle size={16} /> Uploaded</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-gray-800 bg-black p-5">
+                  <h3 className="mb-4 font-black uppercase italic">Today at Checkout</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                      <span className="text-sm font-bold text-gray-500">Registration Fee</span>
+                      <span className="font-black text-green-300">Waived</span>
+                    </div>
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                      <span className="text-sm font-bold text-gray-500">Full Uniform</span>
+                      <span className="font-black">$100.00</span>
+                    </div>
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                      <span className="text-sm font-bold text-gray-500">Monthly Fee</span>
+                      <span className="font-black">$50/mo</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-lg font-black uppercase italic">Due Now</span>
+                      <span className="text-2xl font-black text-[#EF4444]">$100 + $50/mo</span>
+                    </div>
+                    <div className="rounded-xl border border-gray-800 bg-neutral-950 p-3 text-xs leading-5 text-gray-500">
+                      <Shirt className="mb-2 text-[#D4AF37]" size={18} />
+                      Uniform includes game jersey, shorts, socks, and practice jersey.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-center text-sm italic text-gray-500">
+                You will be redirected to secure Stripe checkout. The player profile is already saved as pending payment.
               </p>
-              <p className="mb-4">
-                The risks of injury and illness (ex: communicable diseases such as MRSA, influenza, and COVID-19) to my child from the activities involved in these programs are significant... (Full text implied for brevity)
-              </p>
-              <p className="mb-4">
-                 I, for myself, my spouse, my child, and on behalf of my/our heirs, assigns, personal representatives and next of kin, HEREBY RELEASE AND HOLD HARMLESS BAMIKA FC...
-              </p>
-              <p className="font-bold uppercase mt-6">
-                I HAVE READ THIS RELEASE OF LIABILITY AND ASSUMPTION OF RISK AGREEMENT, FULLY UNDERSTAND ITS TERMS, UNDERSTAND THAT WE HAVE GIVEN UP SUBSTANTIAL RIGHTS BY SIGNING IT, AND SIGN IT FREELY AND VOLUNTARILY WITHOUT ANY INDUCEMENT.
-              </p>
-            </div>
-            
-            <div className="space-y-4 bg-yellow-900 p-4 rounded border border-yellow-700">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={!!formData.waiverSignedAt}
-                  onChange={handleWaiverSign}
-                  className="w-5 h-5 text-[#EF4444] focus:ring-[#EF4444] border-gray-600 rounded mt-0.5"
-                />
-                <span className="text-sm font-bold text-white">
-                  I AGREE to the terms and conditions above.
-                </span>
-              </label>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Parent/Guardian Signature (Type Full Name)</label>
-                <input
-                  type="text"
-                  value={signature}
-                  onChange={(e) => setSignature(e.target.value)}
-                  placeholder="e.g. Jane Doe"
-                  className="w-full border bg-black border-gray-700 rounded-md p-2 focus:ring-[#EF4444] focus:border-[#EF4444] font-serif italic text-lg"
-                />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <button onClick={prevStep} className="inline-flex items-center gap-2 text-sm font-black uppercase text-gray-400 hover:text-white">
+                  <ChevronLeft size={18} /> Back
+                </button>
+                <button onClick={handleSubmit} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#EF4444] px-6 py-4 text-sm font-black uppercase text-white shadow-xl transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
+                  {loading ? 'Processing...' : 'Proceed to Payment'} <ChevronRight size={18} />
+                </button>
               </div>
             </div>
-
-            <div className="flex justify-between mt-6">
-              <button onClick={prevStep} className="text-gray-300 font-bold hover:text-white flex items-center gap-2">
-                <ChevronLeft size={20} /> Back
-              </button>
-              <button
-                onClick={nextStep}
-                disabled={!isStep3Valid}
-                className="bg-[#EF4444] text-white px-6 py-2 rounded-md font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                Next: Payment <ChevronRight size={20} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Payment */}
-        {step === 4 && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-black uppercase italic text-white flex items-center gap-2">
-              <CreditCard className="text-[#EF4444]" /> Review & Pay
-            </h2>
-            
-            <div className="bg-blue-900 border-l-4 border-blue-700 text-blue-300 p-4 rounded-md mb-6">
-              <p className="font-bold">Register today to secure your spot!</p>
-              <p className="text-sm">Your card will not be charged until our season officially begins on May 1st.</p>
-            </div>
-            
-            <div className="bg-gray-900 p-6 rounded-lg space-y-4 border border-gray-700">
-              <div className="flex justify-between border-b border-gray-700 pb-2">
-                <span className="text-gray-400">Player Name</span>
-                <span className="font-bold">{formData.firstName} {formData.lastName}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-700 pb-2">
-                <span className="text-gray-400">Position</span>
-                <span className="font-bold">{formData.position}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-700 pb-2">
-                <span className="text-gray-400">Jersey Size</span>
-                <span className="font-bold">{formData.jerseySize}</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-700 pb-2">
-                <span className="text-gray-400">Photo</span>
-                <span className="font-bold text-green-400 flex items-center gap-1"><CheckCircle size={16} /> Uploaded</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-700 pb-2">
-                <span className="text-gray-400">Waiver</span>
-                <span className="font-bold text-green-400 flex items-center gap-1"><CheckCircle size={16} /> Signed by {signature}</span>
-              </div>
-              <div className="flex justify-between pt-4">
-                <span className="text-xl font-bold">Total Due Now</span>
-                <span className="text-xl font-bold text-[#EF4444]">$0.00</span>
-              </div>
-              <p className="text-xs text-gray-500 mt-2 text-right">First payment of $50.00 on May 1st</p>
-            </div>
-
-            <p className="text-sm text-gray-500 text-center italic">
-              You will be redirected to our secure Stripe checkout page to complete the transaction.
-              Your player profile will be created automatically upon successful payment.
-            </p>
-
-            <div className="flex justify-between mt-6">
-              <button onClick={prevStep} className="text-gray-300 font-bold hover:text-white flex items-center gap-2">
-                <ChevronLeft size={20} /> Back
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={loading}
-                className="bg-[#EF4444] text-white px-8 py-4 rounded-md font-bold hover:bg-red-700 disabled:opacity-50 w-full md:w-auto shadow-xl transform hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
-              >
-                {loading ? 'Processing...' : 'Proceed to Payment'} <ChevronRight size={20} />
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
