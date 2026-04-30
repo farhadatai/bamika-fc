@@ -395,12 +395,10 @@ export default function LandingPage() {
   const fetchAnnouncements = async () => {
     setLoadingAnnouncements(true)
     try {
-      const today = new Date().toISOString().split('T')[0]
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
         .in('audience', ['public', 'everyone'])
-        .or(`expires_at.is.null,expires_at.gte.${today}`)
         .order('is_pinned', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(3)

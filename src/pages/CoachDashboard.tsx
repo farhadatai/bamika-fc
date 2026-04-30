@@ -174,12 +174,10 @@ export default function CoachDashboard() {
         setPlayers(formattedData);
       }
 
-      const today = new Date().toISOString().split('T')[0];
       const { data: announcements, error: announcementsError } = await supabase
         .from('announcements')
         .select('*')
         .eq('team_id', teamId)
-        .or(`expires_at.is.null,expires_at.gte.${today}`)
         .order('is_pinned', { ascending: false })
         .order('created_at', { ascending: false });
 

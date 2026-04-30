@@ -106,7 +106,6 @@ export default function Dashboard() {
           .from('announcements')
           .select('*')
           .in('audience', audiences)
-          .or(`expires_at.is.null,expires_at.gte.${today}`)
           .order('is_pinned', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(4),
@@ -143,7 +142,6 @@ export default function Dashboard() {
             .select('*')
             .eq('audience', 'team')
             .in('team_id', teams)
-            .or(`expires_at.is.null,expires_at.gte.${today}`)
             .order('is_pinned', { ascending: false })
             .order('created_at', { ascending: false });
 

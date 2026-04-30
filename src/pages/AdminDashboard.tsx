@@ -365,12 +365,15 @@ const AnnouncementModal = ({ onClose, onSubmit, newAnnouncement, setNewAnnouncem
             <option value="normal">Normal</option>
             <option value="important">Important</option>
           </select>
-          <input
-            type="date"
-            value={newAnnouncement.expires_at}
-            className="input-primary"
-            onChange={(e) => setNewAnnouncement({ ...newAnnouncement, expires_at: e.target.value })}
-          />
+          <label className="space-y-2">
+            <span className="block text-[10px] font-black uppercase tracking-widest text-gray-500">Reference date</span>
+            <input
+              type="date"
+              value={newAnnouncement.expires_at}
+              className="input-primary"
+              onChange={(e) => setNewAnnouncement({ ...newAnnouncement, expires_at: e.target.value })}
+            />
+          </label>
         </div>
         <label className="flex items-center gap-3 rounded-xl border border-gray-800 bg-black p-4 text-sm font-bold text-gray-300">
           <input
