@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
+import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { useAuthStore } from './store/auth'
 import { Layout } from './components/Layout'
@@ -22,15 +23,40 @@ function App() {
   const { setUser, setUserRole, setLoading } = useAuthStore()
 
   useEffect(() => {
-    const fetchRole = async (userId: string) => {
+    const fetchRole = async (user: User) => {
       const { data } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', userId)
+        .eq('id', user.id)
         .single()
 
       if (data) {
         setUserRole(data.role)
+        return
+      }
+
+      const meta = user.user_metadata || {}
+      const firstName = typeof meta.first_name === 'string' ? meta.first_name : ''
+      const lastName = typeof meta.last_name === 'string' ? meta.last_name : ''
+      const phone = typeof meta.phone === 'string' ? meta.phone : ''
+      const fullName = typeof meta.full_name === 'string' ? meta.full_name : `${firstName} ${lastName}`.trim()
+
+      const { data: createdProfile } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          first_name: firstName,
+          last_name: lastName,
+          full_name: fullName,
+          email: user.email,
+          phone,
+          role: 'user',
+        }, { onConflict: 'id' })
+        .select('role')
+        .single()
+
+      if (createdProfile) {
+        setUserRole(createdProfile.role)
       }
     }
 
@@ -38,7 +64,7 @@ function App() {
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        fetchRole(session.user.id)
+        fetchRole(session.user)
       }
 
       setLoading(false)
@@ -50,7 +76,7 @@ function App() {
       setUser(session?.user ?? null)
 
       if (session?.user) {
-        fetchRole(session.user.id)
+        fetchRole(session.user)
       } else {
         setUserRole(null)
       }
