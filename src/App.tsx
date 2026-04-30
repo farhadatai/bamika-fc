@@ -19,12 +19,24 @@ import RegistrationSuccess from './pages/registration/Success'
 import TrainingLab from './pages/TrainingLab'
 import ParentDetailView from './pages/ParentDetailView'
 
+const isMissingProfileColumnError = (message?: string) => (
+  !!message
+  && message.includes('schema cache')
+  && message.includes('profiles')
+  && (
+    message.includes('first_name')
+    || message.includes('last_name')
+    || message.includes('email')
+    || message.includes('role')
+  )
+)
+
 function App() {
   const { setUser, setUserRole, setLoading } = useAuthStore()
 
   useEffect(() => {
     const fetchRole = async (user: User) => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
@@ -35,13 +47,18 @@ function App() {
         return
       }
 
+      if (isMissingProfileColumnError(error?.message)) {
+        setUserRole('user')
+        return
+      }
+
       const meta = user.user_metadata || {}
       const firstName = typeof meta.first_name === 'string' ? meta.first_name : ''
       const lastName = typeof meta.last_name === 'string' ? meta.last_name : ''
       const phone = typeof meta.phone === 'string' ? meta.phone : ''
       const fullName = typeof meta.full_name === 'string' ? meta.full_name : `${firstName} ${lastName}`.trim()
 
-      const { data: createdProfile } = await supabase
+      const { data: createdProfile, error: createError } = await supabase
         .from('profiles')
         .upsert({
           id: user.id,
@@ -57,6 +74,19 @@ function App() {
 
       if (createdProfile) {
         setUserRole(createdProfile.role)
+        return
+      }
+
+      if (isMissingProfileColumnError(createError?.message)) {
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: user.id,
+            full_name: fullName,
+            phone,
+          }, { onConflict: 'id' })
+
+        setUserRole('user')
       }
     }
 

@@ -2,6 +2,17 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
+const isMissingProfileColumnError = (message: string) => (
+  message.includes('schema cache')
+  && message.includes('profiles')
+  && (
+    message.includes('first_name')
+    || message.includes('last_name')
+    || message.includes('email')
+    || message.includes('role')
+  )
+);
+
 export default function Register() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -69,7 +80,21 @@ export default function Register() {
           }, { onConflict: 'id' });
 
         if (profileError) {
-          throw new Error(profileError.message);
+          if (!isMissingProfileColumnError(profileError.message)) {
+            throw new Error(profileError.message);
+          }
+
+          const { error: legacyProfileError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: authData.user.id,
+              full_name: fullName,
+              phone,
+            }, { onConflict: 'id' });
+
+          if (legacyProfileError) {
+            throw new Error(legacyProfileError.message);
+          }
         }
 
         navigate('/dashboard');
