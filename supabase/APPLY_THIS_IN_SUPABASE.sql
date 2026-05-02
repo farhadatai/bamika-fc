@@ -39,11 +39,30 @@ create table if not exists public.announcements (
   created_at timestamptz default now()
 );
 
+create table if not exists public.drills (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  video_url text not null,
+  thumbnail_url text,
+  duration integer not null default 15,
+  difficulty text not null default 'Beginner',
+  category text not null default 'Dribbling',
+  description text,
+  created_at timestamptz default now()
+);
+
 alter table public.announcements add column if not exists team_id text;
 alter table public.announcements add column if not exists priority text not null default 'normal';
 alter table public.announcements add column if not exists is_pinned boolean not null default false;
 alter table public.announcements add column if not exists expires_at date;
 alter table public.announcements add column if not exists created_at timestamptz default now();
+
+alter table public.drills add column if not exists thumbnail_url text;
+alter table public.drills add column if not exists duration integer not null default 15;
+alter table public.drills add column if not exists difficulty text not null default 'Beginner';
+alter table public.drills add column if not exists category text not null default 'Dribbling';
+alter table public.drills add column if not exists description text;
+alter table public.drills add column if not exists created_at timestamptz default now();
 
 update public.profiles
 set
@@ -77,6 +96,7 @@ alter table public.profiles enable row level security;
 alter table public.players enable row level security;
 alter table public.coaches enable row level security;
 alter table public.announcements enable row level security;
+alter table public.drills enable row level security;
 
 drop policy if exists "Users can insert own profile" on public.profiles;
 drop policy if exists "Users can view own profile" on public.profiles;
@@ -205,8 +225,45 @@ create policy "Admins can delete announcements" on public.announcements
     )
   );
 
+drop policy if exists "Public can view drills" on public.drills;
+drop policy if exists "Admins can insert drills" on public.drills;
+drop policy if exists "Admins can update drills" on public.drills;
+drop policy if exists "Admins can delete drills" on public.drills;
+
+create policy "Public can view drills" on public.drills
+  for select using (true);
+
+create policy "Admins can insert drills" on public.drills
+  for insert to authenticated
+  with check (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  );
+
+create policy "Admins can update drills" on public.drills
+  for update to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  );
+
+create policy "Admins can delete drills" on public.drills
+  for delete to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  );
+
 grant select, insert, update on public.profiles to authenticated;
 grant select, insert, update on public.players to authenticated;
 grant select, update on public.coaches to authenticated;
 grant select on public.announcements to anon, authenticated;
 grant insert, update, delete on public.announcements to authenticated;
+grant select on public.drills to anon, authenticated;
+grant insert, update, delete on public.drills to authenticated;

@@ -81,6 +81,17 @@ const isMissingTableError = (error, tableName) => {
   return message.includes(tableName) && (message.includes('schema cache') || message.includes('table'));
 };
 
+const isMissingDrillSchemaError = (error) => {
+  const message = `${error?.message || ''} ${error?.details || ''}`;
+  return message.includes('drills') && (
+    message.includes('schema cache')
+    || message.includes('difficulty')
+    || message.includes('duration')
+    || message.includes('thumbnail_url')
+    || message.includes('category')
+  );
+};
+
 const POSITION_OPTIONS = ['TBD', 'Forward', 'Midfielder', 'Defender', 'Goalkeeper'];
 const JERSEY_SIZE_OPTIONS = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'S', 'M', 'L', 'XL', '2XL'];
 
@@ -609,6 +620,10 @@ export default function AdminDashboard() {
       setIsDrillModalOpen(false);
       fetchData();
     } else {
+      if (isMissingDrillSchemaError(error)) {
+        alert('Training drills need the latest Supabase database update. Run supabase/APPLY_THIS_IN_SUPABASE.sql in Supabase SQL Editor, then try publishing again.');
+        return;
+      }
       alert(error.message);
     }
   };
