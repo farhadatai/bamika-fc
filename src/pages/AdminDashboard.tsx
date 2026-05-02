@@ -608,47 +608,10 @@ export default function AdminDashboard() {
       return;
     }
 
-    const drillPayload = {
-      ...newDrill,
-      thumbnail_url: newDrill.thumbnail_url || getYoutubeThumbnail(newDrill.video_url),
-      description: newDrill.description || 'Training tutorial for Bamika FC players.',
-    };
-
-    let { error } = await supabase.from('drills').insert([drillPayload]);
-
-    if (error && isMissingDrillSchemaError(error)) {
-      const basicPayloads = [
-        {
-          title: newDrill.title,
-          video_url: newDrill.video_url,
-          thumbnail_url: drillPayload.thumbnail_url,
-          category: newDrill.category,
-          description: drillPayload.description,
-        },
-        {
-          title: newDrill.title,
-          video_url: newDrill.video_url,
-          category: newDrill.category,
-          description: drillPayload.description,
-        },
-        {
-          title: newDrill.title,
-          video_url: newDrill.video_url,
-          description: drillPayload.description,
-        },
-        {
-          title: newDrill.title,
-          video_url: newDrill.video_url,
-        },
-      ];
-
-      for (const payload of basicPayloads) {
-        const retry = await supabase.from('drills').insert([payload]);
-        error = retry.error;
-        if (!error) break;
-        if (!isMissingDrillSchemaError(error)) break;
-      }
-    }
+    const { error } = await supabase.from('drills').insert([{
+      title: newDrill.title,
+      video_url: newDrill.video_url,
+    }]);
 
     if (!error) {
       setNewDrill(emptyDrill);
