@@ -614,7 +614,42 @@ export default function AdminDashboard() {
       description: newDrill.description || 'Training tutorial for Bamika FC players.',
     };
 
-    const { error } = await supabase.from('drills').insert([drillPayload]);
+    let { error } = await supabase.from('drills').insert([drillPayload]);
+
+    if (error && isMissingDrillSchemaError(error)) {
+      const basicPayloads = [
+        {
+          title: newDrill.title,
+          video_url: newDrill.video_url,
+          thumbnail_url: drillPayload.thumbnail_url,
+          category: newDrill.category,
+          description: drillPayload.description,
+        },
+        {
+          title: newDrill.title,
+          video_url: newDrill.video_url,
+          category: newDrill.category,
+          description: drillPayload.description,
+        },
+        {
+          title: newDrill.title,
+          video_url: newDrill.video_url,
+          description: drillPayload.description,
+        },
+        {
+          title: newDrill.title,
+          video_url: newDrill.video_url,
+        },
+      ];
+
+      for (const payload of basicPayloads) {
+        const retry = await supabase.from('drills').insert([payload]);
+        error = retry.error;
+        if (!error) break;
+        if (!isMissingDrillSchemaError(error)) break;
+      }
+    }
+
     if (!error) {
       setNewDrill(emptyDrill);
       setIsDrillModalOpen(false);
