@@ -13,6 +13,24 @@ const getInitials = (firstName = '', lastName = '') => {
   return `${first}${last}`.toUpperCase() || 'FC';
 };
 
+const splitFullName = (fullName = '') => {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: '', lastName: '' };
+  if (parts.length === 1) return { firstName: parts[0], lastName: '' };
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(' '),
+  };
+};
+
+const getParentDisplayName = (parent = {}) => {
+  const splitName = splitFullName(parent.full_name || '');
+  return {
+    firstName: parent.first_name || splitName.firstName,
+    lastName: parent.last_name || splitName.lastName,
+  };
+};
+
 const formatAge = (dateOfBirth) => {
   if (!dateOfBirth) return 'Age TBA';
 
@@ -128,10 +146,11 @@ const EditParentModal = ({ isOpen, onClose, parent, onSave }) => {
 
   useEffect(() => {
     if (parent) {
+      const displayName = getParentDisplayName(parent);
       setFormData({
         id: parent.id,
-        first_name: parent.first_name || '',
-        last_name: parent.last_name || '',
+        first_name: displayName.firstName,
+        last_name: displayName.lastName,
         email: parent.email || '',
         phone: parent.phone || '',
       });
@@ -446,9 +465,17 @@ export default function AdminDashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const { data: p } = await supabase.from('profiles').select('*').eq('role', 'user');
+    const parents = (p || []).map((parent) => {
+      const displayName = getParentDisplayName(parent);
+      return {
+        ...parent,
+        first_name: parent.first_name || displayName.firstName,
+        last_name: parent.last_name || displayName.lastName,
+      };
+    });
 
-    if (p) {
-      p.sort((a, b) => {
+    if (parents) {
+      parents.sort((a, b) => {
         let valA, valB;
         if (sortOrder.column === 'last_name') {
           valA = a.last_name || a.full_name || '';
@@ -491,7 +518,7 @@ export default function AdminDashboard() {
     }
 
     setData({
-      parents: p || [],
+      parents,
       coaches: c || [],
       roster: players,
       games: g || [],
@@ -761,9 +788,14 @@ export default function AdminDashboard() {
   };
 
   const handleSaveParent = async (updatedParent) => {
+    const payload = {
+      ...updatedParent,
+      full_name: `${updatedParent.first_name || ''} ${updatedParent.last_name || ''}`.trim(),
+    };
+
     const { error } = await supabase
       .from('profiles')
-      .update(updatedParent)
+      .update(payload)
       .eq('id', updatedParent.id);
 
     if (!error) {
@@ -880,11 +912,12 @@ export default function AdminDashboard() {
                 <tbody>
                   {data.parents.map((u) => {
                     const familyPlayers = data.roster.filter((player) => player.parent_id === u.id || player.user_id === u.id);
+                    const displayName = getParentDisplayName(u);
 
                     return (
                       <tr key={u.id} className="border-b border-neutral-800 hover:bg-neutral-700/50 transition-colors">
-                        <td className="p-4 text-white font-bold uppercase italic">{u.last_name || u.full_name}</td>
-                        <td className="p-4 text-white font-bold">{u.first_name || '-'}</td>
+                        <td className="p-4 text-white font-bold uppercase italic">{displayName.lastName || '-'}</td>
+                        <td className="p-4 text-white font-bold">{displayName.firstName || '-'}</td>
                         <td className="p-4">
                           {familyPlayers.length > 0 ? (
                             <div className="flex items-center gap-2">

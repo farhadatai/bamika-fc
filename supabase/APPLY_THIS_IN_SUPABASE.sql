@@ -45,6 +45,21 @@ alter table public.announcements add column if not exists is_pinned boolean not 
 alter table public.announcements add column if not exists expires_at date;
 alter table public.announcements add column if not exists created_at timestamptz default now();
 
+update public.profiles
+set
+  first_name = coalesce(
+    nullif(first_name, ''),
+    nullif(split_part(coalesce(full_name, ''), ' ', 1), '')
+  ),
+  last_name = coalesce(
+    nullif(last_name, ''),
+    nullif(trim(regexp_replace(coalesce(full_name, ''), '^\S+\s*', '')), '')
+  ),
+  role = coalesce(role, 'user')
+where first_name is null
+  or last_name is null
+  or role is null;
+
 update public.players
 set
   position = coalesce(position, 'TBD'),
