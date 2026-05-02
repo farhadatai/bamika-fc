@@ -59,3 +59,6 @@ create policy "Admins can delete drills" on public.drills
 
 grant select on public.drills to anon, authenticated;
 grant insert, update, delete on public.drills to authenticated;
+
+-- Force Supabase/PostgREST to refresh the schema cache immediately.
+notify pgrst, 'reload schema';

@@ -619,7 +619,7 @@ export default function AdminDashboard() {
       fetchData();
     } else {
       if (isMissingDrillSchemaError(error)) {
-        alert('Training drills need the latest Supabase database update. Run supabase/APPLY_THIS_IN_SUPABASE.sql in Supabase SQL Editor, then try publishing again.');
+        alert('Supabase is still missing the drills.difficulty column or has a stale schema cache. Run supabase/FIX_DRILLS_ONLY.sql in Supabase SQL Editor, then hard refresh this page.');
         return;
       }
       alert(error.message);
