@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth';
 import { uploadPhoto } from '../lib/upload';
 import { useNavigate } from 'react-router-dom';
-import { Loader, Phone, FileText, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail } from 'lucide-react';
+import { Loader, Phone, FileText, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2 } from 'lucide-react';
 
 interface Player {
   id: string;
@@ -38,6 +38,29 @@ const getPlayerName = (player: Pick<Player, 'first_name' | 'last_name' | 'full_n
 
 const POSITION_OPTIONS = ['TBD', 'Forward', 'Midfielder', 'Defender', 'Goalkeeper'];
 const JERSEY_SIZE_OPTIONS = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'S', 'M', 'L', 'XL', '2XL'];
+const COACH_MESSAGE_PREFIX = '__BAMIKA_COACH__:';
+
+const getCoachDisplayName = (profile?: CoachProfile | null, fallbackEmail?: string) => (
+  `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim()
+  || fallbackEmail?.split('@')[0]
+  || 'Coach'
+);
+
+const parseCoachMessage = (body = '') => {
+  if (!body.startsWith(COACH_MESSAGE_PREFIX)) {
+    return { coachName: 'Coach', body };
+  }
+
+  const [firstLine = '', ...rest] = body.split('\n');
+  return {
+    coachName: firstLine.replace(COACH_MESSAGE_PREFIX, '').trim() || 'Coach',
+    body: rest.join('\n').trim(),
+  };
+};
+
+const getParentName = (profiles?: Player['profiles']) => (
+  `${profiles?.first_name || ''} ${profiles?.last_name || ''}`.trim()
+);
 
 interface Game {
   id: string;
@@ -181,7 +204,7 @@ export default function CoachDashboard() {
         const formattedData = rosterRows.map((p) => ({
           ...p,
           dob: p.date_of_birth || '',
-          profiles: p.profiles || { first_name: 'N/A', last_name: '', phone: 'N/A', email: '' }
+          profiles: p.profiles || { first_name: '', last_name: '', phone: '', email: '' }
         }));
         setPlayers(formattedData);
       }
@@ -226,8 +249,10 @@ export default function CoachDashboard() {
     e.preventDefault();
     if (!teamId) return;
 
+    const coachName = getCoachDisplayName(profile, user?.email);
     const { error } = await supabase.from('announcements').insert([{
       ...newAnnouncement,
+      body: `${COACH_MESSAGE_PREFIX}${coachName}\n\n${newAnnouncement.body}`,
       audience: 'team',
       team_id: teamId,
       is_pinned: false,
@@ -239,6 +264,23 @@ export default function CoachDashboard() {
     } else {
       alert(error.message);
     }
+  };
+
+  const handleDeleteTeamAnnouncement = async (announcementId: string) => {
+    if (!window.confirm('Delete this team message?')) return;
+
+    const { error } = await supabase
+      .from('announcements')
+      .delete()
+      .eq('id', announcementId)
+      .eq('team_id', teamId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setTeamAnnouncements((currentAnnouncements) => currentAnnouncements.filter((announcement) => announcement.id !== announcementId));
   };
 
   const handleUpdatePlayer = async (playerId: string, updates: Partial<Pick<Player, 'position' | 'jersey_number' | 'jersey_size'>>) => {
@@ -438,8 +480,24 @@ export default function CoachDashboard() {
               <div className="space-y-3">
                 {teamAnnouncements.map((announcement) => (
                   <article key={announcement.id} className={`rounded-xl border p-4 ${announcement.priority === 'important' ? 'border-[#EF4444]/70 bg-[#EF4444]/10' : 'border-gray-800 bg-black'}`}>
-                    <h3 className="font-black uppercase italic text-white">{announcement.title}</h3>
-                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-400">{announcement.body}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-black uppercase italic text-white">{announcement.title}</h3>
+                        <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-600">
+                          Posted by {parseCoachMessage(announcement.body).coachName}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTeamAnnouncement(announcement.id)}
+                        className="rounded-lg border border-gray-800 p-2 text-gray-500 transition-colors hover:border-[#EF4444] hover:text-[#EF4444]"
+                        aria-label="Delete team message"
+                        title="Delete team message"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-400">{parseCoachMessage(announcement.body).body}</p>
                     <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-gray-600">
                       {new Date(announcement.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </p>
@@ -537,12 +595,18 @@ export default function CoachDashboard() {
                 <div className="flex items-start gap-3 p-3 bg-neutral-950 border border-gray-800 rounded-lg">
                   <Phone className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs font-bold text-gray-500 uppercase">Emergency Contact</p>
-                    <p className="font-medium text-white">{player.profiles.first_name} {player.profiles.last_name}</p>
+                    <p className="text-xs font-bold text-gray-500 uppercase">Parent Phone</p>
+                    {getParentName(player.profiles) && (
+                      <p className="font-medium text-white">{getParentName(player.profiles)}</p>
+                    )}
                     <div className="flex flex-wrap gap-3">
-                      <a href={`tel:${player.profiles.phone}`} className="text-red-600 font-bold hover:underline">
-                        {player.profiles.phone}
-                      </a>
+                      {player.profiles.phone ? (
+                        <a href={`tel:${player.profiles.phone}`} className="text-red-600 font-bold hover:underline">
+                          {player.profiles.phone}
+                        </a>
+                      ) : (
+                        <span className="text-sm font-bold text-gray-500">No phone listed</span>
+                      )}
                       {player.profiles.email && (
                         <a href={`mailto:${player.profiles.email}`} className="inline-flex items-center gap-1 text-red-600 font-bold hover:underline">
                           <Mail size={14} />

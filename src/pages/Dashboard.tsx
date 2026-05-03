@@ -88,6 +88,20 @@ const statusClass = (status?: string | null) => {
   return 'text-gray-300 bg-gray-500/10 border-gray-700';
 };
 
+const COACH_MESSAGE_PREFIX = '__BAMIKA_COACH__:';
+
+const parseCoachMessage = (body = '') => {
+  if (!body.startsWith(COACH_MESSAGE_PREFIX)) {
+    return { coachName: 'Coach', body };
+  }
+
+  const [firstLine = '', ...rest] = body.split('\n');
+  return {
+    coachName: firstLine.replace(COACH_MESSAGE_PREFIX, '').trim() || 'Coach',
+    body: rest.join('\n').trim(),
+  };
+};
+
 export default function Dashboard() {
   const { user, userRole } = useAuthStore();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -369,7 +383,10 @@ export default function Dashboard() {
                           {getPlayerMessages(player).map((message) => (
                             <div key={message.id} className="border-t border-[#EF4444]/20 pt-2 first:border-t-0 first:pt-0">
                               <div className="text-xs font-black uppercase italic text-white">{message.title}</div>
-                              <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs leading-5 text-gray-300">{message.body}</p>
+                              <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-[#FCA5A5]">
+                                From {parseCoachMessage(message.body).coachName}
+                              </div>
+                              <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs leading-5 text-gray-300">{parseCoachMessage(message.body).body}</p>
                             </div>
                           ))}
                         </div>
