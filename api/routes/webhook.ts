@@ -62,7 +62,6 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
             status: 'active',
             payment_status: 'paid',
             stripe_subscription_id: subscriptionId,
-            stripe_customer_id: customerId,
           })
           .eq(registrationId ? 'id' : 'player_id', registrationId || playerId);
 

@@ -51,9 +51,19 @@ router.post('/create-checkout-session', async (req, res) => {
 
       if (dbError) {
         console.error('Database Error:', dbError)
-        return res.status(500).json({ error: 'Failed to save registration data' })
+        if (!requestPlayerId) {
+          return res.status(500).json({ error: dbError.message || 'Failed to save registration data' })
+        }
+
+        registration = {
+          id: requestPlayerId,
+          player_id: requestPlayerId,
+          first_name: registrationData?.first_name || '',
+          last_name: registrationData?.last_name || '',
+        }
+      } else {
+        registration = newReg as RegistrationRecord
       }
-      registration = newReg as RegistrationRecord
     }
 
     const playerId = requestPlayerId || registration.player_id || registration.checkout_player_id || registration.id;
