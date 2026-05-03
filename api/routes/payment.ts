@@ -5,9 +5,16 @@ import { supabase } from '../lib/supabase.js'
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Payment request failed'
 
 const router = express.Router()
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
-})
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+const stripeOptions: Stripe.StripeConfig = { apiVersion: '2023-10-16' }
+
+const getStripeClient = () => {
+  if (!stripeSecretKey) {
+    throw new Error('Stripe secret key is not configured. Add STRIPE_SECRET_KEY to Vercel Environment Variables, then redeploy.')
+  }
+
+  return new Stripe(stripeSecretKey, stripeOptions)
+}
 
 type RegistrationRecord = {
   id: string
@@ -47,6 +54,8 @@ const requireAdmin = async (req: express.Request, res: express.Response) => {
 }
 
 const findPlayerSubscription = async (playerId: string, storedSubscriptionId?: string | null) => {
+  const stripe = getStripeClient()
+
   if (storedSubscriptionId) {
     try {
       const subscription = await stripe.subscriptions.retrieve(storedSubscriptionId)
@@ -79,6 +88,7 @@ const findPlayerSubscription = async (playerId: string, storedSubscriptionId?: s
 router.post('/create-checkout-session', async (req, res) => {
   try {
     const { registrationData, registrationId, successUrl, playerId: requestPlayerId } = req.body
+    const stripe = getStripeClient()
 
     let registration: RegistrationRecord;
 
@@ -216,6 +226,7 @@ router.post('/create-checkout-session', async (req, res) => {
 
 router.post('/create-portal-session', async (req, res) => {
   const { customerId } = req.body;
+  const stripe = getStripeClient()
 
   const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VITE_BASE_URL || 'https://bamika-fc.vercel.app';
   const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
@@ -256,6 +267,7 @@ router.post('/cancel-player-subscription', async (req, res): Promise<void> => {
       return
     }
 
+    const stripe = getStripeClient()
     const subscription = await findPlayerSubscription(playerId, player.stripe_subscription_id)
     let cancelledSubscription: Stripe.Subscription | null = null
 
