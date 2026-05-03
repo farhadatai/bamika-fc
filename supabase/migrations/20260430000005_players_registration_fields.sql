@@ -40,6 +40,7 @@ alter table public.players enable row level security;
 drop policy if exists "Parents can insert own players" on public.players;
 drop policy if exists "Parents can update own pending players" on public.players;
 drop policy if exists "Parents can view own players" on public.players;
+drop policy if exists "Admins can delete players" on public.players;
 
 create policy "Parents can insert own players" on public.players
   for insert to authenticated
@@ -54,6 +55,15 @@ create policy "Parents can view own players" on public.players
   for select to authenticated
   using (parent_id = auth.uid());
 
-grant select, insert, update on public.players to authenticated;
+create policy "Admins can delete players" on public.players
+  for delete to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  );
+
+grant select, insert, update, delete on public.players to authenticated;
 
 notify pgrst, 'reload schema';

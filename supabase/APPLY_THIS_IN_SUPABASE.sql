@@ -126,6 +126,7 @@ drop policy if exists "Parents can insert own players" on public.players;
 drop policy if exists "Parents can update own pending players" on public.players;
 drop policy if exists "Parents can view own players" on public.players;
 drop policy if exists "Admins can assign player teams" on public.players;
+drop policy if exists "Admins can delete players" on public.players;
 drop policy if exists "Coaches can view team players" on public.players;
 
 create policy "Parents can insert own players" on public.players
@@ -150,6 +151,15 @@ create policy "Admins can assign player teams" on public.players
     )
   )
   with check (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  );
+
+create policy "Admins can delete players" on public.players
+  for delete to authenticated
+  using (
     exists (
       select 1 from public.profiles
       where profiles.id = auth.uid() and profiles.role = 'admin'
@@ -275,7 +285,7 @@ create policy "Admins can delete drills" on public.drills
   );
 
 grant select, insert, update on public.profiles to authenticated;
-grant select, insert, update on public.players to authenticated;
+grant select, insert, update, delete on public.players to authenticated;
 grant select, update on public.coaches to authenticated;
 grant select on public.announcements to anon, authenticated;
 grant insert, update, delete on public.announcements to authenticated;

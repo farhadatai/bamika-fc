@@ -31,6 +31,13 @@ const getParentDisplayName = (parent = {}) => {
   };
 };
 
+const getPlayerDisplayName = (player = {}) => {
+  const splitName = splitFullName(player.full_name || player.name || '');
+  const firstName = player.first_name || splitName.firstName;
+  const lastName = player.last_name || splitName.lastName;
+  return `${firstName || ''} ${lastName || ''}`.trim() || player.full_name || player.name || 'Unnamed Player';
+};
+
 const formatAge = (dateOfBirth) => {
   if (!dateOfBirth) return 'Age TBA';
 
@@ -50,7 +57,8 @@ const formatAge = (dateOfBirth) => {
 
 const PlayerPhoto = ({ player, size = 'large' }) => {
   const [hasImageError, setHasImageError] = useState(false);
-  const initials = getInitials(player.first_name, player.last_name);
+  const displayName = splitFullName(getPlayerDisplayName(player));
+  const initials = getInitials(displayName.firstName, displayName.lastName);
   const sizeClass = size === 'small' ? 'h-10 w-10 text-xs' : 'h-20 w-20 text-xl';
 
   if (!player.photo_url || hasImageError) {
@@ -64,7 +72,7 @@ const PlayerPhoto = ({ player, size = 'large' }) => {
   return (
     <img
       src={player.photo_url}
-      alt={`${player.first_name || 'Player'} ${player.last_name || ''}`}
+      alt={getPlayerDisplayName(player)}
       className={`${sizeClass} shrink-0 rounded-2xl border border-gray-800 object-cover`}
       onError={() => setHasImageError(true)}
     />
@@ -97,6 +105,15 @@ const isMissingDrillSchemaError = (error) => {
 const POSITION_OPTIONS = ['TBD', 'Forward', 'Midfielder', 'Defender', 'Goalkeeper'];
 const JERSEY_SIZE_OPTIONS = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'S', 'M', 'L', 'XL', '2XL'];
 const getDrillVideoUrl = (drill) => drill?.video_url || drill?.youtube_url || '';
+
+const getPaymentStatusClass = (status = '') => {
+  const normalized = status.toLowerCase();
+  if (normalized === 'waived') return 'text-green-400';
+  if (normalized === 'paid') return 'text-green-300';
+  if (normalized === 'paused') return 'text-blue-300';
+  if (normalized === 'cancelled' || normalized === 'canceled') return 'text-red-300';
+  return 'text-yellow-300';
+};
 
 const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach }) => (
   <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md">
@@ -714,8 +731,65 @@ export default function AdminDashboard() {
     }
   };
 
+  const handlePausePlayer = async (player) => {
+    const playerName = getPlayerDisplayName(player);
+    if (!window.confirm(`Mark ${playerName} inactive and pause club billing status? If they have an active Stripe subscription, cancel or pause it in Stripe too.`)) return;
+
+    const updates = {
+      status: 'inactive',
+      payment_status: 'paused',
+      team_assigned: 'Unassigned',
+    };
+
+    const { error: playerError } = await supabase.from('players').update(updates).eq('id', player.id);
+    if (playerError) {
+      alert(playerError.message);
+      return;
+    }
+
+    const splitName = splitFullName(playerName);
+    await supabase
+      .from('registrations')
+      .update({ payment_status: 'paused', status: 'inactive' })
+      .eq('parent_id', player.parent_id)
+      .eq('first_name', splitName.firstName)
+      .eq('last_name', splitName.lastName);
+
+    fetchData();
+  };
+
+  const handleReactivatePlayer = async (player) => {
+    const playerName = getPlayerDisplayName(player);
+    if (!window.confirm(`Reactivate ${playerName}? Billing may still need to be restarted in Stripe if it was cancelled.`)) return;
+
+    const { error } = await supabase
+      .from('players')
+      .update({ status: 'active', payment_status: player.payment_status === 'waived' ? 'waived' : 'pending' })
+      .eq('id', player.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    fetchData();
+  };
+
+  const handleDeletePlayer = async (player) => {
+    const playerName = getPlayerDisplayName(player);
+    if (!window.confirm(`Delete ${playerName} from the roster? Use this only for duplicates or mistakes. For players leaving the club, use Mark inactive.`)) return;
+
+    const { error } = await supabase.from('players').delete().eq('id', player.id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    fetchData();
+  };
+
   const handleWaivePlayerFees = async (player) => {
-    if (!window.confirm(`Waive fees and mark ${player.first_name || 'this player'} as active?`)) return;
+    if (!window.confirm(`Waive fees and mark ${getPlayerDisplayName(player)} as active?`)) return;
 
     const playerUpdate = {
       payment_status: 'waived',
@@ -1071,6 +1145,9 @@ export default function AdminDashboard() {
                 const linkedParent =
                   p.profiles ||
                   data.parents.find((parent) => parent.id === p.parent_id || parent.id === p.user_id);
+                const playerName = getPlayerDisplayName(p);
+                const isInactive = ['inactive', 'cancelled', 'canceled'].includes((p.status || '').toLowerCase());
+                const paymentStatus = p.payment_status || 'Pending';
 
                 return (
                   <div key={p.id} className="bg-black border border-gray-800 rounded-2xl p-4 flex gap-4 transition-colors hover:border-[#EF4444]/70">
@@ -1079,14 +1156,14 @@ export default function AdminDashboard() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <h3 className="truncate text-lg font-black uppercase italic text-white">
-                            {p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : (p.full_name || p.name || 'Unnamed Player')}
+                            {playerName}
                           </h3>
                           <p className="text-xs font-bold uppercase text-gray-500">
                             {formatAge(p.date_of_birth || p.dob)}
                           </p>
                         </div>
                         <span className="shrink-0 rounded-full bg-[#EF4444]/10 px-2 py-1 text-[9px] font-black uppercase text-[#EF4444]">
-                          {p.team_assigned || 'Unassigned'}
+                          {isInactive ? 'Inactive' : (p.team_assigned || 'Unassigned')}
                         </span>
                       </div>
 
@@ -1143,16 +1220,36 @@ export default function AdminDashboard() {
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Fees</div>
-                            <div className={`mt-1 text-xs font-black uppercase ${p.payment_status === 'waived' ? 'text-green-400' : p.payment_status === 'paid' ? 'text-green-300' : 'text-yellow-300'}`}>
-                              {p.payment_status === 'waived' ? 'Waived' : p.payment_status || 'Pending'}
+                            <div className={`mt-1 text-xs font-black uppercase ${getPaymentStatusClass(paymentStatus)}`}>
+                              {paymentStatus}
+                            </div>
+                            <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-gray-600">
+                              Status: {p.status || 'pending'}
                             </div>
                           </div>
-                          <button
-                            onClick={() => handleWaivePlayerFees(p)}
-                            className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-400"
-                          >
-                            Waive
-                          </button>
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={() => handleWaivePlayerFees(p)}
+                              className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-400"
+                            >
+                              Waive
+                            </button>
+                            {isInactive ? (
+                              <button
+                                onClick={() => handleReactivatePlayer(p)}
+                                className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-blue-500 hover:text-blue-300"
+                              >
+                                Reactivate
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handlePausePlayer(p)}
+                                className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-yellow-500 hover:text-yellow-300"
+                              >
+                                Inactive
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -1164,8 +1261,20 @@ export default function AdminDashboard() {
                             : linkedParent?.full_name || 'Parent not linked'}
                         </div>
                         <div className="mt-1 truncate text-xs text-gray-500">
-                          {linkedParent?.phone || linkedParent?.email || 'No contact listed'}
+                          {linkedParent?.phone || 'No phone listed'}
                         </div>
+                        <div className="mt-1 truncate text-xs text-gray-500">
+                          {linkedParent?.email || 'No email listed'}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          onClick={() => handleDeletePlayer(p)}
+                          className="inline-flex items-center gap-1 rounded-md border border-red-500/20 px-2 py-1 text-[9px] font-black uppercase text-red-300 hover:border-red-500 hover:text-red-200"
+                        >
+                          <Trash2 size={12} />
+                          Delete duplicate
+                        </button>
                       </div>
                     </div>
                   </div>
