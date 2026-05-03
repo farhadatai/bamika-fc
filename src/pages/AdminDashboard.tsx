@@ -608,21 +608,47 @@ export default function AdminDashboard() {
       return;
     }
 
-    const { error } = await supabase.from('drills').insert([{
-      title: newDrill.title,
-      video_url: newDrill.video_url,
-    }]);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
 
-    if (!error) {
+    if (!token) {
+      alert('Please log in as an admin again before publishing a drill.');
+      return;
+    }
+
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/drills?columns=title,video_url`, {
+      method: 'POST',
+      headers: {
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify([{
+        title: newDrill.title,
+        video_url: newDrill.video_url,
+      }]),
+    });
+
+    if (response.ok) {
       setNewDrill(emptyDrill);
       setIsDrillModalOpen(false);
       fetchData();
     } else {
-      if (isMissingDrillSchemaError(error)) {
+      const errorText = await response.text();
+      let errorMessage = errorText || 'Unable to publish drill.';
+      try {
+        const parsed = JSON.parse(errorText);
+        errorMessage = parsed.message || parsed.error || parsed.hint || errorMessage;
+      } catch {
+        // Keep the raw response text when Supabase does not return JSON.
+      }
+
+      if (isMissingDrillSchemaError({ message: errorMessage })) {
         alert('Supabase is still missing the drills.difficulty column or has a stale schema cache. Run supabase/FIX_DRILLS_ONLY.sql in Supabase SQL Editor, then hard refresh this page.');
         return;
       }
-      alert(error.message);
+      alert(errorMessage);
     }
   };
 
