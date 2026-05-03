@@ -9,6 +9,7 @@ alter table public.profiles add column if not exists role text default 'user';
 alter table public.profiles add column if not exists photo_url text;
 
 alter table public.players add column if not exists parent_id uuid references public.profiles(id) on delete cascade;
+alter table public.players add column if not exists full_name text;
 alter table public.players add column if not exists first_name text;
 alter table public.players add column if not exists last_name text;
 alter table public.players add column if not exists date_of_birth date;
@@ -21,7 +22,10 @@ alter table public.players add column if not exists photo_url text;
 alter table public.players add column if not exists team_assigned text default 'Unassigned';
 alter table public.players add column if not exists status text default 'pending_payment';
 alter table public.players add column if not exists payment_status text default 'pending';
+alter table public.players add column if not exists waiver_signed boolean default false;
 alter table public.players add column if not exists created_at timestamptz default now();
+
+alter table public.registrations add column if not exists stripe_customer_id text;
 
 alter table public.coaches add column if not exists team_id text;
 alter table public.coaches add column if not exists bio text;
@@ -89,12 +93,14 @@ where first_name is null
 
 update public.players
 set
+  full_name = coalesce(full_name, trim(coalesce(first_name, '') || ' ' || coalesce(last_name, ''))),
   position = coalesce(position, 'TBD'),
   jersey_number = coalesce(jersey_number, '-'),
   team_assigned = coalesce(team_assigned, 'Unassigned'),
   status = coalesce(status, 'pending_payment'),
   payment_status = coalesce(payment_status, 'pending')
 where position is null
+  or full_name is null
   or jersey_number is null
   or team_assigned is null
   or status is null

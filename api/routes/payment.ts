@@ -12,13 +12,14 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 type RegistrationRecord = {
   id: string
   player_id?: string | null
+  checkout_player_id?: string | null
   first_name: string
   last_name: string
 }
 
 router.post('/create-checkout-session', async (req, res) => {
   try {
-    const { registrationData, registrationId, successUrl } = req.body
+    const { registrationData, registrationId, successUrl, playerId: requestPlayerId } = req.body
 
     let registration: RegistrationRecord;
 
@@ -55,7 +56,7 @@ router.post('/create-checkout-session', async (req, res) => {
       registration = newReg as RegistrationRecord
     }
 
-    const playerId = registration.player_id || registration.id;
+    const playerId = requestPlayerId || registration.player_id || registration.checkout_player_id || registration.id;
 
     // DYNAMIC PRICING LOGIC
     const now = new Date();

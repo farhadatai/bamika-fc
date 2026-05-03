@@ -26,6 +26,7 @@ const isMissingPlayerSchemaError = (message: string) => (
   (message.includes('players') && (
     message.includes('first_name')
     || message.includes('last_name')
+    || message.includes('full_name')
     || message.includes('parent_id')
     || message.includes('jersey_size')
     || message.includes('payment_status')
@@ -126,12 +127,12 @@ export default function RegisterNewAthlete() {
     setError(null);
 
     try {
+      const playerFullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
       const { data: existingPlayer, error: existingPlayerError } = await supabase
         .from('players')
         .select('id')
         .eq('parent_id', user.id)
-        .eq('first_name', formData.firstName.trim())
-        .eq('last_name', formData.lastName.trim());
+        .eq('full_name', playerFullName);
 
       if (existingPlayerError) {
         throw new Error(isMissingPlayerSchemaError(existingPlayerError.message) ? playerSchemaMessage : existingPlayerError.message);
@@ -149,8 +150,7 @@ export default function RegisterNewAthlete() {
         .from('players')
         .insert({
           parent_id: user.id,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
+          full_name: playerFullName,
           date_of_birth: safeDob,
           gender: formData.gender,
           position: formData.position,
@@ -161,6 +161,7 @@ export default function RegisterNewAthlete() {
           jersey_number: '-',
           status: 'pending_payment',
           payment_status: 'pending',
+          waiver_signed: !!formData.waiverSignedAt,
         })
         .select('id')
         .single();
@@ -171,7 +172,6 @@ export default function RegisterNewAthlete() {
       if (!newPlayer?.id) throw new Error('Unable to create player profile.');
 
       const payload = {
-        player_id: newPlayer.id,
         parent_id: user.id,
         first_name: formData.firstName.trim(),
         last_name: formData.lastName.trim(),
@@ -192,7 +192,7 @@ export default function RegisterNewAthlete() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ registrationData: payload }),
+        body: JSON.stringify({ registrationData: payload, playerId: newPlayer.id }),
       });
 
       const data = await response.json();

@@ -7,8 +7,9 @@ import { Loader, Phone, FileText, User, Camera, Calendar, Clock, MapPin, Megapho
 
 interface Player {
   id: string;
-  first_name: string;
-  last_name: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
   dob: string;
   medical_conditions: string;
   status: string;
@@ -26,6 +27,10 @@ interface PlayerRow extends Omit<Player, 'dob' | 'profiles'> {
   date_of_birth?: string;
   profiles?: Player['profiles'];
 }
+
+const getPlayerName = (player: Pick<Player, 'first_name' | 'last_name' | 'full_name'>) => (
+  `${player.first_name || ''} ${player.last_name || ''}`.trim() || player.full_name || 'Bamika Player'
+);
 
 interface Game {
   id: string;
@@ -148,7 +153,7 @@ export default function CoachDashboard() {
         .from('players')
         .select('*, profiles:parent_id(first_name, last_name, phone, email)')
         .eq('team_assigned', teamId)
-        .order('last_name', { ascending: true });
+        .order('full_name', { ascending: true });
 
       let rosterRows = data as PlayerRow[] | null;
 
@@ -158,7 +163,7 @@ export default function CoachDashboard() {
           .from('players')
           .select('*')
           .eq('team_assigned', teamId)
-          .order('last_name', { ascending: true });
+          .order('full_name', { ascending: true });
 
         if (basicPlayersError) throw basicPlayersError;
         rosterRows = basicPlayers as PlayerRow[] | null;
@@ -433,7 +438,7 @@ export default function CoachDashboard() {
             <div key={player.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-3">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">{player.first_name} {player.last_name}</h3>
+                  <h3 className="text-xl font-bold text-gray-900">{getPlayerName(player)}</h3>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-500 font-medium">{calculateAge(player.dob)} Years Old</span>
                     {player.age_group && (
@@ -447,7 +452,7 @@ export default function CoachDashboard() {
                   {player.photo_url ? (
                     <img 
                       src={player.photo_url} 
-                      alt={`${player.first_name} ${player.last_name}`}
+                      alt={getPlayerName(player)}
                       className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
                     />
                   ) : (

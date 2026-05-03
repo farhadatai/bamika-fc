@@ -30,8 +30,9 @@ interface Announcement {
 
 interface PlayerSummary {
   id: string;
-  first_name: string;
-  last_name: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  full_name?: string | null;
   age_group?: string | null;
   team_assigned?: string | null;
   position?: string | null;
@@ -55,6 +56,17 @@ const getInitials = (firstName = '', lastName = '') => {
   const first = firstName.trim()[0] || '';
   const last = lastName.trim()[0] || '';
   return `${first}${last}`.toUpperCase() || 'FC';
+};
+
+const getPlayerName = (player?: PlayerSummary | null) => {
+  if (!player) return 'Bamika Player';
+  return `${player.first_name || ''} ${player.last_name || ''}`.trim() || player.full_name || 'Bamika Player';
+};
+
+const getPlayerInitials = (player?: PlayerSummary | null) => {
+  const name = getPlayerName(player);
+  const [first = '', ...rest] = name.split(' ');
+  return getInitials(first, rest.join(' '));
 };
 
 const formatDate = (date: string) => {
@@ -111,7 +123,7 @@ export default function Dashboard() {
           .limit(4),
         supabase
           .from('players')
-          .select('id, first_name, last_name, age_group, team_assigned, position, jersey_number, jersey_size, payment_status, status, photo_url')
+          .select('*')
           .eq('parent_id', user.id)
           .order('created_at', { ascending: false }),
         supabase
@@ -241,14 +253,14 @@ export default function Dashboard() {
                 <div className="mt-5">
                   <div className="flex items-center gap-4">
                     {primaryPlayer.photo_url ? (
-                      <img src={primaryPlayer.photo_url} alt={`${primaryPlayer.first_name} ${primaryPlayer.last_name}`} className="h-20 w-20 rounded-2xl border border-gray-800 object-cover" />
+                      <img src={primaryPlayer.photo_url} alt={getPlayerName(primaryPlayer)} className="h-20 w-20 rounded-2xl border border-gray-800 object-cover" />
                     ) : (
                       <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-gray-800 bg-neutral-900 text-xl font-black text-[#EF4444]">
-                        {getInitials(primaryPlayer.first_name, primaryPlayer.last_name)}
+                        {getPlayerInitials(primaryPlayer)}
                       </div>
                     )}
                     <div className="min-w-0">
-                      <h2 className="truncate text-2xl font-black uppercase italic">{primaryPlayer.first_name} {primaryPlayer.last_name}</h2>
+                      <h2 className="truncate text-2xl font-black uppercase italic">{getPlayerName(primaryPlayer)}</h2>
                       <p className="mt-1 text-sm font-bold text-gray-400">{primaryPlayer.team_assigned || 'Unassigned'} • {primaryPlayer.age_group || 'Age group TBA'}</p>
                     </div>
                   </div>
@@ -304,14 +316,14 @@ export default function Dashboard() {
                   <article key={player.id} className="rounded-xl border border-gray-800 bg-black p-4">
                     <div className="flex items-center gap-3">
                       {player.photo_url ? (
-                        <img src={player.photo_url} alt={`${player.first_name} ${player.last_name}`} className="h-14 w-14 rounded-xl border border-gray-800 object-cover" />
+                        <img src={player.photo_url} alt={getPlayerName(player)} className="h-14 w-14 rounded-xl border border-gray-800 object-cover" />
                       ) : (
                         <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-gray-800 bg-neutral-900 font-black text-[#EF4444]">
-                          {getInitials(player.first_name, player.last_name)}
+                          {getPlayerInitials(player)}
                         </div>
                       )}
                       <div className="min-w-0">
-                        <h3 className="truncate font-black uppercase italic">{player.first_name} {player.last_name}</h3>
+                        <h3 className="truncate font-black uppercase italic">{getPlayerName(player)}</h3>
                         <p className="mt-1 text-xs font-bold uppercase tracking-widest text-gray-500">{player.team_assigned || 'Unassigned'}</p>
                       </div>
                     </div>
