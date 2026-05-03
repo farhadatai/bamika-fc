@@ -17,6 +17,65 @@ type RegistrationRecord = {
   last_name: string
 }
 
+const requireAdmin = async (req: express.Request, res: express.Response) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+
+  if (!token) {
+    res.status(401).json({ error: 'Missing admin session.' })
+    return null
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getUser(token)
+
+  if (authError || !authData.user) {
+    res.status(401).json({ error: 'Invalid admin session.' })
+    return null
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', authData.user.id)
+    .single()
+
+  if (profileError || profile?.role !== 'admin') {
+    res.status(403).json({ error: 'Only admins can manage billing.' })
+    return null
+  }
+
+  return authData.user
+}
+
+const findPlayerSubscription = async (playerId: string, storedSubscriptionId?: string | null) => {
+  if (storedSubscriptionId) {
+    try {
+      const subscription = await stripe.subscriptions.retrieve(storedSubscriptionId)
+      if (subscription && subscription.status !== 'canceled') return subscription
+    } catch (error) {
+      console.warn(`Stored subscription ${storedSubscriptionId} could not be retrieved:`, getErrorMessage(error))
+    }
+  }
+
+  try {
+    const result = await stripe.subscriptions.search({
+      query: `metadata['player_id']:'${playerId}' AND status:'active'`,
+      limit: 1,
+    })
+    if (result.data[0]) return result.data[0]
+  } catch (error) {
+    console.warn('Stripe subscription search failed, falling back to list:', getErrorMessage(error))
+  }
+
+  const statuses: Stripe.SubscriptionListParams.Status[] = ['active', 'trialing', 'past_due', 'unpaid']
+  for (const status of statuses) {
+    const list = await stripe.subscriptions.list({ status, limit: 100 })
+    const match = list.data.find((subscription) => subscription.metadata?.player_id === playerId)
+    if (match) return match
+  }
+
+  return null
+}
+
 router.post('/create-checkout-session', async (req, res) => {
   try {
     const { registrationData, registrationId, successUrl, playerId: requestPlayerId } = req.body
@@ -172,5 +231,105 @@ router.post('/create-portal-session', async (req, res) => {
     res.status(500).json({ error: getErrorMessage(error) });
   }
 });
+
+router.post('/cancel-player-subscription', async (req, res): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+
+    const playerId = String(req.body.playerId || '').trim()
+    const cancelAtPeriodEnd = req.body.cancelAtPeriodEnd !== false
+
+    if (!playerId) {
+      res.status(400).json({ error: 'Missing player id.' })
+      return
+    }
+
+    const { data: player, error: playerError } = await supabase
+      .from('players')
+      .select('*')
+      .eq('id', playerId)
+      .single()
+
+    if (playerError || !player) {
+      res.status(404).json({ error: playerError?.message || 'Player not found.' })
+      return
+    }
+
+    const subscription = await findPlayerSubscription(playerId, player.stripe_subscription_id)
+    let cancelledSubscription: Stripe.Subscription | null = null
+
+    if (subscription) {
+      cancelledSubscription = cancelAtPeriodEnd
+        ? await stripe.subscriptions.update(subscription.id, {
+            cancel_at_period_end: true,
+            metadata: {
+              ...subscription.metadata,
+              cancelled_by_admin: adminUser.id,
+              cancelled_for_player_id: playerId,
+            },
+          })
+        : await stripe.subscriptions.cancel(subscription.id)
+    }
+
+    const playerUpdate = {
+      status: 'inactive',
+      payment_status: cancelledSubscription ? 'cancelled' : 'paused',
+      team_assigned: 'Unassigned',
+      stripe_subscription_id: cancelledSubscription?.id || player.stripe_subscription_id || null,
+      stripe_customer_id: typeof cancelledSubscription?.customer === 'string'
+        ? cancelledSubscription.customer
+        : player.stripe_customer_id || null,
+    }
+
+    const { error: updateError } = await supabase
+      .from('players')
+      .update(playerUpdate)
+      .eq('id', playerId)
+
+    if (updateError) {
+      const { error: fallbackError } = await supabase
+        .from('players')
+        .update({
+          status: 'inactive',
+          payment_status: cancelledSubscription ? 'cancelled' : 'paused',
+          team_assigned: 'Unassigned',
+        })
+        .eq('id', playerId)
+
+      if (fallbackError) {
+        res.status(500).json({ error: fallbackError.message })
+        return
+      }
+    }
+
+    const playerName = player.full_name || `${player.first_name || ''} ${player.last_name || ''}`.trim()
+    const nameParts = playerName.split(/\s+/).filter(Boolean)
+    await supabase
+      .from('registrations')
+      .update({
+        status: 'inactive',
+        payment_status: cancelledSubscription ? 'cancelled' : 'paused',
+        stripe_subscription_id: cancelledSubscription?.id || null,
+      })
+      .eq('parent_id', player.parent_id)
+      .eq('first_name', nameParts[0] || '')
+      .eq('last_name', nameParts.slice(1).join(' '))
+
+    res.json({
+      success: true,
+      message: cancelledSubscription
+        ? cancelAtPeriodEnd
+          ? 'Stripe subscription will cancel at the end of the current billing period. Player marked inactive.'
+          : 'Stripe subscription cancelled immediately. Player marked inactive.'
+        : 'No active Stripe subscription was found. Player marked inactive and billing status paused.',
+      subscriptionId: cancelledSubscription?.id || null,
+      cancelAtPeriodEnd: cancelledSubscription?.cancel_at_period_end || false,
+    })
+  } catch (error: unknown) {
+    console.error('Cancel subscription error:', error)
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
 
 export default router

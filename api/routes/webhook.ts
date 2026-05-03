@@ -46,11 +46,20 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
         // Update Player status to Active
         const { error: playerError } = await supabase
           .from('players')
-          .update({ status: 'active', payment_status: 'paid' })
+          .update({
+            status: 'active',
+            payment_status: 'paid',
+            stripe_subscription_id: subscriptionId,
+            stripe_customer_id: customerId,
+          })
           .eq('id', playerId);
 
         if (playerError) {
-          console.error(`Error updating player ${playerId} to active:`, playerError);
+          console.error(`Error updating player ${playerId} to active with Stripe ids:`, playerError);
+          await supabase
+            .from('players')
+            .update({ status: 'active', payment_status: 'paid' })
+            .eq('id', playerId);
         } else {
           console.log(`Player ${playerId} status updated to active.`);
         }
@@ -67,6 +76,16 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
 
         if (regError) {
           console.error(`Error updating registration for player ${playerId}:`, regError);
+          if (registrationId) {
+            await supabase
+              .from('registrations')
+              .update({
+                status: 'active',
+                payment_status: 'paid',
+                stripe_subscription_id: subscriptionId,
+              })
+              .eq('id', registrationId);
+          }
         } else {
           console.log(`Registration for player ${playerId} updated.`);
         }
@@ -91,11 +110,20 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
         try {
           const { error: playerError } = await supabase
             .from('players')
-            .update({ status: 'active', payment_status: 'paid' })
+            .update({
+              status: 'active',
+              payment_status: 'paid',
+              stripe_subscription_id: subscription.id,
+              stripe_customer_id: typeof subscription.customer === 'string' ? subscription.customer : null,
+            })
             .eq('id', subPlayerId);
 
           if (playerError) {
             console.error(`Error updating player ${subPlayerId} from subscription ${subscription.id}:`, playerError);
+            await supabase
+              .from('players')
+              .update({ status: 'active', payment_status: 'paid' })
+              .eq('id', subPlayerId);
           } else {
             console.log(`Player ${subPlayerId} activated via subscription ${subscription.id}.`);
           }

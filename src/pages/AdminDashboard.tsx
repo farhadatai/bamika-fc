@@ -758,6 +758,41 @@ export default function AdminDashboard() {
     fetchData();
   };
 
+  const handleCancelPlayerBilling = async (player) => {
+    const playerName = getPlayerDisplayName(player);
+    if (!window.confirm(`Cancel Stripe billing for ${playerName} at the end of the current billing period and mark them inactive?`)) return;
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+
+    if (!token) {
+      alert('Please log in as an admin again before cancelling billing.');
+      return;
+    }
+
+    const response = await fetch('/api/cancel-player-subscription', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        playerId: player.id,
+        cancelAtPeriodEnd: true,
+      }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      alert(result.error || 'Unable to cancel Stripe billing.');
+      return;
+    }
+
+    alert(result.message || 'Billing cancellation submitted.');
+    fetchData();
+  };
+
   const handleReactivatePlayer = async (player) => {
     const playerName = getPlayerDisplayName(player);
     if (!window.confirm(`Reactivate ${playerName}? Billing may still need to be restarted in Stripe if it was cancelled.`)) return;
@@ -1242,12 +1277,20 @@ export default function AdminDashboard() {
                                 Reactivate
                               </button>
                             ) : (
-                              <button
-                                onClick={() => handlePausePlayer(p)}
-                                className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-yellow-500 hover:text-yellow-300"
-                              >
-                                Inactive
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleCancelPlayerBilling(p)}
+                                  className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-red-500 hover:text-red-300"
+                                >
+                                  Cancel billing
+                                </button>
+                                <button
+                                  onClick={() => handlePausePlayer(p)}
+                                  className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-yellow-500 hover:text-yellow-300"
+                                >
+                                  Inactive only
+                                </button>
+                              </>
                             )}
                           </div>
                         </div>

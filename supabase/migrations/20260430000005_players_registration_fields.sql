@@ -16,6 +16,8 @@ alter table public.players add column if not exists team_assigned text default '
 alter table public.players add column if not exists status text default 'pending_payment';
 alter table public.players add column if not exists payment_status text default 'pending';
 alter table public.players add column if not exists waiver_signed boolean default false;
+alter table public.players add column if not exists stripe_subscription_id text;
+alter table public.players add column if not exists stripe_customer_id text;
 alter table public.players add column if not exists created_at timestamptz default now();
 
 alter table public.registrations add column if not exists stripe_customer_id text;
