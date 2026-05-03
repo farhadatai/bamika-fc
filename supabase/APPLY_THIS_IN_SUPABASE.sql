@@ -42,7 +42,8 @@ create table if not exists public.announcements (
 create table if not exists public.drills (
   id uuid default gen_random_uuid() primary key,
   title text not null,
-  video_url text not null,
+  video_url text,
+  youtube_url text,
   thumbnail_url text,
   duration integer not null default 15,
   difficulty text not null default 'Beginner',
@@ -51,6 +52,13 @@ create table if not exists public.drills (
   created_at timestamptz default now()
 );
 
+alter table public.drills add column if not exists youtube_url text;
+alter table public.drills add column if not exists video_url text;
+update public.drills
+set video_url = coalesce(video_url, youtube_url),
+    youtube_url = coalesce(youtube_url, video_url)
+where video_url is null
+   or youtube_url is null;
 alter table public.announcements add column if not exists team_id text;
 alter table public.announcements add column if not exists priority text not null default 'normal';
 alter table public.announcements add column if not exists is_pinned boolean not null default false;

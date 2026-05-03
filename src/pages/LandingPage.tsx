@@ -58,7 +58,8 @@ interface Coach {
 interface Drill {
   id: string;
   title: string;
-  video_url: string;
+  video_url?: string;
+  youtube_url?: string;
   thumbnail_url?: string;
   duration: number;
   difficulty: string;
@@ -238,12 +239,15 @@ const CoachCard = ({ coach }: { coach: Coach }) => {
   )
 }
 
+const getDrillVideoUrl = (drill: Drill) => drill.video_url || drill.youtube_url || '';
+
 const DrillCard = ({ drill, onPlay }: { drill: Drill, onPlay: (url: string) => void }) => {
-  const thumbnail = drill.thumbnail_url || getYoutubeThumbnail(drill.video_url);
+  const drillVideoUrl = getDrillVideoUrl(drill);
+  const thumbnail = drill.thumbnail_url || getYoutubeThumbnail(drillVideoUrl);
 
   return (
   <div className="bg-neutral-950 rounded-2xl overflow-hidden border border-gray-800 group hover:border-[#EF4444] transition-all hover:-translate-y-1">
-    <div className="relative aspect-video bg-black overflow-hidden cursor-pointer" onClick={() => onPlay(drill.video_url)}>
+    <div className="relative aspect-video bg-black overflow-hidden cursor-pointer" onClick={() => onPlay(drillVideoUrl)}>
       {thumbnail ? (
         <img src={thumbnail} alt={drill.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
       ) : (
@@ -273,7 +277,7 @@ const DrillCard = ({ drill, onPlay }: { drill: Drill, onPlay: (url: string) => v
         {drill.description}
       </p>
       <button 
-         onClick={() => onPlay(drill.video_url)} 
+         onClick={() => onPlay(drillVideoUrl)} 
          className="w-full py-3 bg-[#EF4444] text-white rounded-xl text-[10px] font-black uppercase italic hover:bg-red-700 transition-all shadow-lg shadow-red-500/20" 
        > 
          Watch Drill

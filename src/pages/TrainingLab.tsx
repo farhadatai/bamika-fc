@@ -6,7 +6,8 @@ import { getYoutubeId, getYoutubeThumbnail } from '../lib/utils';
 interface Drill {
   id: string;
   title: string;
-  video_url: string;
+  video_url?: string;
+  youtube_url?: string;
   thumbnail_url?: string;
   duration?: number;
   difficulty?: string;
@@ -16,7 +17,8 @@ interface Drill {
 
 const categories = ['All', 'Dribbling', 'Passing', 'Shooting', 'Tactical', 'Physical', 'Goalkeeping', 'Warmup'];
 
-const getDrillThumbnail = (drill: Drill) => drill.thumbnail_url || getYoutubeThumbnail(drill.video_url);
+const getDrillVideoUrl = (drill: Drill) => drill.video_url || drill.youtube_url || '';
+const getDrillThumbnail = (drill: Drill) => drill.thumbnail_url || getYoutubeThumbnail(getDrillVideoUrl(drill));
 
 const VideoModal = ({ videoUrl, onClose }: { videoUrl: string | null; onClose: () => void }) => {
   if (!videoUrl) return null;
@@ -116,11 +118,12 @@ export default function TrainingLab() {
             </p>
           </div>
         ) : drills.map((drill) => {
+          const drillVideoUrl = getDrillVideoUrl(drill);
           const thumbnail = getDrillThumbnail(drill);
 
           return (
             <div key={drill.id} className="bg-neutral-900 rounded-3xl overflow-hidden border border-gray-800 group hover:border-[#EF4444] transition-all">
-              <button type="button" className="relative aspect-video w-full bg-black overflow-hidden text-left" onClick={() => setActiveVideo(drill.video_url)}>
+              <button type="button" className="relative aspect-video w-full bg-black overflow-hidden text-left" onClick={() => setActiveVideo(drillVideoUrl)}>
                 {thumbnail ? (
                   <img src={thumbnail} alt={drill.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
                 ) : (
@@ -154,7 +157,7 @@ export default function TrainingLab() {
                   {drill.description || 'Training tutorial for Bamika FC players.'}
                 </p>
                 <button
-                   onClick={() => setActiveVideo(drill.video_url)}
+                   onClick={() => setActiveVideo(drillVideoUrl)}
                    className="w-full py-3 bg-[#EF4444] text-white rounded-xl text-[10px] font-black uppercase italic hover:bg-red-700 transition-all shadow-lg shadow-red-500/20"
                  >
                    Start Tutorial

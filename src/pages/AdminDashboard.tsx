@@ -85,6 +85,8 @@ const isMissingDrillSchemaError = (error) => {
   const message = `${error?.message || ''} ${error?.details || ''}`;
   return message.includes('drills') && (
     message.includes('schema cache')
+    || message.includes('video_url')
+    || message.includes('youtube_url')
     || message.includes('difficulty')
     || message.includes('duration')
     || message.includes('thumbnail_url')
@@ -94,6 +96,7 @@ const isMissingDrillSchemaError = (error) => {
 
 const POSITION_OPTIONS = ['TBD', 'Forward', 'Midfielder', 'Defender', 'Goalkeeper'];
 const JERSEY_SIZE_OPTIONS = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'S', 'M', 'L', 'XL', '2XL'];
+const getDrillVideoUrl = (drill) => drill?.video_url || drill?.youtube_url || '';
 
 const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach }) => (
   <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md">
@@ -616,7 +619,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/drills?columns=title,video_url`, {
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/drills?columns=title,youtube_url,thumbnail_url,duration,difficulty,category,description`, {
       method: 'POST',
       headers: {
         apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -626,7 +629,12 @@ export default function AdminDashboard() {
       },
       body: JSON.stringify([{
         title: newDrill.title,
-        video_url: newDrill.video_url,
+        youtube_url: newDrill.video_url,
+        thumbnail_url: newDrill.thumbnail_url || getYoutubeThumbnail(newDrill.video_url),
+        duration: Number(newDrill.duration) || 15,
+        difficulty: newDrill.difficulty || 'Beginner',
+        category: newDrill.category || 'Training',
+        description: newDrill.description || '',
       }]),
     });
 
@@ -645,7 +653,7 @@ export default function AdminDashboard() {
       }
 
       if (isMissingDrillSchemaError({ message: errorMessage })) {
-        alert('Supabase is still missing the drills.difficulty column or has a stale schema cache. Run supabase/FIX_DRILLS_ONLY.sql in Supabase SQL Editor, then hard refresh this page.');
+        alert(`Supabase drills table is missing a column the site needs: ${errorMessage}. Run supabase/FIX_DRILLS_ONLY.sql in Supabase SQL Editor, then hard refresh this page.`);
         return;
       }
       alert(errorMessage);
@@ -1259,8 +1267,9 @@ export default function AdminDashboard() {
               ) : (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {data.drills.map((d) => {
-                  const thumbnail = d.thumbnail_url || getYoutubeThumbnail(d.video_url);
-                  const videoId = getYoutubeId(d.video_url || '');
+                  const drillVideoUrl = getDrillVideoUrl(d);
+                  const thumbnail = d.thumbnail_url || getYoutubeThumbnail(drillVideoUrl);
+                  const videoId = getYoutubeId(drillVideoUrl);
 
                   return (
                     <div key={d.id} className="overflow-hidden rounded-2xl border border-gray-800 bg-black">
@@ -1294,7 +1303,7 @@ export default function AdminDashboard() {
                         <div className="flex items-center gap-2">
                           {videoId && (
                             <a
-                              href={d.video_url}
+                              href={drillVideoUrl}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-white"
