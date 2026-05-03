@@ -130,6 +130,7 @@ drop policy if exists "Parents can view own players" on public.players;
 drop policy if exists "Admins can assign player teams" on public.players;
 drop policy if exists "Admins can delete players" on public.players;
 drop policy if exists "Coaches can view team players" on public.players;
+drop policy if exists "Coaches can update own team roster details" on public.players;
 
 create policy "Parents can insert own players" on public.players
   for insert to authenticated
@@ -171,6 +172,23 @@ create policy "Admins can delete players" on public.players
 create policy "Coaches can view team players" on public.players
   for select to authenticated
   using (
+    exists (
+      select 1 from public.coaches
+      where coaches.id = auth.uid()
+      and coaches.team_id = players.team_assigned
+    )
+  );
+
+create policy "Coaches can update own team roster details" on public.players
+  for update to authenticated
+  using (
+    exists (
+      select 1 from public.coaches
+      where coaches.id = auth.uid()
+      and coaches.team_id = players.team_assigned
+    )
+  )
+  with check (
     exists (
       select 1 from public.coaches
       where coaches.id = auth.uid()

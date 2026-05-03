@@ -15,6 +15,10 @@ interface Player {
   status: string;
   photo_url?: string;
   age_group?: string;
+  position?: string;
+  jersey_number?: string;
+  jersey_size?: string;
+  team_assigned?: string;
   profiles: {
     first_name: string;
     last_name: string;
@@ -31,6 +35,9 @@ interface PlayerRow extends Omit<Player, 'dob' | 'profiles'> {
 const getPlayerName = (player: Pick<Player, 'first_name' | 'last_name' | 'full_name'>) => (
   `${player.first_name || ''} ${player.last_name || ''}`.trim() || player.full_name || 'Bamika Player'
 );
+
+const POSITION_OPTIONS = ['TBD', 'Forward', 'Midfielder', 'Defender', 'Goalkeeper'];
+const JERSEY_SIZE_OPTIONS = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'S', 'M', 'L', 'XL', '2XL'];
 
 interface Game {
   id: string;
@@ -234,6 +241,22 @@ export default function CoachDashboard() {
     }
   };
 
+  const handleUpdatePlayer = async (playerId: string, updates: Partial<Pick<Player, 'position' | 'jersey_number' | 'jersey_size'>>) => {
+    const { error } = await supabase
+      .from('players')
+      .update(updates)
+      .eq('id', playerId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setPlayers((currentPlayers) => currentPlayers.map((player) => (
+      player.id === playerId ? { ...player, ...updates } : player
+    )));
+  };
+
   const calculateAge = (dob: string) => {
     if (!dob) return 0;
     const birthDate = new Date(dob);
@@ -435,14 +458,14 @@ export default function CoachDashboard() {
       ) : teamId ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {players.map((player) => (
-            <div key={player.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <div key={player.id} className="rounded-2xl border border-gray-800 bg-black p-5 shadow-sm transition-colors hover:border-[#EF4444]/70">
               <div className="flex justify-between items-start mb-3">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">{getPlayerName(player)}</h3>
+                  <h3 className="text-xl font-black uppercase italic text-white">{getPlayerName(player)}</h3>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500 font-medium">{calculateAge(player.dob)} Years Old</span>
+                    <span className="text-sm text-gray-500 font-bold">{calculateAge(player.dob)} Years Old</span>
                     {player.age_group && (
-                      <span className="px-2 py-0.5 text-xs font-bold text-blue-700 bg-blue-100 rounded-full border border-blue-200">
+                      <span className="px-2 py-0.5 text-xs font-black text-[#D4AF37] bg-[#D4AF37]/10 rounded-full border border-[#D4AF37]/30">
                         {player.age_group}
                       </span>
                     )}
@@ -453,10 +476,10 @@ export default function CoachDashboard() {
                     <img 
                       src={player.photo_url} 
                       alt={getPlayerName(player)}
-                      className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
+                      className="h-14 w-14 rounded-xl object-cover border border-gray-800"
                     />
                   ) : (
-                    <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-200">
+                    <div className="h-14 w-14 rounded-xl bg-neutral-900 flex items-center justify-center border border-gray-800">
                       <User className="text-gray-400 h-6 w-6" />
                     </div>
                   )}
@@ -469,11 +492,53 @@ export default function CoachDashboard() {
               </div>
               
               <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
+                <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                  <div className="rounded-lg border border-gray-800 bg-neutral-950 p-2">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</div>
+                    <select
+                      value={player.position || 'TBD'}
+                      onChange={(e) => handleUpdatePlayer(player.id, { position: e.target.value })}
+                      className="mt-1 w-full rounded-md border border-gray-800 bg-black px-2 py-1 font-bold text-gray-300 outline-none focus:border-[#EF4444]"
+                    >
+                      {POSITION_OPTIONS.map((position) => (
+                        <option key={position} value={position}>{position}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="rounded-lg border border-gray-800 bg-neutral-950 p-2">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Number</div>
+                    <input
+                      value={player.jersey_number || ''}
+                      placeholder="-"
+                      onChange={(e) => {
+                        const jerseyNumber = e.target.value;
+                        setPlayers((currentPlayers) => currentPlayers.map((currentPlayer) => (
+                          currentPlayer.id === player.id ? { ...currentPlayer, jersey_number: jerseyNumber } : currentPlayer
+                        )));
+                      }}
+                      onBlur={(e) => handleUpdatePlayer(player.id, { jersey_number: e.target.value || '-' })}
+                      className="mt-1 w-full rounded-md border border-gray-800 bg-black px-2 py-1 font-bold text-gray-300 outline-none focus:border-[#EF4444]"
+                    />
+                  </div>
+                  <div className="rounded-lg border border-gray-800 bg-neutral-950 p-2">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Size</div>
+                    <select
+                      value={player.jersey_size || 'YM'}
+                      onChange={(e) => handleUpdatePlayer(player.id, { jersey_size: e.target.value })}
+                      className="mt-1 w-full rounded-md border border-gray-800 bg-black px-2 py-1 font-bold text-gray-300 outline-none focus:border-[#EF4444]"
+                    >
+                      {JERSEY_SIZE_OPTIONS.map((size) => (
+                        <option key={size} value={size}>{size}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 bg-neutral-950 border border-gray-800 rounded-lg">
                   <Phone className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs font-bold text-red-300 uppercase">Emergency Contact</p>
-                    <p className="font-medium text-gray-900">{player.profiles.first_name} {player.profiles.last_name}</p>
+                    <p className="text-xs font-bold text-gray-500 uppercase">Emergency Contact</p>
+                    <p className="font-medium text-white">{player.profiles.first_name} {player.profiles.last_name}</p>
                     <div className="flex flex-wrap gap-3">
                       <a href={`tel:${player.profiles.phone}`} className="text-red-600 font-bold hover:underline">
                         {player.profiles.phone}
@@ -489,11 +554,11 @@ export default function CoachDashboard() {
                 </div>
 
                 {player.medical_conditions && (
-                  <div className="flex items-start gap-3 p-3 bg-yellow-900 rounded-lg">
+                  <div className="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                     <FileText className="h-5 w-5 text-yellow-400 mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-xs font-bold text-yellow-800 uppercase">Medical Notes</p>
-                      <p className="text-sm text-gray-800">{player.medical_conditions}</p>
+                      <p className="text-xs font-bold text-yellow-200 uppercase">Medical Notes</p>
+                      <p className="text-sm text-gray-300">{player.medical_conditions}</p>
                     </div>
                   </div>
                 )}

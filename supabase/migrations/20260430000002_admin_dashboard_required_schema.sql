@@ -51,6 +51,7 @@ drop policy if exists "Admins can insert announcements" on public.announcements;
 drop policy if exists "Coaches can insert team announcements" on public.announcements;
 drop policy if exists "Admins can update announcements" on public.announcements;
 drop policy if exists "Admins can delete announcements" on public.announcements;
+drop policy if exists "Coaches can update own team roster details" on public.players;
 
 create policy "Anyone can view active announcements" on public.announcements
   for select using (
@@ -120,6 +121,22 @@ create policy "Admins can delete announcements" on public.announcements
     exists (
       select 1 from public.profiles
       where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  );
+
+create policy "Coaches can update own team roster details" on public.players
+  for update using (
+    exists (
+      select 1 from public.coaches
+      where coaches.id = auth.uid()
+      and coaches.team_id = players.team_assigned
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.coaches
+      where coaches.id = auth.uid()
+      and coaches.team_id = players.team_assigned
     )
   );
 

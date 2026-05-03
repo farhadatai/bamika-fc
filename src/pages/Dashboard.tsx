@@ -23,6 +23,7 @@ interface Announcement {
   title: string;
   body: string;
   audience: string;
+  team_id?: string | null;
   priority: string;
   is_pinned: boolean;
   created_at: string;
@@ -90,6 +91,7 @@ const statusClass = (status?: string | null) => {
 export default function Dashboard() {
   const { user, userRole } = useAuthStore();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [teamMessages, setTeamMessages] = useState<Announcement[]>([]);
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,11 +147,11 @@ export default function Dashboard() {
       let teamAnnouncements: Announcement[] = [];
       const basePlayers = playersResponse.data || [];
 
-      if (!announcementsResponse.error && userRole !== 'admin') {
+      if (userRole !== 'admin') {
         const teams = [...new Set(basePlayers.map((player) => player.team_assigned).filter((team) => team && team !== 'Unassigned'))];
 
         if (teams.length > 0) {
-          const { data: teamData } = await supabase
+          const { data: teamData, error: teamMessagesError } = await supabase
             .from('announcements')
             .select('*')
             .eq('audience', 'team')
@@ -157,7 +159,11 @@ export default function Dashboard() {
             .order('is_pinned', { ascending: false })
             .order('created_at', { ascending: false });
 
-          teamAnnouncements = teamData || [];
+          if (teamMessagesError) {
+            console.warn('Team messages unavailable:', teamMessagesError);
+          } else {
+            teamAnnouncements = teamData || [];
+          }
         }
       }
 
@@ -185,6 +191,7 @@ export default function Dashboard() {
       }));
 
       setAnnouncements(mergedAnnouncements);
+      setTeamMessages(teamAnnouncements);
       setPlayers(basePlayers);
       setSchedule([...practiceItems, ...matchItems].sort((a, b) => `${a.date} ${a.time || ''}`.localeCompare(`${b.date} ${b.time || ''}`)).slice(0, 4));
       setLoading(false);
@@ -194,6 +201,9 @@ export default function Dashboard() {
   }, [today, user, userRole]);
 
   const primaryPlayer = players[0];
+  const getPlayerMessages = (player: PlayerSummary) => teamMessages
+    .filter((message) => message.team_id && message.team_id === player.team_assigned)
+    .slice(0, 2);
 
   const quickActions = [
     ...(userRole === 'admin'
@@ -348,6 +358,23 @@ export default function Dashboard() {
                         {player.payment_status || 'Payment pending'}
                       </span>
                     </div>
+
+                    {getPlayerMessages(player).length > 0 && (
+                      <div className="mt-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-3">
+                        <div className="mb-2 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-[#FCA5A5]">
+                          <Megaphone size={13} />
+                          Coach messages
+                        </div>
+                        <div className="space-y-2">
+                          {getPlayerMessages(player).map((message) => (
+                            <div key={message.id} className="border-t border-[#EF4444]/20 pt-2 first:border-t-0 first:pt-0">
+                              <div className="text-xs font-black uppercase italic text-white">{message.title}</div>
+                              <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs leading-5 text-gray-300">{message.body}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </article>
                 ))}
               </div>
