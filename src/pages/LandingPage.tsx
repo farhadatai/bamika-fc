@@ -461,6 +461,9 @@ export default function LandingPage() {
     }
   }
 
+  const sponsorSpotlights = spotlights.filter((spotlight) => spotlight.type === 'sponsor')
+  const playerSpotlights = spotlights.filter((spotlight) => spotlight.type !== 'sponsor')
+
   return (
     <div className="min-h-screen w-full bg-black font-sans text-gray-900">
 
@@ -705,55 +708,115 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PLAYER & SPONSOR SPOTLIGHTS */}
-      <section id="spotlights" className="bg-black py-16 w-full border-b border-gray-900">
+      {/* SPONSORS */}
+      <section id="sponsors" className="bg-black py-20 w-full border-b border-gray-900">
         <div className="mx-auto max-w-7xl px-6">
-          <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
-                <Star size={14} className="text-[#D4AF37]" />
-                Recognition
+                <HandHeart size={14} className="text-[#D4AF37]" />
+                Club partners
               </div>
-              <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tight text-white">
-                Players & <span className="text-[#D4AF37]">Sponsors</span>
+              <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tight text-white">
+                Proud <span className="text-[#D4AF37]">Sponsors</span>
               </h2>
             </div>
             <p className="max-w-xl text-sm leading-6 text-gray-500">
-              Celebrating standout effort from our athletes and the businesses helping Bamika FC grow.
+              Local businesses helping Bamika FC create opportunities for players and families.
             </p>
           </div>
 
           {loadingSpotlights ? (
-            <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Loading spotlights...</div>
-          ) : spotlights.length === 0 ? (
+            <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Loading sponsors...</div>
+          ) : sponsorSpotlights.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-800 bg-neutral-950 p-8 text-center text-gray-500">
-              Player and sponsor spotlights will appear here soon.
+              Sponsor promotions will appear here soon.
+            </div>
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-2">
+              {sponsorSpotlights.map((sponsor) => (
+                <article key={sponsor.id} className="group overflow-hidden rounded-2xl border border-[#D4AF37]/35 bg-neutral-950 shadow-2xl shadow-black/40 transition-colors hover:border-[#D4AF37]">
+                  <div className="grid lg:grid-cols-[0.95fr_1.05fr]">
+                    <div className="relative min-h-[260px] bg-black p-5">
+                      {sponsor.image_url ? (
+                        <img src={sponsor.image_url} alt={sponsor.title} className="h-full max-h-[360px] min-h-[220px] w-full object-contain transition-transform duration-700 group-hover:scale-[1.03]" />
+                      ) : (
+                        <div className="flex h-full min-h-[240px] items-center justify-center rounded-xl border border-dashed border-gray-800">
+                          <HandHeart className="text-[#D4AF37]" size={56} />
+                        </div>
+                      )}
+                      <span className="absolute left-5 top-5 rounded-full bg-[#D4AF37] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-black">
+                        Sponsor
+                      </span>
+                    </div>
+                    <div className="flex flex-col justify-center p-6 md:p-8">
+                      {sponsor.subtitle && (
+                        <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">{sponsor.subtitle}</p>
+                      )}
+                      <h3 className="text-3xl font-black uppercase italic leading-tight text-white">{sponsor.title}</h3>
+                      <p className="mt-4 text-sm leading-7 text-gray-400">{sponsor.body}</p>
+                      {sponsor.link_url && (
+                        <a
+                          href={sponsor.link_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-6 inline-flex w-fit items-center gap-2 rounded-xl bg-[#D4AF37] px-5 py-3 text-xs font-black uppercase tracking-widest text-black transition hover:bg-white"
+                        >
+                          Visit Sponsor <ExternalLink size={14} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* PLAYER RECOGNITION */}
+      <section id="spotlights" className="bg-neutral-950 py-16 w-full border-b border-gray-900">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                <Star size={14} className="text-[#EF4444]" />
+                Player recognition
+              </div>
+              <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tight text-white">
+                Player <span className="text-[#EF4444]">Spotlights</span>
+              </h2>
+            </div>
+            <p className="max-w-xl text-sm leading-6 text-gray-500">
+              Celebrating standout effort, leadership, improvement, and team-first moments.
+            </p>
+          </div>
+
+          {loadingSpotlights ? (
+            <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Loading player recognition...</div>
+          ) : playerSpotlights.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-800 bg-black p-8 text-center text-gray-500">
+              Player recognition will appear here soon.
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {spotlights.map((spotlight) => (
-                <article key={spotlight.id} className="group overflow-hidden rounded-2xl border border-gray-800 bg-neutral-950 transition-colors hover:border-[#D4AF37]/70">
-                  <div className="relative aspect-[16/10] bg-black">
+              {playerSpotlights.map((spotlight) => (
+                <article key={spotlight.id} className="group overflow-hidden rounded-2xl border border-gray-800 bg-black transition-colors hover:border-[#EF4444]/70">
+                  <div className="relative aspect-[4/3] bg-neutral-950">
                     {spotlight.image_url ? (
                       <img src={spotlight.image_url} alt={spotlight.title} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                     ) : (
                       <div className="flex h-full items-center justify-center">
-                        {spotlight.type === 'sponsor' ? (
-                          <HandHeart className="text-[#D4AF37]" size={48} />
-                        ) : (
-                          <Star className="text-[#EF4444]" size={48} />
-                        )}
+                        <Star className="text-[#EF4444]" size={48} />
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.85),transparent_70%)]"></div>
-                    <span className={`absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white ${spotlight.type === 'sponsor' ? 'bg-[#D4AF37]' : 'bg-[#EF4444]'}`}>
-                      {spotlight.type === 'sponsor' ? 'Sponsor' : 'Player'}
+                    <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.78),transparent_70%)]"></div>
+                    <span className="absolute left-4 top-4 rounded-full bg-[#EF4444] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
+                      Player
                     </span>
                   </div>
                   <div className="p-6">
-                    {spotlight.subtitle && (
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">{spotlight.subtitle}</p>
-                    )}
+                    {spotlight.subtitle && <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-[#EF4444]">{spotlight.subtitle}</p>}
                     <h3 className="text-2xl font-black uppercase italic leading-tight text-white">{spotlight.title}</h3>
                     <p className="mt-3 line-clamp-4 text-sm leading-6 text-gray-400">{spotlight.body}</p>
                     {spotlight.link_url && (
@@ -761,9 +824,9 @@ export default function LandingPage() {
                         href={spotlight.link_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-5 inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#D4AF37] hover:text-white"
+                        className="mt-5 inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#EF4444] hover:text-white"
                       >
-                        {spotlight.type === 'sponsor' ? 'Visit Sponsor' : 'Learn More'}
+                        Learn More
                         <ExternalLink size={14} />
                       </a>
                     )}

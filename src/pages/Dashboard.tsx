@@ -5,6 +5,8 @@ import {
   CalendarDays,
   Clock,
   CreditCard,
+  ExternalLink,
+  HandHeart,
   MapPin,
   Megaphone,
   Play,
@@ -53,6 +55,15 @@ interface ScheduleItem {
   time?: string | null;
   location?: string | null;
   type: 'practice' | 'match';
+}
+
+interface SponsorSpotlight {
+  id: string;
+  title: string;
+  subtitle?: string | null;
+  body: string;
+  image_url?: string | null;
+  link_url?: string | null;
 }
 
 const getInitials = (firstName = '', lastName = '') => {
@@ -110,6 +121,7 @@ export default function Dashboard() {
   const [teamMessages, setTeamMessages] = useState<Announcement[]>([]);
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
+  const [sponsors, setSponsors] = useState<SponsorSpotlight[]>([]);
   const [loading, setLoading] = useState(true);
 
   const firstName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'Bamika Family';
@@ -131,6 +143,7 @@ export default function Dashboard() {
         playersResponse,
         practicesResponse,
         matchesResponse,
+        sponsorsResponse,
       ] = await Promise.all([
         supabase
           .from('announcements')
@@ -158,6 +171,13 @@ export default function Dashboard() {
           .order('date', { ascending: true })
           .order('time', { ascending: true })
           .limit(3),
+        supabase
+          .from('recognition_items')
+          .select('id, title, subtitle, body, image_url, link_url')
+          .eq('type', 'sponsor')
+          .eq('is_published', true)
+          .order('created_at', { ascending: false })
+          .limit(2),
       ]);
 
       let teamAnnouncements: Announcement[] = [];
@@ -209,6 +229,7 @@ export default function Dashboard() {
       setAnnouncements(mergedAnnouncements);
       setTeamMessages(teamAnnouncements);
       setPlayers(basePlayers);
+      setSponsors(sponsorsResponse.error ? [] : sponsorsResponse.data || []);
       setSchedule([...practiceItems, ...matchItems].sort((a, b) => `${a.date} ${a.time || ''}`.localeCompare(`${b.date} ${b.time || ''}`)).slice(0, 4));
       setLoading(false);
     };
@@ -315,6 +336,42 @@ export default function Dashboard() {
             </div>
           </div>
         </section>
+
+        {sponsors.length > 0 && (
+          <section className="overflow-hidden rounded-2xl border border-[#D4AF37]/30 bg-neutral-950 shadow-2xl shadow-black/30">
+            <div className="border-b border-[#D4AF37]/20 bg-[#D4AF37]/10 px-5 py-3">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
+                <HandHeart size={15} />
+                Bamika FC sponsor spotlight
+              </div>
+            </div>
+            <div className="grid gap-0 lg:grid-cols-2">
+              {sponsors.map((sponsor) => (
+                <article key={sponsor.id} className="grid gap-0 border-b border-gray-800 last:border-b-0 sm:grid-cols-[220px_1fr] lg:border-b-0 lg:border-r lg:last:border-r-0 lg:border-gray-800">
+                  <div className="bg-black p-4">
+                    {sponsor.image_url ? (
+                      <img src={sponsor.image_url} alt={sponsor.title} className="h-44 w-full rounded-xl border border-gray-800 bg-black object-contain" />
+                    ) : (
+                      <div className="flex h-44 items-center justify-center rounded-xl border border-dashed border-gray-800 bg-black">
+                        <HandHeart className="text-[#D4AF37]" size={42} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col justify-center p-5">
+                    {sponsor.subtitle && <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">{sponsor.subtitle}</p>}
+                    <h2 className="mt-2 text-2xl font-black uppercase italic text-white">{sponsor.title}</h2>
+                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-400">{sponsor.body}</p>
+                    {sponsor.link_url && (
+                      <a href={sponsor.link_url} target="_blank" rel="noreferrer" className="mt-4 inline-flex w-fit items-center gap-2 rounded-lg bg-[#D4AF37] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-black hover:bg-white">
+                        View Sponsor <ExternalLink size={13} />
+                      </a>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <section className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
