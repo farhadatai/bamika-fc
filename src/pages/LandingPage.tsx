@@ -527,38 +527,43 @@ export default function LandingPage() {
 
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-black/70 p-5 text-white shadow-2xl shadow-black/40 backdrop-blur sm:p-6 lg:self-center">
-            <div className="inline-flex rounded-full border border-white/15 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-300">
-              Club tools
+          <div className="rounded-2xl border border-white/10 bg-black/75 p-5 text-white shadow-2xl shadow-black/40 backdrop-blur sm:p-6 lg:self-center">
+            <div className="inline-flex rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
+              Family hub
             </div>
             <h2 className="mt-5 text-3xl font-black uppercase italic leading-tight sm:text-4xl">
-              Fast for phones. Clear for families.
+              Everything families need, right up front.
             </h2>
             <p className="mt-4 text-sm leading-7 text-gray-400">
-              Registration, pricing, schedule, announcements, and training stay on the homepage. Coaches, club information, and player photos now have their own page.
+              Register a player, check the promo price, view practice updates, and open the training lab from one clean place.
             </p>
-            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-              <div className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
+            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Link to="/register" className="group rounded-xl border border-gray-800 bg-neutral-950 p-4 transition hover:border-[#EF4444]">
                 <Target className="mb-3 text-[#EF4444]" size={22} />
-                <div className="text-sm font-black uppercase text-white">Skills</div>
-                <p className="mt-1 text-xs text-gray-500">Ball mastery</p>
-              </div>
-              <div className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
-                <Users className="mb-3 text-[#D4AF37]" size={22} />
-                <div className="text-sm font-black uppercase text-white">Club Info</div>
-                <p className="mt-1 text-xs text-gray-500">Coaches & photos</p>
-              </div>
-              <div className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
-                <ShieldCheck className="mb-3 text-green-500" size={22} />
-                <div className="text-sm font-black uppercase text-white">Growth</div>
-                <p className="mt-1 text-xs text-gray-500">Player path</p>
-              </div>
+                <div className="text-sm font-black uppercase text-white">Register</div>
+                <p className="mt-1 text-xs text-gray-500">Start player signup</p>
+              </Link>
+              <button onClick={() => scrollToSection('pricing')} className="rounded-xl border border-gray-800 bg-neutral-950 p-4 text-left transition hover:border-[#D4AF37]">
+                <ShieldCheck className="mb-3 text-[#D4AF37]" size={22} />
+                <div className="text-sm font-black uppercase text-white">Pricing</div>
+                <p className="mt-1 text-xs text-gray-500">$50 June promo</p>
+              </button>
+              <button onClick={() => scrollToSection('schedule')} className="rounded-xl border border-gray-800 bg-neutral-950 p-4 text-left transition hover:border-green-500">
+                <CalendarDays className="mb-3 text-green-500" size={22} />
+                <div className="text-sm font-black uppercase text-white">Schedule</div>
+                <p className="mt-1 text-xs text-gray-500">Practice and matches</p>
+              </button>
+              <Link to="/training-lab" className="rounded-xl border border-gray-800 bg-neutral-950 p-4 transition hover:border-white">
+                <Dumbbell className="mb-3 text-gray-300" size={22} />
+                <div className="text-sm font-black uppercase text-white">Training</div>
+                <p className="mt-1 text-xs text-gray-500">Drills and videos</p>
+              </Link>
             </div>
             <Link
               to="/club"
               className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 px-5 py-4 text-sm font-black uppercase text-white transition hover:border-[#EF4444] hover:bg-[#EF4444]"
             >
-              Coaches & Club Info <ArrowRight size={18} />
+              Coaches, Photos & Club Info <ArrowRight size={18} />
             </Link>
           </div>
 
