@@ -62,6 +62,18 @@ create table if not exists public.drills (
   created_at timestamptz default now()
 );
 
+create table if not exists public.recognition_items (
+  id uuid default gen_random_uuid() primary key,
+  type text not null default 'player',
+  title text not null,
+  subtitle text,
+  body text not null,
+  image_url text,
+  link_url text,
+  is_published boolean not null default true,
+  created_at timestamptz default now()
+);
+
 alter table public.drills add column if not exists youtube_url text;
 alter table public.drills add column if not exists video_url text;
 update public.drills
@@ -81,6 +93,15 @@ alter table public.drills add column if not exists difficulty text not null defa
 alter table public.drills add column if not exists category text not null default 'Dribbling';
 alter table public.drills add column if not exists description text;
 alter table public.drills add column if not exists created_at timestamptz default now();
+
+alter table public.recognition_items add column if not exists type text not null default 'player';
+alter table public.recognition_items add column if not exists title text;
+alter table public.recognition_items add column if not exists subtitle text;
+alter table public.recognition_items add column if not exists body text;
+alter table public.recognition_items add column if not exists image_url text;
+alter table public.recognition_items add column if not exists link_url text;
+alter table public.recognition_items add column if not exists is_published boolean not null default true;
+alter table public.recognition_items add column if not exists created_at timestamptz default now();
 
 update public.profiles
 set
@@ -117,6 +138,7 @@ alter table public.players enable row level security;
 alter table public.coaches enable row level security;
 alter table public.announcements enable row level security;
 alter table public.drills enable row level security;
+alter table public.recognition_items enable row level security;
 
 drop policy if exists "Users can insert own profile" on public.profiles;
 drop policy if exists "Users can view own profile" on public.profiles;
@@ -320,6 +342,34 @@ create policy "Admins can delete drills" on public.drills
     )
   );
 
+drop policy if exists "Public can view published recognition items" on public.recognition_items;
+drop policy if exists "Admins can manage recognition items" on public.recognition_items;
+
+create policy "Public can view published recognition items" on public.recognition_items
+  for select
+  using (
+    is_published = true
+    or exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  );
+
+create policy "Admins can manage recognition items" on public.recognition_items
+  for all to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  );
+
 grant select, insert, update on public.profiles to authenticated;
 grant select, insert, update, delete on public.players to authenticated;
 grant select, update on public.coaches to authenticated;
@@ -327,6 +377,8 @@ grant select on public.announcements to anon, authenticated;
 grant insert, update, delete on public.announcements to authenticated;
 grant select on public.drills to anon, authenticated;
 grant insert, update, delete on public.drills to authenticated;
+grant select on public.recognition_items to anon, authenticated;
+grant insert, update, delete on public.recognition_items to authenticated;
 
 -- Force Supabase/PostgREST to refresh the schema cache immediately.
 notify pgrst, 'reload schema';

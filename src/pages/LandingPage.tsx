@@ -16,6 +16,9 @@ import {
   ShieldCheck,
   CalendarDays,
   Dumbbell,
+  Star,
+  HandHeart,
+  ExternalLink,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getYoutubeId, getYoutubeThumbnail } from '../lib/utils'
@@ -45,6 +48,18 @@ interface Announcement {
   priority: string
   is_pinned: boolean
   expires_at?: string
+  created_at: string
+}
+
+interface Spotlight {
+  id: string
+  type: 'player' | 'sponsor'
+  title: string
+  subtitle?: string
+  body: string
+  image_url?: string
+  link_url?: string
+  is_published: boolean
   created_at: string
 }
 
@@ -322,6 +337,8 @@ export default function LandingPage() {
   const [loadingEvents, setLoadingEvents] = useState(true)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(true)
+  const [spotlights, setSpotlights] = useState<Spotlight[]>([])
+  const [loadingSpotlights, setLoadingSpotlights] = useState(true)
   const [drills, setDrills] = useState<Drill[]>([])
   const [loadingDrills, setLoadingDrills] = useState(true)
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
@@ -331,6 +348,7 @@ export default function LandingPage() {
     fetchUpcomingGames()
     fetchUpcomingEvents()
     fetchAnnouncements()
+    fetchSpotlights()
     fetchDrills()
   }, [])
 
@@ -413,6 +431,26 @@ export default function LandingPage() {
       console.error('Error fetching announcements:', error)
     } finally {
       setLoadingAnnouncements(false)
+    }
+  }
+
+  const fetchSpotlights = async () => {
+    setLoadingSpotlights(true)
+    try {
+      const { data, error } = await supabase
+        .from('recognition_items')
+        .select('*')
+        .eq('is_published', true)
+        .order('created_at', { ascending: false })
+        .limit(6)
+
+      if (error) throw error
+      setSpotlights(data || [])
+    } catch (error) {
+      console.error('Error fetching spotlights:', error)
+      setSpotlights([])
+    } finally {
+      setLoadingSpotlights(false)
     }
   }
 
@@ -659,6 +697,76 @@ export default function LandingPage() {
               </div>
             )}
           </div>
+        </div>
+      </section>
+
+      {/* PLAYER & SPONSOR SPOTLIGHTS */}
+      <section id="spotlights" className="bg-black py-16 w-full border-b border-gray-900">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                <Star size={14} className="text-[#D4AF37]" />
+                Recognition
+              </div>
+              <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tight text-white">
+                Players & <span className="text-[#D4AF37]">Sponsors</span>
+              </h2>
+            </div>
+            <p className="max-w-xl text-sm leading-6 text-gray-500">
+              Celebrating standout effort from our athletes and the businesses helping Bamika FC grow.
+            </p>
+          </div>
+
+          {loadingSpotlights ? (
+            <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Loading spotlights...</div>
+          ) : spotlights.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-800 bg-neutral-950 p-8 text-center text-gray-500">
+              Player and sponsor spotlights will appear here soon.
+            </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {spotlights.map((spotlight) => (
+                <article key={spotlight.id} className="group overflow-hidden rounded-2xl border border-gray-800 bg-neutral-950 transition-colors hover:border-[#D4AF37]/70">
+                  <div className="relative aspect-[16/10] bg-black">
+                    {spotlight.image_url ? (
+                      <img src={spotlight.image_url} alt={spotlight.title} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        {spotlight.type === 'sponsor' ? (
+                          <HandHeart className="text-[#D4AF37]" size={48} />
+                        ) : (
+                          <Star className="text-[#EF4444]" size={48} />
+                        )}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.85),transparent_70%)]"></div>
+                    <span className={`absolute left-4 top-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white ${spotlight.type === 'sponsor' ? 'bg-[#D4AF37]' : 'bg-[#EF4444]'}`}>
+                      {spotlight.type === 'sponsor' ? 'Sponsor' : 'Player'}
+                    </span>
+                  </div>
+                  <div className="p-6">
+                    {spotlight.subtitle && (
+                      <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">{spotlight.subtitle}</p>
+                    )}
+                    <h3 className="text-2xl font-black uppercase italic leading-tight text-white">{spotlight.title}</h3>
+                    <p className="mt-3 line-clamp-4 text-sm leading-6 text-gray-400">{spotlight.body}</p>
+                    {spotlight.link_url && (
+                      <a
+                        href={spotlight.link_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-5 inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#D4AF37] hover:text-white"
+                      >
+                        {spotlight.type === 'sponsor' ? 'Visit Sponsor' : 'Learn More'}
+                        <ExternalLink size={14} />
+                      </a>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

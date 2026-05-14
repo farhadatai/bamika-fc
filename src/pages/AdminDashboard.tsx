@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone } from 'lucide-react';
+import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone, Star, HandHeart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { TEAM_OPTIONS, getYoutubeId, getYoutubeThumbnail } from '../lib/utils';
@@ -369,13 +369,13 @@ const PracticeModal = ({ onClose, onSubmit, newPractice, setNewPractice }) => (
   </div>
 );
 
-const AnnouncementModal = ({ onClose, onSubmit, newAnnouncement, setNewAnnouncement }) => (
+const AnnouncementModal = ({ onClose, onSubmit, newAnnouncement, setNewAnnouncement, isEditing = false }) => (
   <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
     <div className="bg-neutral-900 border border-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl">
       <div className="p-5 border-b border-gray-800 flex justify-between items-start gap-4 sm:p-6">
         <div>
-          <h3 className="text-white font-black uppercase italic">New Announcement</h3>
-          <p className="mt-1 text-sm text-gray-500">Publish club news for visitors, parents, or coaches.</p>
+          <h3 className="text-white font-black uppercase italic">{isEditing ? 'Edit Announcement' : 'New Announcement'}</h3>
+          <p className="mt-1 text-sm text-gray-500">{isEditing ? 'Update this club message.' : 'Publish club news for visitors, parents, or coaches.'}</p>
         </div>
         <X className="cursor-pointer text-gray-500 hover:text-white" onClick={onClose} />
       </div>
@@ -434,7 +434,83 @@ const AnnouncementModal = ({ onClose, onSubmit, newAnnouncement, setNewAnnouncem
           Pin this announcement to the top
         </label>
         <button type="submit" className="btn-primary w-full">
-          Publish Announcement
+          {isEditing ? 'Save Announcement' : 'Publish Announcement'}
+        </button>
+      </form>
+    </div>
+  </div>
+);
+
+const SpotlightModal = ({ onClose, onSubmit, newSpotlight, setNewSpotlight }) => (
+  <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
+    <div className="bg-neutral-900 border border-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl">
+      <div className="p-5 border-b border-gray-800 flex justify-between items-start gap-4 sm:p-6">
+        <div>
+          <h3 className="text-white font-black uppercase italic">New Spotlight</h3>
+          <p className="mt-1 text-sm text-gray-500">Recognize players or promote sponsors on the homepage.</p>
+        </div>
+        <X className="cursor-pointer text-gray-500 hover:text-white" onClick={onClose} />
+      </div>
+      <form onSubmit={onSubmit} className="p-5 space-y-5 sm:p-8">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <select
+            value={newSpotlight.type}
+            className="input-primary"
+            onChange={(e) => setNewSpotlight({ ...newSpotlight, type: e.target.value })}
+          >
+            <option value="player">Player Recognition</option>
+            <option value="sponsor">Sponsor Promotion</option>
+          </select>
+          <input
+            type="text"
+            placeholder={newSpotlight.type === 'sponsor' ? 'Sponsor name' : 'Player name'}
+            required
+            value={newSpotlight.title}
+            className="input-primary"
+            onChange={(e) => setNewSpotlight({ ...newSpotlight, title: e.target.value })}
+          />
+        </div>
+        <input
+          type="text"
+          placeholder={newSpotlight.type === 'sponsor' ? 'Offer or tagline, e.g. Proud Bamika FC sponsor' : 'Award, team, or highlight'}
+          value={newSpotlight.subtitle}
+          className="input-primary"
+          onChange={(e) => setNewSpotlight({ ...newSpotlight, subtitle: e.target.value })}
+        />
+        <textarea
+          rows={4}
+          placeholder={newSpotlight.type === 'sponsor' ? 'Write the sponsor promotion or what they are supporting...' : 'Write why this player is being recognized...'}
+          required
+          value={newSpotlight.body}
+          className="input-primary resize-none"
+          onChange={(e) => setNewSpotlight({ ...newSpotlight, body: e.target.value })}
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <input
+            type="url"
+            placeholder="Image URL"
+            value={newSpotlight.image_url}
+            className="input-primary"
+            onChange={(e) => setNewSpotlight({ ...newSpotlight, image_url: e.target.value })}
+          />
+          <input
+            type="url"
+            placeholder={newSpotlight.type === 'sponsor' ? 'Sponsor website or promo link' : 'Optional link'}
+            value={newSpotlight.link_url}
+            className="input-primary"
+            onChange={(e) => setNewSpotlight({ ...newSpotlight, link_url: e.target.value })}
+          />
+        </div>
+        <label className="flex items-center gap-3 rounded-xl border border-gray-800 bg-black p-4 text-sm font-bold text-gray-300">
+          <input
+            type="checkbox"
+            checked={newSpotlight.is_published}
+            onChange={(e) => setNewSpotlight({ ...newSpotlight, is_published: e.target.checked })}
+          />
+          Show on homepage
+        </label>
+        <button type="submit" className="btn-primary w-full">
+          Publish Spotlight
         </button>
       </form>
     </div>
@@ -463,6 +539,7 @@ export default function AdminDashboard() {
     events: [],
     drills: [],
     announcements: [],
+    spotlights: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -473,7 +550,9 @@ export default function AdminDashboard() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDrillModalOpen, setIsDrillModalOpen] = useState(false);
   const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
+  const [isSpotlightModalOpen, setIsSpotlightModalOpen] = useState(false);
   const [selectedParent, setSelectedParent] = useState(null);
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null);
 
   // Form State
   const [newGame, setNewGame] = useState({ date: '', time: '', opponent: '', location: 'Home' });
@@ -484,6 +563,8 @@ export default function AdminDashboard() {
   const [newDrill, setNewDrill] = useState(emptyDrill);
   const emptyAnnouncement = { title: '', body: '', audience: 'everyone', priority: 'normal', expires_at: '', is_pinned: false };
   const [newAnnouncement, setNewAnnouncement] = useState(emptyAnnouncement);
+  const emptySpotlight = { type: 'player', title: '', subtitle: '', body: '', image_url: '', link_url: '', is_published: true };
+  const [newSpotlight, setNewSpotlight] = useState(emptySpotlight);
   const [databaseNotice, setDatabaseNotice] = useState('');
 
   const handleSort = (column) => {
@@ -548,6 +629,15 @@ export default function AdminDashboard() {
       notices.push('Announcements need the latest Supabase schema update.');
     }
 
+    const { data: spotlights, error: spotlightsError } = await supabase
+      .from('recognition_items')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (spotlightsError && isMissingTableError(spotlightsError, 'recognition_items')) {
+      notices.push('Spotlights need the latest Supabase schema update.');
+    }
+
     setData({
       parents,
       coaches: c || [],
@@ -556,6 +646,7 @@ export default function AdminDashboard() {
       events: e || [],
       drills: d || [],
       announcements: announcementsError ? [] : a || [],
+      spotlights: spotlightsError ? [] : spotlights || [],
     });
     setDatabaseNotice(notices.join(' '));
     setLoading(false);
@@ -898,9 +989,14 @@ export default function AdminDashboard() {
       expires_at: newAnnouncement.expires_at || null,
     };
 
-    const { error } = await supabase.from('announcements').insert([payload]);
+    const query = editingAnnouncement
+      ? supabase.from('announcements').update(payload).eq('id', editingAnnouncement.id)
+      : supabase.from('announcements').insert([payload]);
+
+    const { error } = await query;
     if (!error) {
       setNewAnnouncement(emptyAnnouncement);
+      setEditingAnnouncement(null);
       setIsAnnouncementModalOpen(false);
       fetchData();
     } else {
@@ -910,6 +1006,53 @@ export default function AdminDashboard() {
       }
       alert(error.message);
     }
+  };
+
+  const openAnnouncementEditor = (announcement) => {
+    setEditingAnnouncement(announcement);
+    setNewAnnouncement({
+      title: announcement.title || '',
+      body: announcement.body || '',
+      audience: announcement.audience || 'everyone',
+      priority: announcement.priority || 'normal',
+      expires_at: announcement.expires_at || '',
+      is_pinned: !!announcement.is_pinned,
+    });
+    setIsAnnouncementModalOpen(true);
+  };
+
+  const closeAnnouncementModal = () => {
+    setIsAnnouncementModalOpen(false);
+    setEditingAnnouncement(null);
+    setNewAnnouncement(emptyAnnouncement);
+  };
+
+  const handleAddSpotlight = async (e) => {
+    e.preventDefault();
+    const payload = {
+      ...newSpotlight,
+      image_url: newSpotlight.image_url || null,
+      link_url: newSpotlight.link_url || null,
+    };
+
+    const { error } = await supabase.from('recognition_items').insert([payload]);
+    if (!error) {
+      setNewSpotlight(emptySpotlight);
+      setIsSpotlightModalOpen(false);
+      fetchData();
+    } else {
+      if (isMissingTableError(error, 'recognition_items')) {
+        setDatabaseNotice('Spotlights need the latest Supabase schema update.');
+        return;
+      }
+      alert(error.message);
+    }
+  };
+
+  const handleDeleteSpotlight = async (id) => {
+    if (!window.confirm('Delete spotlight?')) return;
+    await supabase.from('recognition_items').delete().eq('id', id);
+    fetchData();
   };
 
   const handleDeleteAnnouncement = async (id) => {
@@ -977,6 +1120,7 @@ export default function AdminDashboard() {
     { label: 'Players', value: data.roster.length },
     { label: 'Coaches', value: data.coaches.length },
     { label: 'News', value: data.announcements.length },
+    { label: 'Spotlights', value: data.spotlights.length },
   ];
 
   return (
@@ -1001,7 +1145,7 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {stats.map((stat) => (
             <div key={stat.label} className="rounded-xl border border-gray-800 bg-neutral-900 p-4">
               <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">{stat.label}</div>
@@ -1022,7 +1166,7 @@ export default function AdminDashboard() {
         {/* 2. TAB NAVIGATION */}
         <div className="overflow-x-auto rounded-2xl border border-gray-800 bg-neutral-900 p-1"> 
           <div className="flex min-w-max gap-2">
-            {['parents', 'coaches', 'roster', 'schedule', 'drills', 'announcements'].map((tab) => ( 
+            {['parents', 'coaches', 'roster', 'schedule', 'drills', 'announcements', 'spotlights'].map((tab) => ( 
               <button 
                 key={tab} 
                 onClick={() => setActiveTab(tab)} 
@@ -1498,7 +1642,14 @@ export default function AdminDashboard() {
                   <h2 className="text-xl font-black uppercase italic text-white">Announcements</h2>
                   <p className="text-sm text-gray-500">Publish club updates to the homepage and member dashboards.</p>
                 </div>
-                <button onClick={() => setIsAnnouncementModalOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-2 text-xs font-black uppercase text-white hover:bg-red-700">
+                <button
+                  onClick={() => {
+                    setEditingAnnouncement(null);
+                    setNewAnnouncement(emptyAnnouncement);
+                    setIsAnnouncementModalOpen(true);
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-2 text-xs font-black uppercase text-white hover:bg-red-700"
+                >
                   <Megaphone size={16} />
                   Add Announcement
                 </button>
@@ -1550,6 +1701,12 @@ export default function AdminDashboard() {
                           </p>
                         </div>
                         <div className="flex shrink-0 flex-col gap-2">
+                          <button
+                            onClick={() => openAnnouncementEditor(announcement)}
+                            className="rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]"
+                          >
+                            Edit
+                          </button>
                           {!['public', 'everyone'].includes(announcement.audience) && (
                             <button
                               onClick={() => handleShowAnnouncementOnHomepage(announcement.id)}
@@ -1564,6 +1721,90 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'spotlights' && (
+            <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black uppercase italic text-white">Player & Sponsor Spotlights</h2>
+                  <p className="text-sm text-gray-500">Recognize players and promote sponsors who support Bamika FC.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setNewSpotlight(emptySpotlight);
+                    setIsSpotlightModalOpen(true);
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-2 text-xs font-black uppercase text-white hover:bg-red-700"
+                >
+                  <Star size={16} />
+                  Add Spotlight
+                </button>
+              </div>
+
+              {data.spotlights.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-800 bg-black p-8 text-center">
+                  <HandHeart className="mx-auto mb-4 text-[#D4AF37]" size={36} />
+                  <h3 className="text-lg font-black uppercase italic text-white">No spotlights yet</h3>
+                  <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500">
+                    Add player of the week, hard-work awards, local sponsor promos, or thank-you posts for club supporters.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {data.spotlights.map((spotlight) => (
+                    <article key={spotlight.id} className="overflow-hidden rounded-2xl border border-gray-800 bg-black">
+                      <div className="relative aspect-[16/10] bg-neutral-950">
+                        {spotlight.image_url ? (
+                          <img src={spotlight.image_url} alt={spotlight.title} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            {spotlight.type === 'sponsor' ? (
+                              <HandHeart className="text-[#D4AF37]" size={44} />
+                            ) : (
+                              <Star className="text-[#EF4444]" size={44} />
+                            )}
+                          </div>
+                        )}
+                        <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+                          <span className={`rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white ${spotlight.type === 'sponsor' ? 'bg-[#D4AF37]/90' : 'bg-[#EF4444]/90'}`}>
+                            {spotlight.type === 'sponsor' ? 'Sponsor' : 'Player'}
+                          </span>
+                          <span className={`rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest ${spotlight.is_published ? 'bg-green-500/90 text-black' : 'bg-gray-800 text-gray-300'}`}>
+                            {spotlight.is_published ? 'Published' : 'Draft'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-4 p-5">
+                        <div>
+                          <h3 className="text-xl font-black uppercase italic text-white">{spotlight.title}</h3>
+                          {spotlight.subtitle && (
+                            <p className="mt-1 text-xs font-black uppercase tracking-widest text-[#D4AF37]">{spotlight.subtitle}</p>
+                          )}
+                        </div>
+                        <p className="line-clamp-4 min-h-[72px] whitespace-pre-line text-sm leading-6 text-gray-400">{spotlight.body}</p>
+                        <div className="flex items-center gap-2">
+                          {spotlight.link_url && (
+                            <a
+                              href={spotlight.link_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]"
+                            >
+                              <ExternalLink size={14} />
+                              Open Link
+                            </a>
+                          )}
+                          <button onClick={() => handleDeleteSpotlight(spotlight.id)} className="rounded-lg border border-gray-800 p-2 text-gray-500 hover:border-red-500 hover:text-red-500">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
                   ))}
                 </div>
               )}
@@ -1601,10 +1842,20 @@ export default function AdminDashboard() {
 
         {isAnnouncementModalOpen && (
           <AnnouncementModal
-            onClose={() => setIsAnnouncementModalOpen(false)}
+            onClose={closeAnnouncementModal}
             onSubmit={handleAddAnnouncement}
             newAnnouncement={newAnnouncement}
             setNewAnnouncement={setNewAnnouncement}
+            isEditing={!!editingAnnouncement}
+          />
+        )}
+
+        {isSpotlightModalOpen && (
+          <SpotlightModal
+            onClose={() => setIsSpotlightModalOpen(false)}
+            onSubmit={handleAddSpotlight}
+            newSpotlight={newSpotlight}
+            setNewSpotlight={setNewSpotlight}
           />
         )}
 
