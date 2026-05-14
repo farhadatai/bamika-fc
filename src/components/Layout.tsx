@@ -4,7 +4,7 @@ import Navbar from './Navbar';
 export const Layout = () => {
   const location = useLocation();
   const isPublicMarketingPage =
-    location.pathname === '/' || location.pathname === '/home' || location.pathname === '/training-lab';
+    location.pathname === '/' || location.pathname === '/home' || location.pathname === '/training-lab' || location.pathname === '/club';
 
   return (
     <div className="min-h-screen bg-black text-white">

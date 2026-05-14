@@ -8,6 +8,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 
 import Home from './pages/Home'
 import LandingPage from './pages/LandingPage'
+import ClubPage from './pages/ClubPage'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
@@ -32,7 +33,7 @@ const isMissingProfileColumnError = (message?: string) => (
 )
 
 function App() {
-  const { setUser, setUserRole, setLoading } = useAuthStore()
+  const { user, setUser, setUserRole, setLoading } = useAuthStore()
 
   useEffect(() => {
     const fetchRole = async (user: User) => {
@@ -117,12 +118,38 @@ function App() {
     return () => subscription.unsubscribe()
   }, [setUser, setUserRole, setLoading])
 
+  useEffect(() => {
+    if (!user) return
+
+    const timeoutMs = 30 * 60 * 1000
+    let timeoutId = window.setTimeout(handleIdleLogout, timeoutMs)
+
+    async function handleIdleLogout() {
+      await supabase.auth.signOut()
+      window.location.assign('/login')
+    }
+
+    const resetTimer = () => {
+      window.clearTimeout(timeoutId)
+      timeoutId = window.setTimeout(handleIdleLogout, timeoutMs)
+    }
+
+    const events = ['click', 'keydown', 'mousemove', 'scroll', 'touchstart']
+    events.forEach((event) => window.addEventListener(event, resetTimer, { passive: true }))
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      events.forEach((event) => window.removeEventListener(event, resetTimer))
+    }
+  }, [user])
+
   return (
     <Routes>
       <Route element={<Layout />}>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/home" element={<Home />} />
+        <Route path="/club" element={<ClubPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/registration/success" element={<RegistrationSuccess />} />

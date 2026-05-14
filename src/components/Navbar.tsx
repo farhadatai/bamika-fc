@@ -29,6 +29,7 @@ export default function Navbar() {
           </div>
           <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-4">
+              <Link to="/club" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Club Info</Link>
               {user ? (
                 <>
                   <Link to="/dashboard" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Dashboard</Link>
@@ -67,6 +68,7 @@ export default function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-gray-800 bg-black px-4 pb-5 pt-3">
           <div className="flex flex-col gap-2">
+            <Link onClick={closeMobileMenu} to="/club" className="rounded-md px-3 py-3 text-sm font-medium text-gray-200 hover:bg-gray-800">Club Info</Link>
             {user ? (
               <>
                 <Link onClick={closeMobileMenu} to="/dashboard" className="rounded-md px-3 py-3 text-sm font-medium text-gray-200 hover:bg-gray-800">Dashboard</Link>
