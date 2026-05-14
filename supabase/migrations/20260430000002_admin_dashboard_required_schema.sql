@@ -43,6 +43,8 @@ alter table public.players add column if not exists jersey_number text;
 alter table public.players add column if not exists jersey_size text;
 alter table public.players add column if not exists payment_status text default 'pending';
 alter table public.players add column if not exists status text default 'pending';
+alter table public.players add column if not exists uniform_purchased boolean default false;
+alter table public.players add column if not exists uniform_confirmation_code text;
 
 alter table public.announcements enable row level security;
 

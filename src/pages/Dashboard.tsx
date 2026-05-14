@@ -42,6 +42,8 @@ interface PlayerSummary {
   payment_status?: string | null;
   status?: string | null;
   photo_url?: string | null;
+  uniform_purchased?: boolean | null;
+  uniform_confirmation_code?: string | null;
 }
 
 interface ScheduleItem {
@@ -371,6 +373,20 @@ export default function Dashboard() {
                         <CreditCard className="mr-1 inline" size={12} />
                         {player.payment_status || 'Payment pending'}
                       </span>
+                    </div>
+
+                    <div className="mt-3 rounded-lg border border-gray-800 bg-neutral-950 p-3">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Uniform</div>
+                      {player.uniform_purchased ? (
+                        <>
+                          <div className="mt-1 text-xs font-black uppercase text-green-300">Purchased</div>
+                          <div className="mt-1 text-[11px] font-black uppercase tracking-widest text-[#D4AF37]">
+                            Code: {player.uniform_confirmation_code || 'Pending'}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="mt-1 text-xs font-bold text-gray-400">Not purchased at checkout</div>
+                      )}
                     </div>
 
                     {getPlayerMessages(player).length > 0 && (

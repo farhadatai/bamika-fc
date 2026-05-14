@@ -24,6 +24,11 @@ type RegistrationRecord = {
   last_name: string
 }
 
+const generateUniformConfirmationCode = () => {
+  const random = Math.random().toString(36).slice(2, 8).toUpperCase()
+  return `UNI-${new Date().getFullYear()}-${random}`
+}
+
 const requireAdmin = async (req: express.Request, res: express.Response) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
 
@@ -89,6 +94,8 @@ router.post('/create-checkout-session', async (req, res) => {
   try {
     const { registrationData, registrationId, successUrl, playerId: requestPlayerId } = req.body
     const stripe = getStripeClient()
+    const includeUniform = Boolean(req.body.includeUniform ?? registrationData?.include_uniform)
+    const uniformConfirmationCode = includeUniform ? generateUniformConfirmationCode() : ''
 
     let registration: RegistrationRecord;
 
@@ -106,11 +113,12 @@ router.post('/create-checkout-session', async (req, res) => {
       registration = data as RegistrationRecord
     } else {
       // 1. Create a pending registration in Supabase
+      const { include_uniform: _includeUniform, ...safeRegistrationData } = registrationData || {}
       const { data: newReg, error: dbError } = await supabase
         .from('registrations')
         .insert([
           {
-            ...registrationData,
+            ...safeRegistrationData,
             status: 'pending',
             created_at: new Date().toISOString(),
           },
@@ -162,7 +170,10 @@ router.post('/create-checkout-session', async (req, res) => {
         },
         quantity: 1,
       },
-      {
+    ];
+
+    if (includeUniform) {
+      lineItems.push({
         price_data: {
           currency: 'usd',
           product_data: {
@@ -172,8 +183,8 @@ router.post('/create-checkout-session', async (req, res) => {
           unit_amount: 10000, // $100.00
         },
         quantity: 1,
-      },
-    ];
+      });
+    }
 
     if (!isPromoSignup) {
       lineItems.push({
@@ -198,11 +209,15 @@ router.post('/create-checkout-session', async (req, res) => {
       metadata: {
         registration_id: registration.id,
         player_id: playerId,
+        uniform_purchased: includeUniform ? 'true' : 'false',
+        uniform_confirmation_code: uniformConfirmationCode,
       },
       subscription_data: {
         metadata: {
           registration_id: registration.id,
           player_id: playerId,
+          uniform_purchased: includeUniform ? 'true' : 'false',
+          uniform_confirmation_code: uniformConfirmationCode,
         },
       },
       allow_promotion_codes: true,

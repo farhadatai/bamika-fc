@@ -54,6 +54,7 @@ export default function RegisterNewAthlete() {
     birthCertPath: '',
     photoUrl: '',
     waiverSignedAt: '',
+    includeUniform: false,
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -183,6 +184,7 @@ export default function RegisterNewAthlete() {
         birth_cert_path: formData.birthCertPath || 'not_provided',
         photo_url: formData.photoUrl,
         waiver_signed_at: formData.waiverSignedAt,
+        include_uniform: formData.includeUniform,
         status: 'pending_payment',
         payment_status: 'pending',
       };
@@ -192,7 +194,7 @@ export default function RegisterNewAthlete() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ registrationData: payload, playerId: newPlayer.id }),
+        body: JSON.stringify({ registrationData: payload, playerId: newPlayer.id, includeUniform: formData.includeUniform }),
       });
 
       const data = await response.json();
@@ -231,7 +233,7 @@ export default function RegisterNewAthlete() {
                 New Athlete <span className="text-[#D4AF37]">Registration</span>
               </h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-gray-400 sm:text-base">
-                Add your player, upload a roster photo, sign the waiver, and complete the Bamika FC uniform and monthly membership checkout.
+                Add your player, upload a roster photo, sign the waiver, and complete Bamika FC monthly membership checkout.
               </p>
             </div>
 
@@ -243,9 +245,9 @@ export default function RegisterNewAthlete() {
                   <div className="mt-1 text-3xl font-black text-[#EF4444]">$50/mo</div>
                 </div>
                 <div className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
-                  <div className="text-sm font-bold text-gray-300">Full uniform package</div>
+                  <div className="text-sm font-bold text-gray-300">Optional uniform package</div>
                   <div className="mt-1 text-3xl font-black text-white">$100</div>
-                  <p className="mt-2 text-xs leading-5 text-gray-500">Game jersey, shorts, socks, and practice jersey.</p>
+                  <p className="mt-2 text-xs leading-5 text-gray-500">Add only if your player needs a new game and practice uniform.</p>
                 </div>
                 <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-sm font-black uppercase tracking-widest text-green-300">
                   Registration fee waived through June 30
@@ -329,6 +331,20 @@ export default function RegisterNewAthlete() {
                       <option key={size} value={size}>{size}</option>
                     ))}
                   </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-gray-800 bg-black p-4 transition hover:border-[#EF4444]/60">
+                    <input
+                      type="checkbox"
+                      checked={formData.includeUniform}
+                      onChange={(e) => setFormData({ ...formData, includeUniform: e.target.checked })}
+                      className="mt-1 h-5 w-5 rounded border-gray-700 bg-black text-[#EF4444] focus:ring-[#EF4444]"
+                    />
+                    <span>
+                      <span className="block text-sm font-black uppercase text-white">Add full uniform package for $100</span>
+                      <span className="mt-1 block text-xs leading-5 text-gray-500">Leave unchecked if your player already has a uniform. If purchased, Stripe will generate a confirmation code after payment.</span>
+                    </span>
+                  </label>
                 </div>
                 <div className="md:col-span-2">
                   <label className={labelClass}>Medical Conditions</label>
@@ -482,6 +498,7 @@ export default function RegisterNewAthlete() {
                       ['Player Name', `${formData.firstName} ${formData.lastName}`],
                       ['Position', formData.position],
                       ['Jersey Size', formData.jerseySize],
+                      ['Uniform', formData.includeUniform ? 'Add full package' : 'Already have uniform'],
                       ['Waiver', `Signed by ${signature}`],
                     ].map(([label, value]) => (
                       <div key={label} className="flex items-center justify-between gap-4 border-b border-gray-800 pb-3 text-sm">
@@ -505,7 +522,7 @@ export default function RegisterNewAthlete() {
                     </div>
                     <div className="flex items-center justify-between border-b border-gray-800 pb-3">
                       <span className="text-sm font-bold text-gray-500">Full Uniform</span>
-                      <span className="font-black">$100.00</span>
+                      <span className="font-black">{formData.includeUniform ? '$100.00' : 'Skipped'}</span>
                     </div>
                     <div className="flex items-center justify-between border-b border-gray-800 pb-3">
                       <span className="text-sm font-bold text-gray-500">Monthly Fee</span>
@@ -513,11 +530,13 @@ export default function RegisterNewAthlete() {
                     </div>
                     <div className="flex items-center justify-between pt-2">
                       <span className="text-lg font-black uppercase italic">Due Now</span>
-                      <span className="text-2xl font-black text-[#EF4444]">$100 + $50/mo</span>
+                      <span className="text-2xl font-black text-[#EF4444]">{formData.includeUniform ? '$100 + $50/mo' : '$50/mo'}</span>
                     </div>
                     <div className="rounded-xl border border-gray-800 bg-neutral-950 p-3 text-xs leading-5 text-gray-500">
                       <Shirt className="mb-2 text-[#D4AF37]" size={18} />
-                      Uniform includes game jersey, shorts, socks, and practice jersey.
+                      {formData.includeUniform
+                        ? 'Uniform includes game jersey, shorts, socks, and practice jersey. Your confirmation code appears after payment.'
+                        : 'Uniform purchase is optional. You can skip it if your player already has one.'}
                     </div>
                   </div>
                 </div>

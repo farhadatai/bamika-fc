@@ -44,6 +44,8 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
       const registrationId = session.metadata?.registration_id;
       const subscriptionId = session.subscription as string;
       const customerId = session.customer as string;
+      const uniformPurchased = session.metadata?.uniform_purchased === 'true';
+      const uniformConfirmationCode = session.metadata?.uniform_confirmation_code || null;
 
       if (!playerId) {
         console.error('Webhook Error: No player_id in checkout.session.completed client_reference_id');
@@ -59,6 +61,8 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
             payment_status: 'paid',
             stripe_subscription_id: subscriptionId,
             stripe_customer_id: customerId,
+            uniform_purchased: uniformPurchased,
+            uniform_confirmation_code: uniformPurchased ? uniformConfirmationCode : null,
           })
           .eq('id', playerId);
 
@@ -79,20 +83,35 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
             status: 'active',
             payment_status: 'paid',
             stripe_subscription_id: subscriptionId,
+            uniform_purchased: uniformPurchased,
+            uniform_confirmation_code: uniformPurchased ? uniformConfirmationCode : null,
           })
           .eq(registrationId ? 'id' : 'player_id', registrationId || playerId);
 
         if (regError) {
           console.error(`Error updating registration for player ${playerId}:`, regError);
           if (registrationId) {
-            await supabase
+            const { error: regRetryError } = await supabase
               .from('registrations')
               .update({
                 status: 'active',
                 payment_status: 'paid',
                 stripe_subscription_id: subscriptionId,
+                uniform_purchased: uniformPurchased,
+                uniform_confirmation_code: uniformPurchased ? uniformConfirmationCode : null,
               })
               .eq('id', registrationId);
+
+            if (regRetryError) {
+              await supabase
+                .from('registrations')
+                .update({
+                  status: 'active',
+                  payment_status: 'paid',
+                  stripe_subscription_id: subscriptionId,
+                })
+                .eq('id', registrationId);
+            }
           }
         } else {
           console.log(`Registration for player ${playerId} updated.`);

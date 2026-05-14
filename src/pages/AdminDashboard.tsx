@@ -1296,6 +1296,20 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
+                      <div className="mt-3 rounded-lg border border-gray-800 bg-neutral-950 p-2">
+                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Uniform</div>
+                        {p.uniform_purchased ? (
+                          <>
+                            <div className="mt-1 text-xs font-black uppercase text-green-300">Purchased</div>
+                            <div className="mt-1 break-all text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
+                              Code: {p.uniform_confirmation_code || 'Pending confirmation'}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="mt-1 text-xs font-bold text-gray-400">Not purchased at checkout</div>
+                        )}
+                      </div>
+
                       <div className="mt-3 border-t border-gray-800 pt-3">
                         <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Parent</div>
                         <div className="mt-1 truncate text-sm font-bold text-gray-300">
