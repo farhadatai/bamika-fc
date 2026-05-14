@@ -4,6 +4,7 @@ import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone, S
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { TEAM_OPTIONS, getYoutubeId, getYoutubeThumbnail } from '../lib/utils';
+import { uploadPhoto } from '../lib/upload';
 
 // --- SUB-COMPONENTS (Modals) ---
 
@@ -441,7 +442,7 @@ const AnnouncementModal = ({ onClose, onSubmit, newAnnouncement, setNewAnnouncem
   </div>
 );
 
-const SpotlightModal = ({ onClose, onSubmit, newSpotlight, setNewSpotlight }) => (
+const SpotlightModal = ({ onClose, onSubmit, newSpotlight, setNewSpotlight, onImageUpload, uploading }) => (
   <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
     <div className="bg-neutral-900 border border-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl">
       <div className="p-5 border-b border-gray-800 flex justify-between items-start gap-4 sm:p-6">
@@ -486,13 +487,17 @@ const SpotlightModal = ({ onClose, onSubmit, newSpotlight, setNewSpotlight }) =>
           onChange={(e) => setNewSpotlight({ ...newSpotlight, body: e.target.value })}
         />
         <div className="grid gap-4 sm:grid-cols-2">
-          <input
-            type="url"
-            placeholder="Image URL"
-            value={newSpotlight.image_url}
-            className="input-primary"
-            onChange={(e) => setNewSpotlight({ ...newSpotlight, image_url: e.target.value })}
-          />
+          <label className="flex min-h-[58px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-700 bg-black px-4 py-3 text-sm font-black uppercase text-gray-300 transition hover:border-[#D4AF37] hover:text-white">
+            <Upload size={16} />
+            {uploading ? 'Uploading...' : newSpotlight.image_url ? 'Change Picture' : 'Upload Picture'}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={uploading}
+              onChange={onImageUpload}
+            />
+          </label>
           <input
             type="url"
             placeholder={newSpotlight.type === 'sponsor' ? 'Sponsor website or promo link' : 'Optional link'}
@@ -501,6 +506,11 @@ const SpotlightModal = ({ onClose, onSubmit, newSpotlight, setNewSpotlight }) =>
             onChange={(e) => setNewSpotlight({ ...newSpotlight, link_url: e.target.value })}
           />
         </div>
+        {newSpotlight.image_url && (
+          <div className="overflow-hidden rounded-xl border border-gray-800 bg-black">
+            <img src={newSpotlight.image_url} alt="Spotlight preview" className="h-48 w-full object-cover" />
+          </div>
+        )}
         <label className="flex items-center gap-3 rounded-xl border border-gray-800 bg-black p-4 text-sm font-bold text-gray-300">
           <input
             type="checkbox"
@@ -553,6 +563,7 @@ export default function AdminDashboard() {
   const [isSpotlightModalOpen, setIsSpotlightModalOpen] = useState(false);
   const [selectedParent, setSelectedParent] = useState(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
+  const [spotlightUploading, setSpotlightUploading] = useState(false);
 
   // Form State
   const [newGame, setNewGame] = useState({ date: '', time: '', opponent: '', location: 'Home' });
@@ -1042,10 +1053,28 @@ export default function AdminDashboard() {
       fetchData();
     } else {
       if (isMissingTableError(error, 'recognition_items')) {
-        setDatabaseNotice('Spotlights need the latest Supabase schema update.');
+        setDatabaseNotice('Spotlights need the latest Supabase schema update. Run the recognition_items SQL in Supabase SQL Editor.');
         return;
       }
       alert(error.message);
+    }
+  };
+
+  const handleSpotlightImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSpotlightUploading(true);
+    try {
+      const publicUrl = await uploadPhoto(file, 'spotlights');
+      if (!publicUrl) {
+        alert('Could not upload the picture. Make sure the Supabase photos bucket exists, then try again.');
+        return;
+      }
+      setNewSpotlight((current) => ({ ...current, image_url: publicUrl }));
+    } finally {
+      setSpotlightUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -1856,6 +1885,8 @@ export default function AdminDashboard() {
             onSubmit={handleAddSpotlight}
             newSpotlight={newSpotlight}
             setNewSpotlight={setNewSpotlight}
+            onImageUpload={handleSpotlightImageUpload}
+            uploading={spotlightUploading}
           />
         )}
 

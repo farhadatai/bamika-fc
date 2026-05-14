@@ -380,5 +380,20 @@ grant insert, update, delete on public.drills to authenticated;
 grant select on public.recognition_items to anon, authenticated;
 grant insert, update, delete on public.recognition_items to authenticated;
 
+insert into storage.buckets (id, name, public)
+values ('photos', 'photos', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Public can view spotlight photos" on storage.objects;
+drop policy if exists "Authenticated users can upload spotlight photos" on storage.objects;
+
+create policy "Public can view spotlight photos" on storage.objects
+  for select
+  using (bucket_id = 'photos');
+
+create policy "Authenticated users can upload spotlight photos" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'photos');
+
 -- Force Supabase/PostgREST to refresh the schema cache immediately.
 notify pgrst, 'reload schema';
