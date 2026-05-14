@@ -110,7 +110,7 @@ router.post('/invite-coach', async (req: Request, res: Response): Promise<void> 
           role: 'coach',
           invited_by: adminUser.id,
         },
-        redirectTo: `${getBaseUrl()}/login`,
+        redirectTo: `${getBaseUrl()}/coach/setup-password`,
       },
     )
 

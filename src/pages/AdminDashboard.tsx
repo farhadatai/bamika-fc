@@ -116,7 +116,7 @@ const getPaymentStatusClass = (status = '') => {
   return 'text-yellow-300';
 };
 
-const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach }) => (
+const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach, onPhotoUpload, photoUploading }) => (
   <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md">
     <div className="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
       <div className="p-5 border-b border-gray-800 flex justify-between items-start gap-4 sticky top-0 bg-neutral-900 z-10 sm:p-8">
@@ -152,10 +152,25 @@ const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach }) => (
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Photo URL</label>
-            <input placeholder="https://..." className="input-primary" value={newCoach.photo_url} onChange={e => setNewCoach({...newCoach, photo_url: e.target.value})} />
+            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Coach Photo</label>
+            <label className="flex min-h-[58px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-700 bg-black px-4 py-3 text-sm font-black uppercase text-gray-300 transition hover:border-[#D4AF37] hover:text-white">
+              <Upload size={16} />
+              {photoUploading ? 'Uploading...' : newCoach.photo_url ? 'Change Photo' : 'Upload Photo'}
+              <input type="file" accept="image/*" className="hidden" disabled={photoUploading} onChange={onPhotoUpload} />
+            </label>
           </div>
         </div>
+        {newCoach.photo_url && (
+          <div className="rounded-xl border border-gray-800 bg-black p-4">
+            <div className="flex items-center gap-4">
+              <img src={newCoach.photo_url} alt="Coach preview" className="h-20 w-20 rounded-full border border-gray-800 object-cover" />
+              <div>
+                <div className="text-sm font-black uppercase text-white">Photo uploaded</div>
+                <p className="mt-1 text-xs text-gray-500">This photo will show on the coach profile.</p>
+              </div>
+            </div>
+          </div>
+        )}
         <div>
           <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Professional Bio</label>
           <textarea rows={4} className="input-primary resize-none" placeholder="Describe the coach's experience and philosophy..." value={newCoach.bio} onChange={e => setNewCoach({...newCoach, bio: e.target.value})} />
@@ -564,6 +579,7 @@ export default function AdminDashboard() {
   const [selectedParent, setSelectedParent] = useState(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
   const [spotlightUploading, setSpotlightUploading] = useState(false);
+  const [coachPhotoUploading, setCoachPhotoUploading] = useState(false);
 
   // Form State
   const [newGame, setNewGame] = useState({ date: '', time: '', opponent: '', location: 'Home' });
@@ -720,6 +736,24 @@ export default function AdminDashboard() {
     setIsOnboardModalOpen(false);
     fetchData();
     alert(result.message || `Coach invite sent to ${newCoach.email}.`);
+  };
+
+  const handleCoachPhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCoachPhotoUploading(true);
+    try {
+      const publicUrl = await uploadPhoto(file, 'coaches');
+      if (!publicUrl) {
+        alert('Could not upload the coach photo. Make sure the Supabase photos bucket exists, then try again.');
+        return;
+      }
+      setNewCoach((current) => ({ ...current, photo_url: publicUrl }));
+    } finally {
+      setCoachPhotoUploading(false);
+      e.target.value = '';
+    }
   };
   
   const handleAddDrill = async (e) => {
@@ -1848,6 +1882,8 @@ export default function AdminDashboard() {
             onSubmit={handleOnboardSubmit}
             newCoach={newCoach}
             setNewCoach={setNewCoach}
+            onPhotoUpload={handleCoachPhotoUpload}
+            photoUploading={coachPhotoUploading}
           />
         )}
 

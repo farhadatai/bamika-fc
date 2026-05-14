@@ -19,6 +19,7 @@ import Payment from './pages/Payment'
 import RegistrationSuccess from './pages/registration/Success'
 import TrainingLab from './pages/TrainingLab'
 import ParentDetailView from './pages/ParentDetailView'
+import CoachSetupPassword from './pages/CoachSetupPassword'
 
 const isMissingProfileColumnError = (message?: string) => (
   !!message
@@ -154,6 +155,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/registration/success" element={<RegistrationSuccess />} />
         <Route path="/training-lab" element={<TrainingLab />} />
+        <Route path="/coach/setup-password" element={<CoachSetupPassword />} />
 
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
