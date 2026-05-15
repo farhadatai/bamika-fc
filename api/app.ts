@@ -49,6 +49,11 @@ app.use(
     res.status(200).json({
       success: true,
       message: 'ok',
+      env: {
+        hasSupabaseUrl: Boolean(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL),
+        hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY),
+        hasStripeSecretKey: Boolean(process.env.STRIPE_SECRET_KEY),
+      },
     })
   },
 )

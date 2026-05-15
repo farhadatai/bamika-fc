@@ -12,13 +12,6 @@ const getStripeClient = () => {
   return new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' })
 }
 
-const hasServiceRoleKey = () => Boolean(
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_SERVICE_KEY ||
-  process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.VITE_SUPABASE_SERVICE_KEY,
-)
-
 const requireAdmin = async (req: Request, res: Response) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
 
@@ -151,11 +144,6 @@ const deletePlayerRecord = async (playerId: string) => {
 
 router.delete('/players/:playerId', async (req, res): Promise<void> => {
   try {
-    if (!hasServiceRoleKey()) {
-      res.status(503).json({ error: 'Full deletion requires SUPABASE_SERVICE_ROLE_KEY on the server.' })
-      return
-    }
-
     const adminUser = await requireAdmin(req, res)
     if (!adminUser) return
 
@@ -179,11 +167,6 @@ router.delete('/players/:playerId', async (req, res): Promise<void> => {
 
 router.delete('/parents/:parentId', async (req, res): Promise<void> => {
   try {
-    if (!hasServiceRoleKey()) {
-      res.status(503).json({ error: 'Full parent deletion requires SUPABASE_SERVICE_ROLE_KEY on the server.' })
-      return
-    }
-
     const adminUser = await requireAdmin(req, res)
     if (!adminUser) return
 
