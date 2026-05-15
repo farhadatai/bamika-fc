@@ -5,11 +5,13 @@ import { supabase } from '../lib/supabase.js';
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Webhook processing failed';
 
 const router = express.Router();
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripeOptions: Stripe.StripeConfig = { apiVersion: '2023-10-16' };
 const getStripeClient = () => {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim();
   if (!stripeSecretKey) {
-    throw new Error('Stripe secret key is not configured. Add STRIPE_SECRET_KEY to Vercel Environment Variables, then redeploy.');
+    const error = new Error('Stripe webhook is not configured because STRIPE_SECRET_KEY is missing from the server environment.');
+    error.name = 'StripeConfigurationError';
+    throw error;
   }
 
   return new Stripe(stripeSecretKey, stripeOptions);

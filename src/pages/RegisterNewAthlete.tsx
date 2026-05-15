@@ -131,7 +131,7 @@ export default function RegisterNewAthlete() {
       const playerFullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
       const { data: existingPlayer, error: existingPlayerError } = await supabase
         .from('players')
-        .select('id')
+        .select('id, status, payment_status')
         .eq('parent_id', user.id)
         .eq('full_name', playerFullName);
 
@@ -139,7 +139,14 @@ export default function RegisterNewAthlete() {
         throw new Error(isMissingPlayerSchemaError(existingPlayerError.message) ? playerSchemaMessage : existingPlayerError.message);
       }
 
-      if (existingPlayer && existingPlayer.length > 0) {
+      const blockingExistingPlayer = (existingPlayer || []).find((player) => {
+        const status = String(player.status || '').toLowerCase();
+        const paymentStatus = String(player.payment_status || '').toLowerCase();
+        return !['inactive', 'deleted', 'cancelled'].includes(status)
+          && !['cancelled', 'deleted'].includes(paymentStatus);
+      });
+
+      if (blockingExistingPlayer) {
         setError('You have already registered a player with this name. Please check your dashboard.');
         setLoading(false);
         return;

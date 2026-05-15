@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url'
 import authRoutes from './routes/auth.js'
 import paymentRoutes from './routes/payment.js'
 import webhookRoutes from './routes/webhook.js'
+import adminRoutes from './routes/admin.js'
 
 // for esm mode
 const __filename = fileURLToPath(import.meta.url)
@@ -37,6 +38,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
  */
 app.use('/api/auth', authRoutes)
 app.use('/api', paymentRoutes)
+app.use('/api/admin', adminRoutes)
 
 /**
  * health

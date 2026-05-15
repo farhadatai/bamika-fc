@@ -5,15 +5,26 @@ import { supabase } from '../lib/supabase.js'
 const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Payment request failed'
 
 const router = express.Router()
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY
 const stripeOptions: Stripe.StripeConfig = { apiVersion: '2023-10-16' }
 
 const getStripeClient = () => {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim()
   if (!stripeSecretKey) {
-    throw new Error('Stripe secret key is not configured. Add STRIPE_SECRET_KEY to Vercel Environment Variables, then redeploy.')
+    const error = new Error('Stripe is not configured yet. Add STRIPE_SECRET_KEY to the server environment for Production, then redeploy.')
+    error.name = 'StripeConfigurationError'
+    throw error
   }
 
   return new Stripe(stripeSecretKey, stripeOptions)
+}
+
+const sendPaymentError = (res: express.Response, error: unknown) => {
+  const message = getErrorMessage(error)
+  const isConfigurationError = error instanceof Error && error.name === 'StripeConfigurationError'
+  res.status(isConfigurationError ? 503 : 500).json({
+    error: message,
+    code: isConfigurationError ? 'STRIPE_NOT_CONFIGURED' : 'PAYMENT_ERROR',
+  })
 }
 
 type RegistrationRecord = {
@@ -235,18 +246,23 @@ router.post('/create-checkout-session', async (req, res) => {
     res.json({ url: session.url })
   } catch (error: unknown) {
     console.error('Stripe Error:', error)
-    res.status(500).json({ error: getErrorMessage(error) })
+    sendPaymentError(res, error)
   }
 })
 
 router.post('/create-portal-session', async (req, res) => {
-  const { customerId } = req.body;
-  const stripe = getStripeClient()
-
-  const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VITE_BASE_URL || 'https://bamika-fc.vercel.app';
-  const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
-
   try {
+    const { customerId } = req.body;
+    const stripe = getStripeClient()
+
+    if (!customerId) {
+      res.status(400).json({ error: 'Missing Stripe customer id.' })
+      return
+    }
+
+    const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VITE_BASE_URL || 'https://bamika-fc.vercel.app';
+    const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${baseUrl}/dashboard`,
@@ -254,7 +270,7 @@ router.post('/create-portal-session', async (req, res) => {
     res.json({ url: session.url });
   } catch (error: unknown) {
     console.error('Stripe Billing Portal Error:', error);
-    res.status(500).json({ error: getErrorMessage(error) });
+    sendPaymentError(res, error);
   }
 });
 
@@ -355,7 +371,7 @@ router.post('/cancel-player-subscription', async (req, res): Promise<void> => {
     })
   } catch (error: unknown) {
     console.error('Cancel subscription error:', error)
-    res.status(500).json({ error: getErrorMessage(error) })
+    sendPaymentError(res, error)
   }
 })
 

@@ -946,17 +946,42 @@ export default function AdminDashboard() {
     fetchData();
   };
 
-  const handleDeletePlayer = async (player) => {
-    const playerName = getPlayerDisplayName(player);
-    if (!window.confirm(`Delete ${playerName} from the roster? Use this only for duplicates or mistakes. For players leaving the club, use Mark inactive.`)) return;
+  const adminApiRequest = async (url, options = {}) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
 
-    const { error } = await supabase.from('players').delete().eq('id', player.id);
-    if (error) {
-      alert(error.message);
-      return;
+    if (!token) {
+      throw new Error('Please log in as an admin again.');
     }
 
-    fetchData();
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {}),
+      },
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.error || 'Admin request failed.');
+    }
+
+    return result;
+  };
+
+  const handleDeletePlayer = async (player) => {
+    const playerName = getPlayerDisplayName(player);
+    if (!window.confirm(`Permanently delete ${playerName}? This removes the player profile, registration records, payment references, team assignment, and uploaded player files. Use Mark inactive if the player may return.`)) return;
+
+    try {
+      const result = await adminApiRequest(`/api/admin/players/${player.id}`, { method: 'DELETE' });
+      alert(result.message || 'Player deleted.');
+      fetchData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to delete player.');
+    }
   };
 
   const handleWaivePlayerFees = async (player) => {
@@ -1139,9 +1164,15 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteParent = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this parent and all associated data?')) return;
-    await supabase.from('profiles').delete().eq('id', id);
-    fetchData();
+    if (!window.confirm('Permanently delete this parent account? This removes the parent login, profile, child/player records, registrations, payment references, and uploaded player files. Admins and coaches are protected.')) return;
+
+    try {
+      const result = await adminApiRequest(`/api/admin/parents/${id}`, { method: 'DELETE' });
+      alert(result.message || 'Parent deleted.');
+      fetchData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to delete parent.');
+    }
   };
 
   const openEditModal = (parent) => {
