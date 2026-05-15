@@ -24,6 +24,18 @@ const hasServiceRoleKey = () => Boolean(
   process.env.VITE_SUPABASE_SERVICE_KEY,
 )
 
+const isMissingProfileColumnError = (message?: string) => (
+  !!message
+  && message.includes('schema cache')
+  && message.includes('profiles')
+  && (
+    message.includes('first_name')
+    || message.includes('last_name')
+    || message.includes('email')
+    || message.includes('photo_url')
+  )
+)
+
 const requireAdmin = async (req: Request, res: Response) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
 
@@ -126,14 +138,30 @@ router.post('/invite-coach', async (req: Request, res: Response): Promise<void> 
       id: userId,
       first_name: firstName,
       last_name: lastName,
+      full_name: fullName,
       email,
       role: 'coach',
       photo_url: photoUrl || null,
     })
 
     if (profileError) {
-      res.status(500).json({ error: `Invite sent, but profile setup failed: ${profileError.message}` })
-      return
+      if (!isMissingProfileColumnError(profileError.message)) {
+        res.status(500).json({ error: `Invite sent, but profile setup failed: ${profileError.message}` })
+        return
+      }
+
+      const { error: legacyProfileError } = await supabase.from('profiles').upsert({
+        id: userId,
+        full_name: fullName,
+        role: 'coach',
+      })
+
+      if (legacyProfileError) {
+        res.status(500).json({
+          error: `Invite sent, but profile setup failed. Run the profile fields SQL migration in Supabase. Details: ${legacyProfileError.message}`,
+        })
+        return
+      }
     }
 
     const { error: coachError } = await supabase.from('coaches').upsert({
