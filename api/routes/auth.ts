@@ -6,15 +6,33 @@ import { Router, type Request, type Response } from 'express'
 import { supabase } from '../lib/supabase.js'
 
 const router = Router()
+const canonicalBaseUrl = 'https://www.bamikafc.com'
 
 const getBaseUrl = () => {
-  const rawBaseUrl =
+  const candidates = [
+    process.env.SITE_URL,
     process.env.NEXT_PUBLIC_BASE_URL ||
     process.env.VITE_BASE_URL ||
-    process.env.SITE_URL ||
-    'https://bamika-fc.vercel.app'
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+  ].filter(Boolean)
 
-  return rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl
+  for (const value of candidates) {
+    try {
+      const url = new URL(String(value).startsWith('http') ? String(value) : `https://${value}`)
+      const hostname = url.hostname
+
+      if (hostname === 'www.bamikafc.com' || hostname === 'bamikafc.com' || hostname === 'localhost' || hostname === '127.0.0.1') {
+        url.pathname = url.pathname.replace(/\/+$/, '')
+        url.search = ''
+        url.hash = ''
+        return url.toString().replace(/\/+$/, '')
+      }
+    } catch {
+      // Try the next configured URL.
+    }
+  }
+
+  return canonicalBaseUrl
 }
 
 const hasServiceRoleKey = () => Boolean(

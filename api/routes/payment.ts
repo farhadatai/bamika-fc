@@ -6,6 +6,7 @@ const getErrorMessage = (error: unknown) => error instanceof Error ? error.messa
 
 const router = express.Router()
 const stripeOptions: Stripe.StripeConfig = { apiVersion: '2023-10-16' }
+const canonicalBaseUrl = 'https://www.bamikafc.com'
 
 const getStripeClient = () => {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim()
@@ -25,6 +26,89 @@ const sendPaymentError = (res: express.Response, error: unknown) => {
     error: message,
     code: isConfigurationError ? 'STRIPE_NOT_CONFIGURED' : 'PAYMENT_ERROR',
   })
+}
+
+const normalizeBaseUrl = (value?: string | null) => {
+  if (!value) return null
+
+  try {
+    const url = new URL(value.startsWith('http') ? value : `https://${value}`)
+    url.pathname = url.pathname.replace(/\/+$/, '')
+    url.search = ''
+    url.hash = ''
+    return url.toString().replace(/\/+$/, '')
+  } catch {
+    return null
+  }
+}
+
+const isLocalHost = (hostname: string) => hostname === 'localhost' || hostname === '127.0.0.1'
+const isProductionHost = (hostname: string) => hostname === 'www.bamikafc.com' || hostname === 'bamikafc.com'
+const isAllowedReturnHost = (hostname: string, baseHostname: string) => {
+  if (isProductionHost(hostname)) return true
+  return isLocalHost(hostname) && isLocalHost(baseHostname)
+}
+
+const getRequestOrigin = (req: express.Request) => {
+  const origin = normalizeBaseUrl(req.get('origin'))
+  if (origin) return origin
+
+  const host = req.get('x-forwarded-host') || req.get('host')
+  if (!host) return null
+
+  const protocol = req.get('x-forwarded-proto') || (host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https')
+  return normalizeBaseUrl(`${protocol}://${host}`)
+}
+
+const getSiteBaseUrl = (req: express.Request) => {
+  const requestOrigin = getRequestOrigin(req)
+  if (requestOrigin) {
+    const requestHost = new URL(requestOrigin).hostname
+    if (isLocalHost(requestHost)) return requestOrigin
+  }
+
+  const configuredUrls = [
+    process.env.SITE_URL,
+    process.env.NEXT_PUBLIC_BASE_URL,
+    process.env.VITE_BASE_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+  ]
+
+  for (const value of configuredUrls) {
+    const normalized = normalizeBaseUrl(value)
+    if (!normalized) continue
+
+    const hostname = new URL(normalized).hostname
+    if (isProductionHost(hostname) || isLocalHost(hostname)) return normalized
+  }
+
+  if (requestOrigin) {
+    const requestHost = new URL(requestOrigin).hostname
+    if (isProductionHost(requestHost)) return requestOrigin
+  }
+
+  return canonicalBaseUrl
+}
+
+const buildReturnUrl = (req: express.Request, requestedUrl: unknown, fallbackPath: string) => {
+  const baseUrl = getSiteBaseUrl(req)
+  const fallbackUrl = `${baseUrl}${fallbackPath}`
+
+  if (typeof requestedUrl !== 'string' || !requestedUrl.trim()) return fallbackUrl
+
+  try {
+    const requested = new URL(requestedUrl, baseUrl)
+    const baseHostname = new URL(baseUrl).hostname
+
+    if (!isAllowedReturnHost(requested.hostname, baseHostname)) {
+      return fallbackUrl
+    }
+
+    requested.hash = ''
+    return requested.toString()
+  } catch {
+    return fallbackUrl
+  }
 }
 
 type RegistrationRecord = {
@@ -161,8 +245,7 @@ router.post('/create-checkout-session', async (req, res) => {
     const mayFirst2026 = new Date('2026-05-01T00:00:00Z');
     const julyFirst2026 = new Date('2026-07-01T00:00:00Z');
     const isPromoSignup = now < julyFirst2026;
-    const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VITE_BASE_URL || 'https://bamika-fc.vercel.app';
-    const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+    const baseUrl = getSiteBaseUrl(req);
 
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
       {
@@ -214,8 +297,8 @@ router.post('/create-checkout-session', async (req, res) => {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'subscription',
-      success_url: successUrl || `${baseUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/registration/payment`,
+      success_url: buildReturnUrl(req, successUrl, '/registration/success?session_id={CHECKOUT_SESSION_ID}'),
+      cancel_url: `${baseUrl}/dashboard`,
       client_reference_id: playerId,
       metadata: {
         registration_id: registration.id,
@@ -260,8 +343,7 @@ router.post('/create-portal-session', async (req, res) => {
       return
     }
 
-    const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VITE_BASE_URL || 'https://bamika-fc.vercel.app';
-    const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+    const baseUrl = getSiteBaseUrl(req);
 
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
