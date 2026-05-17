@@ -42,6 +42,7 @@ const COACH_MESSAGE_PREFIX = '__BAMIKA_COACH__:';
 
 const getCoachDisplayName = (profile?: CoachProfile | null, fallbackEmail?: string) => (
   `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim()
+  || profile?.full_name
   || fallbackEmail?.split('@')[0]
   || 'Coach'
 );
@@ -80,8 +81,9 @@ interface Announcement {
 }
 
 interface CoachProfile {
-  first_name: string;
-  last_name: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
   photo_url?: string;
 }
 
@@ -103,8 +105,16 @@ export default function CoachDashboard() {
   const fetchProfile = useCallback(async () => {
     try {
       if (!user) return;
-      const { data } = await supabase.from('profiles').select('first_name, last_name, photo_url').eq('id', user.id).single();
-      if (data) setProfile(data);
+      const { data, error } = await supabase.from('profiles').select('first_name, last_name, full_name, photo_url').eq('id', user.id).single();
+      if (data) {
+        setProfile(data);
+        return;
+      }
+
+      if (error) {
+        const { data: legacyProfile } = await supabase.from('profiles').select('full_name, photo_url').eq('id', user.id).single();
+        if (legacyProfile) setProfile(legacyProfile);
+      }
     } catch (e) {
       console.error("Profile fetch error", e);
     }
@@ -359,7 +369,7 @@ export default function CoachDashboard() {
                 {profile.photo_url ? (
                   <img 
                     src={profile.photo_url} 
-                    alt={`${profile.first_name} ${profile.last_name}`} 
+                    alt={getCoachDisplayName(profile, user?.email)}
                     className="h-32 w-32 rounded-full object-cover border-4 border-gray-100 shadow-md"
                   />
                 ) : (
@@ -392,7 +402,7 @@ export default function CoachDashboard() {
             <div className="flex-1 space-y-4 w-full text-center md:text-left">
               <div>
                 <label className="text-sm font-bold text-gray-400 uppercase">Full Name</label>
-                <p className="text-xl font-bold text-white">{profile.first_name} {profile.last_name}</p>
+                <p className="text-xl font-bold text-white">{getCoachDisplayName(profile, user?.email)}</p>
               </div>
               <div>
                 <label className="text-sm font-bold text-gray-500 uppercase">Email</label>

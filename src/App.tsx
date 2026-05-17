@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { useAuthStore } from './store/auth'
@@ -35,8 +35,23 @@ const isMissingProfileColumnError = (message?: string) => (
 
 function App() {
   const { user, setUser, setUserRole, setLoading } = useAuthStore()
+  const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
+    const maybeOpenCoachSetup = (role?: string | null, signedInUser?: User | null) => {
+      const metadataRole = typeof signedInUser?.user_metadata?.role === 'string' ? signedInUser.user_metadata.role : ''
+      const authReturn = `${window.location.search}${window.location.hash}`
+      const isInviteReturn = authReturn.includes('type=invite')
+        || authReturn.includes('type=recovery')
+        || authReturn.includes('token_hash=')
+        || authReturn.includes('access_token=')
+
+      if ((role === 'coach' || metadataRole === 'coach') && isInviteReturn && window.location.pathname !== '/coach/setup-password') {
+        navigate('/coach/setup-password', { replace: true })
+      }
+    }
+
     const fetchRole = async (user: User) => {
       const { data, error } = await supabase
         .from('profiles')
@@ -46,11 +61,13 @@ function App() {
 
       if (data) {
         setUserRole(data.role)
+        maybeOpenCoachSetup(data.role, user)
         return
       }
 
       if (isMissingProfileColumnError(error?.message)) {
         setUserRole('user')
+        maybeOpenCoachSetup(user.user_metadata?.role === 'coach' ? 'coach' : 'user', user)
         return
       }
 
@@ -76,6 +93,7 @@ function App() {
 
       if (createdProfile) {
         setUserRole(createdProfile.role)
+        maybeOpenCoachSetup(createdProfile.role, user)
         return
       }
 
@@ -89,6 +107,7 @@ function App() {
           }, { onConflict: 'id' })
 
         setUserRole('user')
+        maybeOpenCoachSetup(user.user_metadata?.role === 'coach' ? 'coach' : 'user', user)
       }
     }
 
@@ -117,7 +136,7 @@ function App() {
     })
 
     return () => subscription.unsubscribe()
-  }, [setUser, setUserRole, setLoading])
+  }, [setUser, setUserRole, setLoading, navigate, location.pathname])
 
   useEffect(() => {
     if (!user) return

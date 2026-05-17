@@ -1037,15 +1037,28 @@ export default function AdminDashboard() {
       .from('coaches')
       .upsert([{
         id: parent.id,
-        name: parentName,
-        role: 'Coach',
+        full_name: parentName,
+        specialty: 'Coach',
         bio: 'Bamika FC coach and parent volunteer.',
+        photo_url: parent.photo_url || null,
         is_published: true,
       }], { onConflict: 'id' });
 
     if (coachError) {
-      alert(coachError.message);
-      return;
+      const { error: legacyCoachError } = await supabase
+        .from('coaches')
+        .upsert([{
+          id: parent.id,
+          name: parentName,
+          role: 'Coach',
+          bio: 'Bamika FC coach and parent volunteer.',
+          is_published: true,
+        }], { onConflict: 'id' });
+
+      if (legacyCoachError) {
+        alert(legacyCoachError.message);
+        return;
+      }
     }
 
     fetchData();
@@ -1374,11 +1387,15 @@ export default function AdminDashboard() {
                 <div className="p-8 text-center text-gray-500">No coaches have been added yet.</div>
               ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {data.coaches.map((coach) => (
+              {data.coaches.map((coach) => {
+                const coachName = coach.name || coach.full_name || 'Bamika Coach';
+                const coachRole = coach.role || coach.specialty || 'Coach';
+                const coachPhoto = coach.profiles?.photo_url || coach.photo_url || "https://via.placeholder.com/150";
+                return (
                 <div key={coach.id} className="bg-black border border-gray-800 rounded-xl p-4 group flex flex-col text-center items-center">
-                  <img src={coach.profiles?.photo_url || "https://via.placeholder.com/150"} alt={coach.name} className="h-20 w-20 object-cover rounded-full border-2 border-gray-800 mb-4" />
-                  <h3 className="text-md font-bold uppercase text-white">{coach.name}</h3>
-                  <p className="text-[#D4AF37] text-[10px] font-bold uppercase mb-3">{coach.role}</p>
+                  <img src={coachPhoto} alt={coachName} className="h-20 w-20 object-cover rounded-full border-2 border-gray-800 mb-4" />
+                  <h3 className="text-md font-bold uppercase text-white">{coachName}</h3>
+                  <p className="text-[#D4AF37] text-[10px] font-bold uppercase mb-3">{coachRole}</p>
                   <label className="mb-2 text-[9px] font-black uppercase tracking-widest text-gray-600">Assigned Team</label>
                   <select
                     value={coach.team_id || 'Unassigned'}
@@ -1393,7 +1410,7 @@ export default function AdminDashboard() {
                     {coach.team_id || 'Unassigned'}
                   </span>
                 </div>
-              ))}
+              )})}
               </div>
               )}
             </div>

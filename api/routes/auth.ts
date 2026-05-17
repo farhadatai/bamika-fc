@@ -54,6 +54,19 @@ const isMissingProfileColumnError = (message?: string) => (
   )
 )
 
+const isMissingCoachColumnError = (message?: string) => (
+  !!message
+  && message.includes('schema cache')
+  && message.includes('coaches')
+  && (
+    message.includes('name')
+    || message.includes('role')
+    || message.includes('full_name')
+    || message.includes('specialty')
+    || message.includes('photo_url')
+  )
+)
+
 const requireAdmin = async (req: Request, res: Response) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
 
@@ -184,15 +197,33 @@ router.post('/invite-coach', async (req: Request, res: Response): Promise<void> 
 
     const { error: coachError } = await supabase.from('coaches').upsert({
       id: userId,
-      name: fullName,
-      role,
+      full_name: fullName,
+      specialty: role,
       bio,
+      photo_url: photoUrl || null,
       is_published: true,
     })
 
     if (coachError) {
-      res.status(500).json({ error: `Invite sent, but coach profile setup failed: ${coachError.message}` })
-      return
+      if (!isMissingCoachColumnError(coachError.message)) {
+        res.status(500).json({ error: `Invite sent, but coach profile setup failed: ${coachError.message}` })
+        return
+      }
+
+      const { error: legacyCoachError } = await supabase.from('coaches').upsert({
+        id: userId,
+        name: fullName,
+        role,
+        bio,
+        is_published: true,
+      })
+
+      if (legacyCoachError) {
+        res.status(500).json({
+          error: `Invite sent, but coach profile setup failed. The coaches table needs either full_name/specialty or name/role fields. Details: ${legacyCoachError.message}`,
+        })
+        return
+      }
     }
 
     res.status(200).json({
