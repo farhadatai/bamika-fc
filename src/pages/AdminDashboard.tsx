@@ -385,6 +385,106 @@ const PracticeModal = ({ onClose, onSubmit, newPractice, setNewPractice }) => (
   </div>
 );
 
+const EditCoachModal = ({ coach, onClose, onSave, onPhotoUpload, photoUploading }) => {
+  const coachName = coach?.name || coach?.full_name || '';
+  const splitName = splitFullName(coachName);
+  const [formData, setFormData] = useState({
+    id: coach?.id || '',
+    first_name: coach?.profiles?.first_name || splitName.firstName,
+    last_name: coach?.profiles?.last_name || splitName.lastName,
+    email: coach?.profiles?.email || '',
+    role: coach?.role || coach?.specialty || 'Coach',
+    bio: coach?.bio || '',
+    photo_url: coach?.profiles?.photo_url || coach?.photo_url || '',
+    team_id: coach?.team_id || 'Unassigned',
+  });
+
+  useEffect(() => {
+    const currentName = coach?.name || coach?.full_name || '';
+    const currentSplitName = splitFullName(currentName);
+    setFormData({
+      id: coach?.id || '',
+      first_name: coach?.profiles?.first_name || currentSplitName.firstName,
+      last_name: coach?.profiles?.last_name || currentSplitName.lastName,
+      email: coach?.profiles?.email || '',
+      role: coach?.role || coach?.specialty || 'Coach',
+      bio: coach?.bio || '',
+      photo_url: coach?.profiles?.photo_url || coach?.photo_url || '',
+      team_id: coach?.team_id || 'Unassigned',
+    });
+  }, [coach]);
+
+  if (!coach) return null;
+
+  const updateField = (field, value) => setFormData((current) => ({ ...current, [field]: value }));
+
+  return (
+    <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[150] p-4 backdrop-blur-md">
+      <div className="bg-neutral-900 border border-gray-800 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="p-5 border-b border-gray-800 flex justify-between items-start gap-4 sticky top-0 bg-neutral-900 z-10 sm:p-8">
+          <div>
+            <h2 className="text-2xl font-black uppercase italic text-white">Edit <span className="text-[#D4AF37]">Coach</span></h2>
+            <p className="mt-2 text-xs font-bold uppercase tracking-widest text-gray-500">Update coach details, photo, and team assignment.</p>
+          </div>
+          <X className="text-gray-500 cursor-pointer hover:text-white" onClick={onClose} />
+        </div>
+        <form onSubmit={(event) => { event.preventDefault(); onSave(formData); }} className="p-5 space-y-6 sm:p-8">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">First Name</label>
+              <input required className="input-primary" value={formData.first_name} onChange={(e) => updateField('first_name', e.target.value)} />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Last Name</label>
+              <input className="input-primary" value={formData.last_name} onChange={(e) => updateField('last_name', e.target.value)} />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Email Address</label>
+              <input type="email" className="input-primary" value={formData.email} onChange={(e) => updateField('email', e.target.value)} />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Assigned Team</label>
+              <select className="input-primary appearance-none" value={formData.team_id} onChange={(e) => updateField('team_id', e.target.value)}>
+                {TEAM_OPTIONS.map((team) => <option key={team} value={team}>{team}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Primary Role</label>
+              <input className="input-primary" value={formData.role} onChange={(e) => updateField('role', e.target.value)} />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Coach Photo</label>
+              <label className="flex min-h-[58px] cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-gray-700 bg-black px-4 py-3 text-sm font-black uppercase text-gray-300 transition hover:border-[#D4AF37] hover:text-white">
+                <Upload size={16} />
+                {photoUploading ? 'Uploading...' : formData.photo_url ? 'Change Photo' : 'Upload Photo'}
+                <input type="file" accept="image/*" className="hidden" disabled={photoUploading} onChange={(e) => onPhotoUpload(e, setFormData)} />
+              </label>
+            </div>
+          </div>
+          {formData.photo_url && (
+            <div className="rounded-xl border border-gray-800 bg-black p-4">
+              <div className="flex items-center gap-4">
+                <img src={formData.photo_url} alt="Coach preview" className="h-20 w-20 rounded-full border border-gray-800 object-cover" />
+                <div>
+                  <div className="text-sm font-black uppercase text-white">Photo ready</div>
+                  <p className="mt-1 text-xs text-gray-500">This photo will show on the coach profile.</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <div>
+            <label className="text-[10px] font-black uppercase text-gray-500 mb-2 block">Professional Bio</label>
+            <textarea rows={4} className="input-primary resize-none" value={formData.bio} onChange={(e) => updateField('bio', e.target.value)} />
+          </div>
+          <button type="submit" className="btn-primary w-full">
+            Save Coach
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const AnnouncementModal = ({ onClose, onSubmit, newAnnouncement, setNewAnnouncement, isEditing = false }) => (
   <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
     <div className="bg-neutral-900 border border-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl">
@@ -572,11 +672,13 @@ export default function AdminDashboard() {
   const [isGameModalOpen, setIsGameModalOpen] = useState(false);
   const [isPracticeModalOpen, setIsPracticeModalOpen] = useState(false);
   const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
+  const [isCoachEditModalOpen, setIsCoachEditModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDrillModalOpen, setIsDrillModalOpen] = useState(false);
   const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
   const [isSpotlightModalOpen, setIsSpotlightModalOpen] = useState(false);
   const [selectedParent, setSelectedParent] = useState(null);
+  const [selectedCoach, setSelectedCoach] = useState(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
   const [spotlightUploading, setSpotlightUploading] = useState(false);
   const [coachPhotoUploading, setCoachPhotoUploading] = useState(false);
@@ -630,7 +732,7 @@ export default function AdminDashboard() {
     }
 
     const notices = [];
-    const { data: c } = await supabase.from('coaches').select('*, profiles(photo_url)');
+    const { data: c } = await supabase.from('coaches').select('*, profiles(first_name, last_name, email, photo_url, role)');
     let players = [];
     const { data: playersWithParents, error: playersWithParentsError } = await supabase
       .from('players')
@@ -754,6 +856,91 @@ export default function AdminDashboard() {
       setCoachPhotoUploading(false);
       e.target.value = '';
     }
+  };
+
+  const handleEditCoachPhotoUpload = async (e, setFormData) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCoachPhotoUploading(true);
+    try {
+      const publicUrl = await uploadPhoto(file, 'coaches');
+      if (!publicUrl) {
+        alert('Could not upload the coach photo. Make sure the Supabase photos bucket exists, then try again.');
+        return;
+      }
+      setFormData((current) => ({ ...current, photo_url: publicUrl }));
+    } finally {
+      setCoachPhotoUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const openEditCoach = (coach) => {
+    setSelectedCoach(coach);
+    setIsCoachEditModalOpen(true);
+  };
+
+  const handleSaveCoach = async (coachForm) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+
+    if (!token) {
+      alert('Please log in as an admin again before editing a coach.');
+      return;
+    }
+
+    const response = await fetch(`/api/admin/coaches/${coachForm.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(coachForm),
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      alert(result.error || 'Unable to update coach.');
+      return;
+    }
+
+    setSelectedCoach(null);
+    setIsCoachEditModalOpen(false);
+    fetchData();
+  };
+
+  const handleDeleteCoach = async (coach) => {
+    const coachName = coach.name || coach.full_name || 'this coach';
+    if (!window.confirm(`Delete ${coachName} as a coach? If this person is only a coach account, their login will also be removed. If they are also a parent, their parent account will be kept.`)) return;
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+
+    if (!token) {
+      alert('Please log in as an admin again before deleting a coach.');
+      return;
+    }
+
+    const response = await fetch(`/api/admin/coaches/${coach.id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ photo_url: coach.profiles?.photo_url || coach.photo_url || '' }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      alert(result.error || 'Unable to delete coach.');
+      return;
+    }
+
+    fetchData();
+    alert(result.message || 'Coach deleted.');
   };
   
   const handleAddDrill = async (e) => {
@@ -1409,6 +1596,23 @@ export default function AdminDashboard() {
                   <span className={`mt-3 rounded-full px-2 py-1 text-xs font-bold ${coach.team_id ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}`}>
                     {coach.team_id || 'Unassigned'}
                   </span>
+                  <div className="mt-4 grid w-full grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEditCoach(coach)}
+                      className="rounded-lg border border-gray-800 px-3 py-2 text-xs font-black uppercase text-white transition-colors hover:border-[#D4AF37] hover:text-[#D4AF37]"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCoach(coach)}
+                      className="inline-flex items-center justify-center gap-1 rounded-lg border border-red-900/80 px-3 py-2 text-xs font-black uppercase text-red-300 transition-colors hover:border-[#EF4444] hover:text-[#EF4444]"
+                    >
+                      <Trash2 size={13} />
+                      Delete
+                    </button>
+                  </div>
                 </div>
               )})}
               </div>
@@ -1931,6 +2135,19 @@ export default function AdminDashboard() {
             newCoach={newCoach}
             setNewCoach={setNewCoach}
             onPhotoUpload={handleCoachPhotoUpload}
+            photoUploading={coachPhotoUploading}
+          />
+        )}
+
+        {isCoachEditModalOpen && selectedCoach && (
+          <EditCoachModal
+            coach={selectedCoach}
+            onClose={() => {
+              setSelectedCoach(null);
+              setIsCoachEditModalOpen(false);
+            }}
+            onSave={handleSaveCoach}
+            onPhotoUpload={handleEditCoachPhotoUpload}
             photoUploading={coachPhotoUploading}
           />
         )}

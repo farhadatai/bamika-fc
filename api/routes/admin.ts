@@ -142,6 +142,180 @@ const deletePlayerRecord = async (playerId: string) => {
   return { player, deletedRegistrations: registrationIds.length }
 }
 
+const splitFullName = (fullName = '') => {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return { firstName: '', lastName: '' }
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(' '),
+  }
+}
+
+router.patch('/coaches/:coachId', async (req, res): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+
+    const coachId = String(req.params.coachId || '').trim()
+    if (!coachId) {
+      res.status(400).json({ error: 'Missing coach id.' })
+      return
+    }
+
+    const firstName = String(req.body.first_name || '').trim()
+    const lastName = String(req.body.last_name || '').trim()
+    const fullName = String(req.body.full_name || `${firstName} ${lastName}`.trim()).trim()
+    const splitName = splitFullName(fullName)
+    const email = String(req.body.email || '').trim().toLowerCase()
+    const role = String(req.body.role || req.body.specialty || 'Coach').trim()
+    const bio = String(req.body.bio || '').trim()
+    const photoUrl = String(req.body.photo_url || '').trim()
+    const teamId = String(req.body.team_id || '').trim()
+
+    if (!fullName) {
+      res.status(400).json({ error: 'Coach name is required.' })
+      return
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email, role')
+      .eq('id', coachId)
+      .single()
+
+    if (profile?.role === 'admin') {
+      res.status(400).json({ error: 'Admin accounts cannot be edited from the coach list.' })
+      return
+    }
+
+    const profileUpdate = {
+      first_name: firstName || splitName.firstName,
+      last_name: lastName || splitName.lastName,
+      full_name: fullName,
+      email: email || profile?.email || null,
+      role: 'coach',
+      photo_url: photoUrl || null,
+    }
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({ id: coachId, ...profileUpdate }, { onConflict: 'id' })
+
+    if (profileError) throw new Error(profileError.message)
+
+    if (email && email !== profile?.email) {
+      const { error: authUpdateError } = await supabase.auth.admin.updateUserById(coachId, { email })
+      if (authUpdateError) {
+        throw new Error(`Coach profile saved, but email login update failed: ${authUpdateError.message}`)
+      }
+    }
+
+    const coachUpdate = {
+      id: coachId,
+      full_name: fullName,
+      name: fullName,
+      specialty: role,
+      role,
+      bio,
+      photo_url: photoUrl || null,
+      team_id: teamId && teamId !== 'Unassigned' ? teamId : null,
+      is_published: true,
+    }
+
+    const { error: coachError } = await supabase
+      .from('coaches')
+      .upsert(coachUpdate, { onConflict: 'id' })
+
+    if (coachError) throw new Error(coachError.message)
+
+    res.json({ success: true, message: 'Coach updated.' })
+  } catch (error) {
+    console.error('Coach update failed:', error)
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+router.delete('/coaches/:coachId', async (req, res): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+
+    const coachId = String(req.params.coachId || '').trim()
+    if (!coachId) {
+      res.status(400).json({ error: 'Missing coach id.' })
+      return
+    }
+
+    if (coachId === adminUser.id) {
+      res.status(400).json({ error: 'You cannot delete your own admin account from the coach list.' })
+      return
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, role, email')
+      .eq('id', coachId)
+      .single()
+
+    if (profileError || !profile) {
+      res.status(404).json({ error: profileError?.message || 'Coach profile not found.' })
+      return
+    }
+
+    if (profile.role === 'admin') {
+      res.status(400).json({ error: 'Admin accounts are protected and were not deleted.' })
+      return
+    }
+
+    const { data: linkedPlayers } = await supabase
+      .from('players')
+      .select('id')
+      .eq('parent_id', coachId)
+      .limit(1)
+
+    const hasFamilyRecords = Boolean(linkedPlayers?.length)
+
+    const { error: coachDeleteError } = await supabase.from('coaches').delete().eq('id', coachId)
+    if (coachDeleteError) throw new Error(coachDeleteError.message)
+
+    if (hasFamilyRecords) {
+      const { error: downgradeError } = await supabase
+        .from('profiles')
+        .update({ role: 'user' })
+        .eq('id', coachId)
+
+      if (downgradeError) throw new Error(downgradeError.message)
+
+      res.json({
+        success: true,
+        message: 'Coach role removed. Parent account was kept because this person has linked player records.',
+        keptParentAccount: true,
+      })
+      return
+    }
+
+    await removeStorageObjects([
+      storagePathFromPublicUrl((req.body && req.body.photo_url) || null),
+    ].filter(Boolean) as Array<{ bucket: string, path: string }>)
+
+    await supabase.from('profiles').delete().eq('id', coachId)
+
+    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(coachId)
+    if (authDeleteError) {
+      throw new Error(`Coach database records were deleted, but Supabase Auth deletion failed: ${authDeleteError.message}`)
+    }
+
+    res.json({
+      success: true,
+      message: `Coach ${profile.email || coachId} was deleted from coaches, profile, and Auth login.`,
+      keptParentAccount: false,
+    })
+  } catch (error) {
+    console.error('Coach deletion failed:', error)
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
 router.delete('/players/:playerId', async (req, res): Promise<void> => {
   try {
     const adminUser = await requireAdmin(req, res)
