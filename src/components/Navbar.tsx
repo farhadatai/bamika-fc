@@ -29,6 +29,9 @@ export default function Navbar() {
           </div>
           <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-4">
+              <a href="/#programs" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Programs</a>
+              <a href="/#schedule" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Schedule</a>
+              <a href="/#pricing" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Pricing</a>
               <Link to="/club" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Club Info</Link>
               {user ? (
                 <>
@@ -68,6 +71,9 @@ export default function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-gray-800 bg-black px-4 pb-5 pt-3">
           <div className="flex flex-col gap-2">
+            <a onClick={closeMobileMenu} href="/#programs" className="rounded-md px-3 py-3 text-sm font-medium text-gray-200 hover:bg-gray-800">Programs</a>
+            <a onClick={closeMobileMenu} href="/#schedule" className="rounded-md px-3 py-3 text-sm font-medium text-gray-200 hover:bg-gray-800">Schedule</a>
+            <a onClick={closeMobileMenu} href="/#pricing" className="rounded-md px-3 py-3 text-sm font-medium text-gray-200 hover:bg-gray-800">Pricing</a>
             <Link onClick={closeMobileMenu} to="/club" className="rounded-md px-3 py-3 text-sm font-medium text-gray-200 hover:bg-gray-800">Club Info</Link>
             {user ? (
               <>

@@ -518,8 +518,8 @@ export default function LandingPage() {
             <div className="mt-10 grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-3">
               {[
                 ['U6-U16', 'Programs'],
-                ['$50/mo', 'June promo'],
-                ['$0', 'Registration'],
+                ['Weekly', 'Training'],
+                ['Teams', 'Match path'],
               ].map(([value, label]) => (
                 <div key={label} className="border-l-2 border-[#EF4444] bg-black/45 p-4 backdrop-blur">
                   <div className="text-xl font-black text-white sm:text-2xl">{value}</div>
@@ -532,42 +532,54 @@ export default function LandingPage() {
 
           <div className="rounded-2xl border border-white/10 bg-black/75 p-5 text-white shadow-2xl shadow-black/40 backdrop-blur sm:p-6 lg:self-center">
             <div className="inline-flex rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
-              Family hub
+              Start here
             </div>
             <h2 className="mt-5 text-3xl font-black uppercase italic leading-tight sm:text-4xl">
-              Everything families need, right up front.
+              Fast for families. Clear for players.
             </h2>
             <p className="mt-4 text-sm leading-7 text-gray-400">
-              Register a player, check the promo price, view practice updates, and open the training lab from one clean place.
+              The most important actions are grouped here so families do not have to search through the page.
             </p>
-            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Link to="/register" className="group rounded-xl border border-gray-800 bg-neutral-950 p-4 transition hover:border-[#EF4444]">
-                <Target className="mb-3 text-[#EF4444]" size={22} />
-                <div className="text-sm font-black uppercase text-white">Register</div>
-                <p className="mt-1 text-xs text-gray-500">Start player signup</p>
-              </Link>
-              <button onClick={() => scrollToSection('pricing')} className="rounded-xl border border-gray-800 bg-neutral-950 p-4 text-left transition hover:border-[#D4AF37]">
-                <ShieldCheck className="mb-3 text-[#D4AF37]" size={22} />
-                <div className="text-sm font-black uppercase text-white">Pricing</div>
-                <p className="mt-1 text-xs text-gray-500">$50 June promo</p>
-              </button>
-              <button onClick={() => scrollToSection('schedule')} className="rounded-xl border border-gray-800 bg-neutral-950 p-4 text-left transition hover:border-green-500">
-                <CalendarDays className="mb-3 text-green-500" size={22} />
-                <div className="text-sm font-black uppercase text-white">Schedule</div>
-                <p className="mt-1 text-xs text-gray-500">Practice and matches</p>
-              </button>
-              <Link to="/training-lab" className="rounded-xl border border-gray-800 bg-neutral-950 p-4 transition hover:border-white">
-                <Dumbbell className="mb-3 text-gray-300" size={22} />
-                <div className="text-sm font-black uppercase text-white">Training</div>
-                <p className="mt-1 text-xs text-gray-500">Drills and videos</p>
-              </Link>
+            <div className="mt-6 divide-y divide-gray-800 overflow-hidden rounded-xl border border-gray-800 bg-neutral-950">
+              {[
+                ['Register', 'Create your parent account and add a player.', Target, '/register'],
+                ['Pricing', '$50/mo June promo and optional uniform details.', ShieldCheck, 'pricing'],
+                ['Schedule', 'Practice times and upcoming matches.', CalendarDays, 'schedule'],
+                ['Club Info', 'Coaches, player photos, and club background.', Dumbbell, '/club'],
+              ].map(([title, copy, Icon, target]) => {
+                const content = (
+                  <>
+                    <Icon className="mt-1 shrink-0 text-[#EF4444]" size={20} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-black uppercase text-white">{title as string}</span>
+                      <span className="mt-1 block text-xs leading-5 text-gray-500">{copy as string}</span>
+                    </span>
+                    <ArrowRight className="shrink-0 text-gray-600" size={17} />
+                  </>
+                )
+
+                if (String(target).startsWith('/')) {
+                  return (
+                    <Link key={title as string} to={target as string} className="flex items-start gap-3 p-4 text-left transition hover:bg-black">
+                      {content}
+                    </Link>
+                  )
+                }
+
+                return (
+                  <button key={title as string} onClick={() => scrollToSection(target as string)} className="flex w-full items-start gap-3 p-4 text-left transition hover:bg-black">
+                    {content}
+                  </button>
+                )
+              })}
             </div>
-            <Link
-              to="/club"
-              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 px-5 py-4 text-sm font-black uppercase text-white transition hover:border-[#EF4444] hover:bg-[#EF4444]"
-            >
-              Coaches, Photos & Club Info <ArrowRight size={18} />
-            </Link>
+
+            <div className="mt-6 rounded-xl border border-[#EF4444]/30 bg-[#EF4444]/10 p-4">
+              <div className="text-[10px] font-black uppercase tracking-widest text-[#EF4444]">Current offer</div>
+              <p className="mt-2 text-sm font-bold leading-6 text-white">
+                $0 registration and $50/mo for families who sign up by June 30.
+              </p>
+            </div>
           </div>
 
           <div className="hidden">
@@ -838,28 +850,28 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PLAYER PATH */}
+      {/* CLUB APPROACH */}
       <section className="bg-black py-20 w-full">
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
             <div>
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
                 <Dumbbell size={14} className="text-[#EF4444]" />
-                Player development
+                Club approach
               </div>
               <h2 className="text-4xl font-black uppercase italic tracking-tight text-white md:text-5xl">
-                A clear path from practice to <span className="text-[#EF4444]">game day</span>
+                Built around the full <span className="text-[#EF4444]">family experience</span>
               </h2>
               <p className="mt-5 text-base leading-8 text-gray-400">
-                Families get organized communication, coaches get team tools, and players get structured training that carries into matches.
+                The homepage now keeps public information simple while the parent, coach, and admin dashboards handle the deeper team details.
               </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
               {[
-                ['01', 'Register', 'Create a parent account and add your athlete profile.'],
-                ['02', 'Train', 'Join practices, follow coach notes, and use Training Lab tutorials.'],
-                ['03', 'Compete', 'Get placed with a team and prepare for matches with confidence.'],
+                ['01', 'Communication', 'Parents can find updates, schedules, and next steps without digging.'],
+                ['02', 'Development', 'Players get consistent training, drills, and coach feedback.'],
+                ['03', 'Organization', 'Coaches and admins manage teams behind the scenes in dedicated dashboards.'],
               ].map(([number, title, copy]) => (
                 <div key={title} className="rounded-2xl border border-gray-800 bg-neutral-950 p-6 transition-colors hover:border-[#EF4444]/70">
                   <div className="text-4xl font-black italic text-[#EF4444]">{number}</div>
@@ -994,7 +1006,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* TRAINING SCHEDULE */}
+      {/* SCHEDULE */}
       <section id="schedule" className="py-24 bg-neutral-950 w-full">
         <div className="w-full px-6">
           <div className="text-center mb-16">
@@ -1003,48 +1015,118 @@ export default function LandingPage() {
               Live schedule
             </div>
             <h2 className="text-4xl md:text-5xl font-extrabold text-white uppercase tracking-tight mb-4">
-              Training <span className="text-[#EF4444]">Schedule</span>
+              Practices & <span className="text-[#EF4444]">Matches</span>
             </h2>
+            <p className="mx-auto max-w-2xl text-sm leading-6 text-gray-500">
+              One place for families to check upcoming practice times, locations, and match days.
+            </p>
             <div className="h-1 w-24 bg-[#EF4444] mx-auto"></div>
           </div>
-          {loadingEvents ? (
-            <div className="text-center text-gray-400">Loading practice schedule...</div>
-          ) : events.length === 0 ? (
-            <div className="text-center text-gray-500 italic">
-              No upcoming practices scheduled at the moment.
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-              {events.map((event) => (
-                <div key={event.id} className="bg-black border border-gray-800 rounded-2xl p-6 hover:border-[#EF4444] transition-all duration-300 group flex flex-col h-full shadow-lg hover:shadow-red-900/20">
-                  <span className="text-[#EF4444] font-bold uppercase text-xs tracking-wider mb-3">
-                    {new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </span>
-                  <h3 className="text-xl font-bold text-white mb-3 group-hover:text-[#EF4444] transition-colors">{event.title}</h3>
-                  <p className="text-gray-400 leading-relaxed text-sm flex items-center gap-2">
-                    <Clock size={14} className="text-[#EF4444]" />
-                    {event.time
-                      ? new Date(`1970-01-01T${event.time}`).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })
-                      : 'TBA'}
-                  </p>
-                  <p className="text-gray-400 leading-relaxed text-sm mt-2 flex items-center gap-2">
-                    <MapPin size={14} className="text-[#EF4444]" />
-                    {event.location}
-                  </p>
-                  {event.description && (
-                    <p className="mt-4 border-t border-gray-800 pt-4 text-sm text-gray-500">{event.description}</p>
-                  )}
+
+          <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-2">
+            <div className="rounded-2xl border border-gray-800 bg-black p-5 md:p-6">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-[#EF4444]">Practice</div>
+                  <h3 className="mt-1 text-2xl font-black uppercase italic text-white">Training Times</h3>
                 </div>
-              ))}
+                <Dumbbell className="text-[#EF4444]" size={24} />
+              </div>
+              {loadingEvents ? (
+                <div className="text-sm text-gray-500">Loading practice schedule...</div>
+              ) : events.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-800 p-6 text-center text-sm text-gray-500">
+                  No upcoming practices scheduled at the moment.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {events.slice(0, 4).map((event) => (
+                    <article key={event.id} className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#EF4444]">
+                            {new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </p>
+                          <h4 className="mt-1 text-base font-black uppercase text-white">{event.title}</h4>
+                          {event.description && <p className="mt-2 text-sm leading-6 text-gray-500">{event.description}</p>}
+                        </div>
+                        <div className="shrink-0 text-sm text-gray-400 sm:text-right">
+                          <p className="flex items-center gap-2 sm:justify-end">
+                            <Clock size={14} className="text-[#EF4444]" />
+                            {event.time
+                              ? new Date(`1970-01-01T${event.time}`).toLocaleTimeString('en-US', {
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                })
+                              : 'TBA'}
+                          </p>
+                          <p className="mt-2 flex items-center gap-2 sm:justify-end">
+                            <MapPin size={14} className="text-[#EF4444]" />
+                            {event.location}
+                          </p>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+
+            <div className="rounded-2xl border border-gray-800 bg-black p-5 md:p-6">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Match day</div>
+                  <h3 className="mt-1 text-2xl font-black uppercase italic text-white">Upcoming Games</h3>
+                </div>
+                <Trophy className="text-[#D4AF37]" size={24} />
+              </div>
+              {loadingGames ? (
+                <div className="text-sm text-gray-500">Loading upcoming matches...</div>
+              ) : games.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-800 p-6 text-center text-sm text-gray-500">
+                  No upcoming matches scheduled at the moment.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {games.slice(0, 4).map((game) => (
+                    <article key={game.id} className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
+                            {new Date(game.date + 'T00:00:00').toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </p>
+                          <h4 className="mt-1 text-base font-black uppercase text-white">vs. {game.opponent}</h4>
+                        </div>
+                        <div className="shrink-0 text-sm text-gray-400 sm:text-right">
+                          <p className="flex items-center gap-2 sm:justify-end">
+                            <Clock size={14} className="text-[#D4AF37]" />
+                            {game.time
+                              ? new Date(`1970-01-01T${game.time}`).toLocaleTimeString('en-US', {
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                })
+                              : 'TBA'}
+                          </p>
+                          <p className="mt-2 flex items-center gap-2 sm:justify-end">
+                            <MapPin size={14} className="text-[#D4AF37]" />
+                            {game.location}
+                          </p>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </section>
       
@@ -1104,79 +1186,6 @@ export default function LandingPage() {
             {coachesData.map((coach, index) => (
               <CoachCard key={index} coach={coach} />
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* MATCHES */}
-      <section className="py-20 bg-black w-full">
-        <div className="w-full px-6">
-          <div className="text-center mb-16">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
-              <Trophy size={14} className="text-[#D4AF37]" />
-              Match day
-            </div>
-            <h2 className="text-3xl md:text-5xl font-black italic uppercase tracking-tighter text-white mb-4">
-              UPCOMING <span className="text-[#EF4444]">MATCHES</span>
-            </h2>
-            <div className="w-24 h-2 bg-[#EF4444] mx-auto skew-x-[-12deg]"></div>
-          </div>
-
-          {loadingGames ? (
-            <div className="text-center text-gray-400">Loading upcoming matches...</div>
-          ) : games.length === 0 ? (
-            <div className="text-center text-gray-500 italic">
-              No upcoming matches scheduled at the moment.
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-3 gap-6 max-w-7xl mx-auto">
-              {games.map((game) => (
-                <div
-                  key={game.id}
-                  className="bg-black border border-gray-800 p-6 rounded-xl hover:border-[#EF4444] transition-colors group"
-                >
-                  <div className="flex flex-col h-full">
-                    <div className="mb-4">
-                      <span className="text-[#EF4444] font-bold text-sm uppercase tracking-wider block mb-1">
-                        {new Date(game.date + 'T00:00:00').toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                      </span>
-
-                      <span className="text-gray-400 text-sm flex items-center gap-2">
-                        <Clock size={14} />
-                        {game.time
-                          ? new Date(`1970-01-01T${game.time}`).toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                            })
-                          : 'TBA'}
-                      </span>
-                    </div>
-
-                    <h3 className="text-xl font-bold text-white mb-4 group-hover:text-[#EF4444] transition-colors">
-                      vs. {game.opponent}
-                    </h3>
-
-                    <div className="mt-auto pt-4 border-t border-gray-800 flex items-center text-gray-400 text-sm">
-                      <MapPin size={16} className="mr-2 text-[#EF4444]" />
-                      {game.location}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="text-center mt-12">
-            <button
-              onClick={() => scrollToSection('contact')}
-              className="px-8 py-3 bg-[#EF4444] hover:bg-red-600 text-white font-black italic uppercase tracking-wider skew-x-[-12deg] transition-all transform hover:scale-105 shadow-lg shadow-red-900/20"
-            >
-              <span className="block skew-x-[12deg]">View Full Schedule</span>
-            </button>
           </div>
         </div>
       </section>
