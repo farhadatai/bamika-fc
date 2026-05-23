@@ -1,13 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
-  X,
   Facebook,
   Instagram,
   MapPin,
   Clock,
-  Play,
   Megaphone,
   CheckCircle,
   Trophy,
@@ -21,7 +19,6 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { getYoutubeId, getYoutubeThumbnail } from '../lib/utils'
 
 interface Game {
   id: string
@@ -70,17 +67,6 @@ interface Coach {
   image: string
 }
 
-interface Drill {
-  id: string;
-  title: string;
-  video_url?: string;
-  youtube_url?: string;
-  thumbnail_url?: string;
-  duration: number;
-  difficulty: string;
-  description: string;
-}
-
 const programCards = [
   {
     title: 'Junior Academy',
@@ -107,64 +93,6 @@ const programCards = [
       'Advanced coaching for top-tier talent with speed, strength, decision-making, and match-performance development.',
   },
 ];
-
-const clubSlideshowPhotos = [
-  { image: '/slideshow/web/bamika-slide-01.jpg', fit: 'contain', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-02.jpg', fit: 'cover', position: 'center 30%' },
-  { image: '/slideshow/web/bamika-slide-03.jpg', fit: 'cover', position: 'center 28%' },
-  { image: '/slideshow/web/bamika-slide-04.jpg', fit: 'contain', position: 'center 24%' },
-  { image: '/slideshow/web/bamika-slide-05.jpg', fit: 'cover', position: 'center 28%' },
-  { image: '/slideshow/web/bamika-slide-06.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-07.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-08.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-09.jpg', fit: 'cover', position: 'center 28%' },
-  { image: '/slideshow/web/bamika-slide-10.jpg', fit: 'cover', position: 'center 28%' },
-  { image: '/slideshow/web/bamika-slide-11.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-12.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-13.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-14.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-15.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-16.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-17.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-18.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-19.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-20.jpg', fit: 'cover', position: 'center 26%' },
-  { image: '/slideshow/web/bamika-slide-21.jpg', fit: 'cover', position: 'center 24%' },
-  { image: '/slideshow/web/bamika-slide-22.jpg', fit: 'cover', position: 'center 24%' },
-  { image: '/slideshow/web/bamika-slide-23.jpg', fit: 'contain', position: 'center 24%' },
-];
-
-const heroSlideCopy = [
-  {
-    label: 'Bamika FC',
-    title: 'Our Players. Our Club.',
-    description:
-      'Real Bamika FC players, coaches, and families are the heartbeat of the club on training days and match days.',
-  },
-  {
-    label: 'Match day energy',
-    title: 'Compete Together.',
-    description:
-      'Every match is a chance to show discipline, courage, teamwork, and the Bamika FC standard.',
-  },
-  {
-    label: 'Player development',
-    title: 'Grow Every Session.',
-    description:
-      'Players build confidence through repetition, coaching feedback, and training habits that carry into games.',
-  },
-  {
-    label: 'Team culture',
-    title: 'Play For The Badge.',
-    description:
-      'Bamika FC is built on effort, respect, family support, and pride in representing the club.',
-  },
-];
-
-const heroSlides = clubSlideshowPhotos.map((photo, index) => ({
-  ...photo,
-  ...heroSlideCopy[index % heroSlideCopy.length],
-}));
 
 const coachesData: Coach[] = [
   {
@@ -254,82 +182,6 @@ const CoachCard = ({ coach }: { coach: Coach }) => {
   )
 }
 
-const getDrillVideoUrl = (drill: Drill) => drill.video_url || drill.youtube_url || '';
-
-const DrillCard = ({ drill, onPlay }: { drill: Drill, onPlay: (url: string) => void }) => {
-  const drillVideoUrl = getDrillVideoUrl(drill);
-  const thumbnail = drill.thumbnail_url || getYoutubeThumbnail(drillVideoUrl);
-
-  return (
-  <div className="bg-neutral-950 rounded-2xl overflow-hidden border border-gray-800 group hover:border-[#EF4444] transition-all hover:-translate-y-1">
-    <div className="relative aspect-video bg-black overflow-hidden cursor-pointer" onClick={() => onPlay(drillVideoUrl)}>
-      {thumbnail ? (
-        <img src={thumbnail} alt={drill.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
-      ) : (
-        <div className="flex h-full items-center justify-center bg-neutral-950 text-xs font-black uppercase tracking-widest text-gray-600">
-          YouTube Tutorial
-        </div>
-      )}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-12 h-12 bg-[#EF4444] rounded-full flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-transform">
-          <Play size={20} fill="white" />
-        </div>
-      </div>
-      <span className="absolute bottom-4 left-4 bg-black/80 text-[9px] font-black uppercase text-white px-3 py-1 rounded-md border border-white/10">
-        {drill.duration} MIN
-      </span>
-    </div>
-    <div className="p-6">
-      <div className="flex justify-between items-start mb-3">
-        <h3 className="text-xl font-black uppercase italic text-white leading-tight">
-          {drill.title}
-        </h3>
-        <span className="text-[9px] font-black text-[#EF4444] uppercase tracking-tighter">
-          {drill.difficulty}
-        </span>
-      </div>
-      <p className="text-gray-500 text-sm line-clamp-2 mb-6">
-        {drill.description}
-      </p>
-      <button 
-         onClick={() => onPlay(drillVideoUrl)} 
-         className="w-full py-3 bg-[#EF4444] text-white rounded-xl text-[10px] font-black uppercase italic hover:bg-red-700 transition-all shadow-lg shadow-red-500/20" 
-       > 
-         Watch Drill
-      </button> 
-     </div> 
-   </div>
-  );
-}
-
-const VideoModal = ({ videoUrl, onClose }: { videoUrl: string | null; onClose: () => void }) => {
-  if (!videoUrl) return null;
-  const videoId = getYoutubeId(videoUrl);
-  if (!videoId) return null;
-
-  return (
-    <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 md:p-10" onClick={onClose}>
-      <div className="relative w-full max-w-5xl aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl border border-gray-800" onClick={(event) => event.stopPropagation()}>
-        <button 
-          onClick={onClose} 
-          className="absolute top-4 right-4 z-10 bg-black/50 hover:bg-[#EF4444] text-white p-2 rounded-full transition-all"
-        > 
-          <X size={24} /> 
-        </button> 
-        <iframe 
-          className="w-full h-full" 
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} 
-          title="Training Drill" 
-          frameBorder="0" 
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-          allowFullScreen 
-        ></iframe> 
-      </div> 
-    </div>
-  );
-};
-
-
 export default function LandingPage() {
   const [games, setGames] = useState<Game[]>([])
   const [loadingGames, setLoadingGames] = useState(true)
@@ -339,26 +191,22 @@ export default function LandingPage() {
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(true)
   const [spotlights, setSpotlights] = useState<Spotlight[]>([])
   const [loadingSpotlights, setLoadingSpotlights] = useState(true)
-  const [drills, setDrills] = useState<Drill[]>([])
-  const [loadingDrills, setLoadingDrills] = useState(true)
-  const [activeVideo, setActiveVideo] = useState<string | null>(null);
-  const [activeHeroSlide, setActiveHeroSlide] = useState(0);
+  const [sponsorForm, setSponsorForm] = useState({
+    businessName: '',
+    contactName: '',
+    email: '',
+    phone: '',
+    message: '',
+  })
+  const [sponsorStatus, setSponsorStatus] = useState('')
+  const [submittingSponsor, setSubmittingSponsor] = useState(false)
 
   useEffect(() => {
     fetchUpcomingGames()
     fetchUpcomingEvents()
     fetchAnnouncements()
     fetchSpotlights()
-    fetchDrills()
   }, [])
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setActiveHeroSlide((current) => (current + 1) % heroSlides.length);
-    }, 6000);
-
-    return () => window.clearInterval(timer);
-  }, []);
 
   const fetchUpcomingGames = async () => {
     try {
@@ -400,19 +248,6 @@ export default function LandingPage() {
       setLoadingEvents(false)
     }
   }
-
-  const fetchDrills = async () => {
-    setLoadingDrills(true);
-    try {
-      const { data, error } = await supabase.from('drills').select('*').order('created_at', { ascending: false }).limit(6);
-      if (error) throw error;
-      setDrills(data || []);
-    } catch (error) {
-      console.error('Error fetching drills:', error);
-    } finally {
-      setLoadingDrills(false);
-    }
-  };
 
   const fetchAnnouncements = async () => {
     setLoadingAnnouncements(true)
@@ -461,6 +296,42 @@ export default function LandingPage() {
     }
   }
 
+  const handleSponsorFormChange = (field: string, value: string) => {
+    setSponsorForm((current) => ({ ...current, [field]: value }))
+  }
+
+  const handleSponsorRequest = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSubmittingSponsor(true)
+    setSponsorStatus('')
+
+    try {
+      const { error } = await supabase.from('sponsor_requests').insert({
+        business_name: sponsorForm.businessName,
+        contact_name: sponsorForm.contactName,
+        email: sponsorForm.email,
+        phone: sponsorForm.phone,
+        message: sponsorForm.message,
+      })
+
+      if (error) throw error
+
+      setSponsorStatus('Thank you. We received your request and will email you with sponsor information.')
+      setSponsorForm({
+        businessName: '',
+        contactName: '',
+        email: '',
+        phone: '',
+        message: '',
+      })
+    } catch (error) {
+      console.error('Error saving sponsor request:', error)
+      setSponsorStatus('Sponsor request form needs the latest database update. Please contact Bamika FC directly for now.')
+    } finally {
+      setSubmittingSponsor(false)
+    }
+  }
+
   const sponsorSpotlights = spotlights.filter((spotlight) => spotlight.type === 'sponsor')
   const playerSpotlights = spotlights.filter((spotlight) => spotlight.type !== 'sponsor')
 
@@ -482,8 +353,8 @@ export default function LandingPage() {
           <div className="absolute inset-x-0 bottom-0 h-48 bg-[linear-gradient(0deg,#000,transparent)]"></div>
         </div>
 
-        <div className="relative z-10 mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-7xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="text-white">
+        <div className="relative z-10 mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-7xl items-center px-4 py-12 sm:px-6 sm:py-16">
+          <div className="max-w-4xl text-white">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/60 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-200 backdrop-blur">
               <Trophy size={15} className="text-[#D4AF37]" />
               Elk Grove youth soccer academy
@@ -530,142 +401,6 @@ export default function LandingPage() {
 
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-black/75 p-5 text-white shadow-2xl shadow-black/40 backdrop-blur sm:p-6 lg:self-center">
-            <div className="inline-flex rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
-              Start here
-            </div>
-            <h2 className="mt-5 text-3xl font-black uppercase italic leading-tight sm:text-4xl">
-              Fast for families. Clear for players.
-            </h2>
-            <p className="mt-4 text-sm leading-7 text-gray-400">
-              The most important actions are grouped here so families do not have to search through the page.
-            </p>
-            <div className="mt-6 divide-y divide-gray-800 overflow-hidden rounded-xl border border-gray-800 bg-neutral-950">
-              {[
-                ['Register', 'Create your parent account and add a player.', Target, '/register'],
-                ['Pricing', '$50/mo June promo and optional uniform details.', ShieldCheck, 'pricing'],
-                ['Schedule', 'Practice times and upcoming matches.', CalendarDays, 'schedule'],
-                ['Club Info', 'Coaches, player photos, and club background.', Dumbbell, '/club'],
-              ].map(([title, copy, Icon, target]) => {
-                const content = (
-                  <>
-                    <Icon className="mt-1 shrink-0 text-[#EF4444]" size={20} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-black uppercase text-white">{title as string}</span>
-                      <span className="mt-1 block text-xs leading-5 text-gray-500">{copy as string}</span>
-                    </span>
-                    <ArrowRight className="shrink-0 text-gray-600" size={17} />
-                  </>
-                )
-
-                if (String(target).startsWith('/')) {
-                  return (
-                    <Link key={title as string} to={target as string} className="flex items-start gap-3 p-4 text-left transition hover:bg-black">
-                      {content}
-                    </Link>
-                  )
-                }
-
-                return (
-                  <button key={title as string} onClick={() => scrollToSection(target as string)} className="flex w-full items-start gap-3 p-4 text-left transition hover:bg-black">
-                    {content}
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="mt-6 rounded-xl border border-[#EF4444]/30 bg-[#EF4444]/10 p-4">
-              <div className="text-[10px] font-black uppercase tracking-widest text-[#EF4444]">Current offer</div>
-              <p className="mt-2 text-sm font-bold leading-6 text-white">
-                $0 registration and $50/mo for families who sign up by June 30.
-              </p>
-            </div>
-          </div>
-
-          <div className="hidden">
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/70 shadow-2xl shadow-black/40 backdrop-blur">
-              <div className="relative h-[30rem] bg-black">
-                {heroSlides.map((slide, index) => (
-                  <div
-                    key={slide.image}
-                    className={`absolute inset-0 transition-opacity duration-1000 ${
-                      index === activeHeroSlide ? 'opacity-100' : 'opacity-0'
-                    }`}
-                  >
-                    <img
-                      src={slide.image}
-                      alt=""
-                      aria-hidden="true"
-                      className="absolute inset-0 h-full w-full scale-110 object-cover opacity-45 blur-xl"
-                      style={{ objectPosition: slide.position }}
-                    />
-                    <img
-                      src={slide.image}
-                      alt={slide.label}
-                      className={`relative z-10 h-full w-full ${slide.fit === 'contain' ? 'object-contain' : 'object-cover'}`}
-                      style={{ objectPosition: slide.position }}
-                    />
-                  </div>
-                ))}
-                <div className="absolute inset-0 z-20 bg-[linear-gradient(0deg,rgba(0,0,0,0.78),rgba(0,0,0,0.05)_55%,rgba(0,0,0,0.18))]"></div>
-                <div className="absolute bottom-5 left-5 right-5 z-30">
-                  <div className="mb-2 inline-flex rounded-full border border-white/15 bg-black/70 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
-                    Bamika FC moments
-                  </div>
-                  <h2 className="text-3xl font-black uppercase italic text-white">{heroSlides[activeHeroSlide].title}</h2>
-                  <p className="mt-2 text-sm leading-6 text-gray-300">
-                    {heroSlides[activeHeroSlide].description}
-                  </p>
-                  <div className="mt-4 flex items-center justify-between gap-4" aria-label="Training slideshow controls">
-                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/20">
-                      <div
-                        className="h-full rounded-full bg-[#EF4444] transition-all duration-500"
-                        style={{ width: `${((activeHeroSlide + 1) / heroSlides.length) * 100}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setActiveHeroSlide((current) => (current - 1 + heroSlides.length) % heroSlides.length)}
-                        className="h-9 w-9 rounded-full border border-white/20 bg-black/55 text-sm font-black text-white hover:border-[#EF4444]"
-                        aria-label="Show previous slide"
-                      >
-                        ‹
-                      </button>
-                      <span className="min-w-[3.5rem] text-center text-[10px] font-black uppercase tracking-widest text-gray-300">
-                        {String(activeHeroSlide + 1).padStart(2, '0')} / {heroSlides.length}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setActiveHeroSlide((current) => (current + 1) % heroSlides.length)}
-                        className="h-9 w-9 rounded-full border border-white/20 bg-black/55 text-sm font-black text-white hover:border-[#EF4444]"
-                        aria-label="Show next slide"
-                      >
-                        ›
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 divide-x divide-gray-800">
-                <div className="p-5">
-                  <Target className="mb-3 text-[#EF4444]" size={22} />
-                  <div className="text-sm font-black uppercase text-white">Skills</div>
-                  <p className="mt-1 text-xs text-gray-500">Ball mastery</p>
-                </div>
-                <div className="p-5">
-                  <Users className="mb-3 text-[#D4AF37]" size={22} />
-                  <div className="text-sm font-black uppercase text-white">Teams</div>
-                  <p className="mt-1 text-xs text-gray-500">Coach led</p>
-                </div>
-                <div className="p-5">
-                  <ShieldCheck className="mb-3 text-green-500" size={22} />
-                  <div className="text-sm font-black uppercase text-white">Growth</div>
-                  <p className="mt-1 text-xs text-gray-500">Player path</p>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -720,133 +455,147 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* SPONSORS */}
+      {/* SPONSORS & PLAYER OF THE MONTH */}
       <section id="sponsors" className="bg-black py-20 w-full border-b border-gray-900">
         <div className="mx-auto max-w-7xl px-6">
-          <div className="mb-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
-                <HandHeart size={14} className="text-[#D4AF37]" />
-                Club partners
-              </div>
-              <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tight text-white">
-                Proud <span className="text-[#D4AF37]">Sponsors</span>
-              </h2>
+          <div className="mb-10">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+              <Star size={14} className="text-[#EF4444]" />
+              Recognition
             </div>
-            <p className="max-w-xl text-sm leading-6 text-gray-500">
-              Local businesses helping Bamika FC create opportunities for players and families.
+            <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tight text-white">
+              Sponsors <span className="text-[#D4AF37]">&</span> Player of the Month
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-500">
+              Sponsors and player recognition stay separate, but families can see both in one organized section.
             </p>
           </div>
 
-          {loadingSpotlights ? (
-            <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Loading sponsors...</div>
-          ) : sponsorSpotlights.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-800 bg-neutral-950 p-8 text-center text-gray-500">
-              Sponsor promotions will appear here soon.
-            </div>
-          ) : (
-            <div className="grid gap-6 lg:grid-cols-2">
-              {sponsorSpotlights.map((sponsor) => (
-                <article key={sponsor.id} className="group overflow-hidden rounded-2xl border border-[#D4AF37]/35 bg-neutral-950 shadow-2xl shadow-black/40 transition-colors hover:border-[#D4AF37]">
-                  <div className="grid lg:grid-cols-[0.95fr_1.05fr]">
-                    <div className="relative min-h-[260px] bg-black p-5">
-                      {sponsor.image_url ? (
-                        <img src={sponsor.image_url} alt={sponsor.title} className="h-full max-h-[360px] min-h-[220px] w-full object-contain transition-transform duration-700 group-hover:scale-[1.03]" />
-                      ) : (
-                        <div className="flex h-full min-h-[240px] items-center justify-center rounded-xl border border-dashed border-gray-800">
-                          <HandHeart className="text-[#D4AF37]" size={56} />
+          <div className="grid gap-8 lg:grid-cols-2">
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-[#D4AF37]/35 bg-neutral-950 p-5 md:p-6">
+                <div className="mb-5 flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Club partners</div>
+                    <h3 className="mt-1 text-3xl font-black uppercase italic text-white">Proud Sponsors</h3>
+                  </div>
+                  <HandHeart className="text-[#D4AF37]" size={26} />
+                </div>
+
+                {loadingSpotlights ? (
+                  <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Loading sponsors...</div>
+                ) : sponsorSpotlights.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-800 bg-black p-8 text-center text-gray-500">
+                    Sponsor promotions will appear here soon.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {sponsorSpotlights.slice(0, 2).map((sponsor) => (
+                      <article key={sponsor.id} className="overflow-hidden rounded-xl border border-[#D4AF37]/30 bg-black">
+                        <div className="grid gap-0 sm:grid-cols-[0.9fr_1.1fr]">
+                          <div className="relative flex min-h-[220px] items-center justify-center bg-neutral-950 p-4">
+                            {sponsor.image_url ? (
+                              <img src={sponsor.image_url} alt={sponsor.title} className="max-h-64 w-full object-contain" />
+                            ) : (
+                              <HandHeart className="text-[#D4AF37]" size={52} />
+                            )}
+                            <span className="absolute left-4 top-4 rounded-full bg-[#D4AF37] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-black">
+                              Sponsor
+                            </span>
+                          </div>
+                          <div className="p-5">
+                            {sponsor.subtitle && <p className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">{sponsor.subtitle}</p>}
+                            <h4 className="mt-2 text-2xl font-black uppercase italic leading-tight text-white">{sponsor.title}</h4>
+                            <p className="mt-3 line-clamp-6 text-sm leading-7 text-gray-400">{sponsor.body}</p>
+                            {sponsor.link_url && (
+                              <a href={sponsor.link_url} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#D4AF37] px-4 py-3 text-xs font-black uppercase tracking-widest text-black transition hover:bg-white">
+                                Visit Sponsor <ExternalLink size={14} />
+                              </a>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      <span className="absolute left-5 top-5 rounded-full bg-[#D4AF37] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-black">
-                        Sponsor
-                      </span>
-                    </div>
-                    <div className="flex flex-col justify-center p-6 md:p-8">
-                      {sponsor.subtitle && (
-                        <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">{sponsor.subtitle}</p>
-                      )}
-                      <h3 className="text-3xl font-black uppercase italic leading-tight text-white">{sponsor.title}</h3>
-                      <p className="mt-4 text-sm leading-7 text-gray-400">{sponsor.body}</p>
-                      {sponsor.link_url && (
-                        <a
-                          href={sponsor.link_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-6 inline-flex w-fit items-center gap-2 rounded-xl bg-[#D4AF37] px-5 py-3 text-xs font-black uppercase tracking-widest text-black transition hover:bg-white"
-                        >
-                          Visit Sponsor <ExternalLink size={14} />
-                        </a>
-                      )}
-                    </div>
+                      </article>
+                    ))}
                   </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* PLAYER RECOGNITION */}
-      <section id="spotlights" className="bg-neutral-950 py-16 w-full border-b border-gray-900">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
-                <Star size={14} className="text-[#EF4444]" />
-                Player recognition
+                )}
               </div>
-              <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tight text-white">
-                Player <span className="text-[#EF4444]">Spotlights</span>
-              </h2>
-            </div>
-            <p className="max-w-xl text-sm leading-6 text-gray-500">
-              Celebrating standout effort, leadership, improvement, and team-first moments.
-            </p>
-          </div>
 
-          {loadingSpotlights ? (
-            <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Loading player recognition...</div>
-          ) : playerSpotlights.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-800 bg-black p-8 text-center text-gray-500">
-              Player recognition will appear here soon.
+              <form onSubmit={handleSponsorRequest} className="rounded-2xl border border-gray-800 bg-neutral-950 p-5 md:p-6">
+                <div className="mb-5">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Become a sponsor</div>
+                  <h3 className="mt-1 text-2xl font-black uppercase italic text-white">Request Sponsor Info</h3>
+                  <p className="mt-2 text-sm leading-6 text-gray-500">
+                    Send us your business contact and we will email sponsorship information.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input required value={sponsorForm.businessName} onChange={(event) => handleSponsorFormChange('businessName', event.target.value)} placeholder="Business name" className="rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]" />
+                  <input required value={sponsorForm.contactName} onChange={(event) => handleSponsorFormChange('contactName', event.target.value)} placeholder="Contact name" className="rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]" />
+                  <input required type="email" value={sponsorForm.email} onChange={(event) => handleSponsorFormChange('email', event.target.value)} placeholder="Email address" className="rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]" />
+                  <input value={sponsorForm.phone} onChange={(event) => handleSponsorFormChange('phone', event.target.value)} placeholder="Phone number" className="rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]" />
+                </div>
+                <textarea value={sponsorForm.message} onChange={(event) => handleSponsorFormChange('message', event.target.value)} placeholder="Tell us what kind of sponsorship you are interested in." rows={4} className="mt-3 w-full rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]" />
+                {sponsorStatus && (
+                  <div className="mt-3 rounded-xl border border-gray-800 bg-black p-3 text-sm font-bold text-gray-300">
+                    {sponsorStatus}
+                  </div>
+                )}
+                <button disabled={submittingSponsor} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#D4AF37] px-5 py-4 text-sm font-black uppercase text-black transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60">
+                  {submittingSponsor ? 'Sending Request...' : 'Send Sponsor Request'} <ArrowRight size={18} />
+                </button>
+              </form>
             </div>
-          ) : (
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {playerSpotlights.map((spotlight) => (
-                <article key={spotlight.id} className="group overflow-hidden rounded-2xl border border-gray-800 bg-black transition-colors hover:border-[#EF4444]/70">
-                  <div className="relative aspect-[4/3] bg-neutral-950">
-                    {spotlight.image_url ? (
-                      <img src={spotlight.image_url} alt={spotlight.title} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <Star className="text-[#EF4444]" size={48} />
+
+            <div id="spotlights" className="rounded-2xl border border-[#EF4444]/35 bg-neutral-950 p-5 md:p-6">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-[#EF4444]">Player recognition</div>
+                  <h3 className="mt-1 text-3xl font-black uppercase italic text-white">Player of the Month</h3>
+                </div>
+                <Star className="text-[#EF4444]" size={26} />
+              </div>
+
+              {loadingSpotlights ? (
+                <div className="text-sm font-bold uppercase tracking-widest text-gray-500">Loading player recognition...</div>
+              ) : playerSpotlights.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-800 bg-black p-8 text-center text-gray-500">
+                  Player of the month will appear here soon.
+                </div>
+              ) : (
+                <div className="grid gap-5">
+                  {playerSpotlights.slice(0, 2).map((spotlight) => (
+                    <article key={spotlight.id} className="overflow-hidden rounded-xl border border-gray-800 bg-black">
+                      <div className="relative aspect-[16/11] bg-neutral-950">
+                        {spotlight.image_url ? (
+                          <img src={spotlight.image_url} alt={spotlight.title} className="h-full w-full object-cover object-center" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <Star className="text-[#EF4444]" size={52} />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.82),transparent_65%)]"></div>
+                        <span className="absolute left-4 top-4 rounded-full bg-[#EF4444] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
+                          Player
+                        </span>
+                        <div className="absolute bottom-5 left-5 right-5">
+                          {spotlight.subtitle && <p className="text-[10px] font-black uppercase tracking-widest text-[#EF4444]">{spotlight.subtitle}</p>}
+                          <h4 className="mt-1 text-3xl font-black uppercase italic leading-tight text-white">{spotlight.title}</h4>
+                        </div>
                       </div>
-                    )}
-                    <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.78),transparent_70%)]"></div>
-                    <span className="absolute left-4 top-4 rounded-full bg-[#EF4444] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
-                      Player
-                    </span>
-                  </div>
-                  <div className="p-6">
-                    {spotlight.subtitle && <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-[#EF4444]">{spotlight.subtitle}</p>}
-                    <h3 className="text-2xl font-black uppercase italic leading-tight text-white">{spotlight.title}</h3>
-                    <p className="mt-3 line-clamp-4 text-sm leading-6 text-gray-400">{spotlight.body}</p>
-                    {spotlight.link_url && (
-                      <a
-                        href={spotlight.link_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-5 inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#EF4444] hover:text-white"
-                      >
-                        Learn More
-                        <ExternalLink size={14} />
-                      </a>
-                    )}
-                  </div>
-                </article>
-              ))}
+                      <div className="p-5">
+                        <p className="text-sm leading-7 text-gray-400">{spotlight.body}</p>
+                        {spotlight.link_url && (
+                          <a href={spotlight.link_url} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#EF4444] hover:text-white">
+                            Learn More <ExternalLink size={14} />
+                          </a>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </section>
 
@@ -951,7 +700,7 @@ export default function LandingPage() {
                     'Age-appropriate technical training',
                     'Team practices and match preparation',
                     'Coach communication with parents',
-                    'Player development through the Training Lab',
+                    'Player development with consistent coach support',
                   ].map((item) => (
                     <div key={item} className="flex items-start gap-3 rounded-xl border border-gray-800 bg-black p-4">
                       <CheckCircle className="mt-0.5 shrink-0 text-[#EF4444]" size={18} />
@@ -1130,44 +879,6 @@ export default function LandingPage() {
         </div>
       </section>
       
-      {/* TRAINING LAB */}
-      <section id="training-lab" className="py-24 bg-black w-full">
-        <div className="w-full px-6">
-          <div className="text-center mb-16">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
-              <Play size={14} className="text-[#EF4444]" />
-              Video tutorials
-            </div>
-            <h2 className="text-4xl md:text-5xl font-extrabold text-white uppercase tracking-tight mb-4">
-              Training <span className="text-[#EF4444]">Lab</span>
-            </h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">Hone your skills with our curated collection of training drills and tutorials.</p>
-            <div className="h-1 w-24 bg-[#EF4444] mx-auto mt-4"></div>
-          </div>
-          {loadingDrills ? (
-            <div className="text-center text-gray-400">Loading drills...</div>
-          ) : drills.length === 0 ? (
-            <div className="text-center text-gray-500 italic">
-              Training videos are being updated. Check back soon for new drills.
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-              {drills.map((drill) => (
-                <DrillCard key={drill.id} drill={drill} onPlay={setActiveVideo} />
-              ))}
-            </div>
-          )}
-           <div className="text-center mt-12">
-            <Link
-              to="/login"
-              className="px-8 py-3 bg-transparent border-2 border-[#EF4444] hover:bg-[#EF4444] text-white font-black italic uppercase tracking-wider skew-x-[-12deg] transition-all transform hover:scale-105"
-            >
-              <span className="block skew-x-[12deg]">Access Full Lab</span>
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* COACHES */}
       <section id="coaches" className="hidden">
         <div className="w-full px-6">
@@ -1231,8 +942,6 @@ export default function LandingPage() {
         </div>
       </footer>
       
-      <VideoModal videoUrl={activeVideo} onClose={() => setActiveVideo(null)} />
-
     </div>
   )
 }
