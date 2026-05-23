@@ -12,6 +12,8 @@ const getStripeClient = () => {
   return new Stripe(stripeSecretKey, { apiVersion: '2023-10-16' })
 }
 
+const activeStripeStatuses = new Set(['active', 'trialing'])
+
 const requireAdmin = async (req: Request, res: Response) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
 
@@ -84,6 +86,39 @@ const cancelSubscriptionIfPresent = async (subscriptionId?: string | null) => {
   } catch (error) {
     console.warn(`Stripe subscription cleanup skipped for ${subscriptionId}:`, getErrorMessage(error))
   }
+}
+
+const findPlayerSubscription = async (playerId: string, storedSubscriptionId?: string | null) => {
+  const stripe = getStripeClient()
+  if (!stripe) return null
+
+  if (storedSubscriptionId) {
+    try {
+      const subscription = await stripe.subscriptions.retrieve(storedSubscriptionId)
+      if (subscription && subscription.status !== 'canceled') return subscription
+    } catch (error) {
+      console.warn(`Stored subscription ${storedSubscriptionId} could not be retrieved:`, getErrorMessage(error))
+    }
+  }
+
+  try {
+    const result = await stripe.subscriptions.search({
+      query: `metadata['player_id']:'${playerId}'`,
+      limit: 1,
+    })
+    if (result.data[0]) return result.data[0]
+  } catch (error) {
+    console.warn('Stripe subscription search failed, falling back to subscription list:', getErrorMessage(error))
+  }
+
+  const statuses: Stripe.SubscriptionListParams.Status[] = ['active', 'trialing', 'past_due', 'unpaid', 'canceled']
+  for (const status of statuses) {
+    const list = await stripe.subscriptions.list({ status, limit: 100 })
+    const match = list.data.find((subscription) => subscription.metadata?.player_id === playerId)
+    if (match) return match
+  }
+
+  return null
 }
 
 const deletePlayerRecord = async (playerId: string) => {
@@ -312,6 +347,159 @@ router.delete('/coaches/:coachId', async (req, res): Promise<void> => {
     })
   } catch (error) {
     console.error('Coach deletion failed:', error)
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+router.post('/players/:playerId/sync-payment', async (req, res): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+
+    const playerId = String(req.params.playerId || '').trim()
+    if (!playerId) {
+      res.status(400).json({ error: 'Missing player id.' })
+      return
+    }
+
+    const { data: player, error: playerError } = await supabase
+      .from('players')
+      .select('*')
+      .eq('id', playerId)
+      .single()
+
+    if (playerError || !player) {
+      res.status(404).json({ error: playerError?.message || 'Player not found.' })
+      return
+    }
+
+    const subscription = await findPlayerSubscription(playerId, player.stripe_subscription_id)
+
+    if (!subscription) {
+      res.json({
+        success: true,
+        paymentStatus: player.payment_status || 'pending',
+        status: player.status || 'pending',
+        message: 'No Stripe subscription was found for this player yet. They may not have finished checkout.',
+      })
+      return
+    }
+
+    const paymentStatus = activeStripeStatuses.has(subscription.status)
+      ? 'paid'
+      : subscription.status === 'canceled'
+        ? 'cancelled'
+        : subscription.status
+    const playerStatus = activeStripeStatuses.has(subscription.status) ? 'active' : player.status || 'pending_payment'
+    const customerId = typeof subscription.customer === 'string' ? subscription.customer : null
+    const uniformPurchased = subscription.metadata?.uniform_purchased === 'true' || Boolean(player.uniform_purchased)
+    const uniformConfirmationCode = subscription.metadata?.uniform_confirmation_code || player.uniform_confirmation_code || null
+
+    const playerUpdate = {
+      status: playerStatus,
+      payment_status: paymentStatus,
+      stripe_subscription_id: subscription.id,
+      stripe_customer_id: customerId,
+      uniform_purchased: uniformPurchased,
+      uniform_confirmation_code: uniformPurchased ? uniformConfirmationCode : null,
+    }
+
+    const { error: playerUpdateError } = await supabase
+      .from('players')
+      .update(playerUpdate)
+      .eq('id', playerId)
+
+    if (playerUpdateError) {
+      const { error: fallbackError } = await supabase
+        .from('players')
+        .update({
+          status: playerStatus,
+          payment_status: paymentStatus,
+        })
+        .eq('id', playerId)
+
+      if (fallbackError) throw new Error(fallbackError.message)
+    }
+
+    const registrationUpdate = {
+      status: playerStatus,
+      payment_status: paymentStatus,
+      stripe_subscription_id: subscription.id,
+      stripe_customer_id: customerId,
+      uniform_purchased: uniformPurchased,
+      uniform_confirmation_code: uniformPurchased ? uniformConfirmationCode : null,
+    }
+
+    const { error: registrationError } = await supabase
+      .from('registrations')
+      .update(registrationUpdate)
+      .or(`player_id.eq.${playerId},checkout_player_id.eq.${playerId}`)
+
+    if (registrationError) {
+      const playerName = player.full_name || `${player.first_name || ''} ${player.last_name || ''}`.trim()
+      const [firstName = '', ...lastParts] = playerName.split(/\s+/).filter(Boolean)
+      await supabase
+        .from('registrations')
+        .update(registrationUpdate)
+        .eq('parent_id', player.parent_id)
+        .eq('first_name', firstName)
+        .eq('last_name', lastParts.join(' '))
+    }
+
+    res.json({
+      success: true,
+      message: activeStripeStatuses.has(subscription.status)
+        ? 'Stripe payment is active. Player was marked paid.'
+        : `Stripe subscription status is ${subscription.status}. Player payment status was updated.`,
+      paymentStatus,
+      status: playerStatus,
+      subscriptionId: subscription.id,
+    })
+  } catch (error) {
+    console.error('Stripe payment sync failed:', error)
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+router.get('/registrations/:registrationId/birth-certificate-url', async (req, res): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+
+    const registrationId = String(req.params.registrationId || '').trim()
+    if (!registrationId) {
+      res.status(400).json({ error: 'Missing registration id.' })
+      return
+    }
+
+    const { data: registration, error: registrationError } = await supabase
+      .from('registrations')
+      .select('birth_cert_path')
+      .eq('id', registrationId)
+      .single()
+
+    if (registrationError || !registration) {
+      res.status(404).json({ error: registrationError?.message || 'Registration not found.' })
+      return
+    }
+
+    if (!registration.birth_cert_path || registration.birth_cert_path === 'not_provided') {
+      res.status(404).json({ error: 'No birth certificate has been uploaded for this player yet.' })
+      return
+    }
+
+    const { data, error } = await supabase.storage
+      .from('birth_certificates')
+      .createSignedUrl(registration.birth_cert_path, 60 * 10)
+
+    if (error || !data?.signedUrl) {
+      res.status(500).json({ error: error?.message || 'Unable to open birth certificate.' })
+      return
+    }
+
+    res.json({ success: true, url: data.signedUrl })
+  } catch (error) {
+    console.error('Birth certificate URL failed:', error)
     res.status(500).json({ error: getErrorMessage(error) })
   }
 })

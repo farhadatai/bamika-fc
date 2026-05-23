@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone, Star, HandHeart } from 'lucide-react';
+import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone, Star, HandHeart, FileText, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { TEAM_OPTIONS, getYoutubeId, getYoutubeThumbnail } from '../lib/utils';
@@ -114,6 +114,21 @@ const getPaymentStatusClass = (status = '') => {
   if (normalized === 'paused') return 'text-blue-300';
   if (normalized === 'cancelled' || normalized === 'canceled') return 'text-red-300';
   return 'text-yellow-300';
+};
+
+const getRegistrationForPlayer = (player = {}, registrations = []) => {
+  const playerName = getPlayerDisplayName(player);
+  const splitName = splitFullName(playerName);
+
+  return registrations.find((registration) => (
+    registration.player_id === player.id
+    || registration.checkout_player_id === player.id
+    || (
+      registration.parent_id === player.parent_id
+      && (registration.first_name || '').toLowerCase() === (player.first_name || splitName.firstName || '').toLowerCase()
+      && (registration.last_name || '').toLowerCase() === (player.last_name || splitName.lastName || '').toLowerCase()
+    )
+  ));
 };
 
 const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach, onPhotoUpload, photoUploading }) => (
@@ -665,6 +680,7 @@ export default function AdminDashboard() {
     drills: [],
     announcements: [],
     spotlights: [],
+    registrations: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -745,6 +761,15 @@ export default function AdminDashboard() {
       players = playersWithParents || [];
     }
 
+    const { data: registrations, error: registrationsError } = await supabase
+      .from('registrations')
+      .select('id, parent_id, player_id, checkout_player_id, first_name, last_name, birth_cert_path, waiver_signed_at, status, payment_status, stripe_subscription_id, stripe_customer_id, uniform_purchased, uniform_confirmation_code, created_at')
+      .order('created_at', { ascending: false });
+
+    if (registrationsError) {
+      notices.push('Registration details could not be loaded. Birth certificate and payment tracking may be limited.');
+    }
+
     const { data: g } = await supabase.from('games').select('*').order('date', { ascending: true });
     const { data: e } = await supabase.from('events').select('*').order('date', { ascending: true }).order('time', { ascending: true });
     const { data: d } = await supabase.from('drills').select('*');
@@ -776,6 +801,7 @@ export default function AdminDashboard() {
       drills: d || [],
       announcements: announcementsError ? [] : a || [],
       spotlights: spotlightsError ? [] : spotlights || [],
+      registrations: registrationsError ? [] : registrations || [],
     });
     setDatabaseNotice(notices.join(' '));
     setLoading(false);
@@ -1171,6 +1197,65 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSyncPlayerPayment = async (player) => {
+    try {
+      const result = await adminApiRequest(`/api/admin/players/${player.id}/sync-payment`, { method: 'POST' });
+      alert(result.message || 'Stripe payment status synced.');
+      fetchData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to sync Stripe payment.');
+    }
+  };
+
+  const handleOpenBirthCertificate = async (registration) => {
+    if (!registration?.id) {
+      alert('No registration record is linked to this player yet.');
+      return;
+    }
+
+    try {
+      const result = await adminApiRequest(`/api/admin/registrations/${registration.id}/birth-certificate-url`);
+      if (result.url) window.open(result.url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to open birth certificate.');
+    }
+  };
+
+  const handleBirthCertificateUpload = async (player, registration, event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (!registration?.id) {
+      alert('No registration record is linked to this player yet, so the certificate cannot be attached.');
+      return;
+    }
+
+    const extension = file.name.includes('.') ? file.name.split('.').pop() : 'file';
+    const filePath = `${player.parent_id || 'admin'}/${player.id}-${Date.now()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('birth_certificates')
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) {
+      alert(uploadError.message);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from('registrations')
+      .update({ birth_cert_path: filePath })
+      .eq('id', registration.id);
+
+    if (updateError) {
+      alert(updateError.message);
+      return;
+    }
+
+    fetchData();
+  };
+
   const handleWaivePlayerFees = async (player) => {
     if (!window.confirm(`Waive fees and mark ${getPlayerDisplayName(player)} as active?`)) return;
 
@@ -1416,6 +1501,18 @@ export default function AdminDashboard() {
     { label: 'News', value: data.announcements.length },
     { label: 'Spotlights', value: data.spotlights.length },
   ];
+  const paymentSummary = data.roster.reduce((summary, player) => {
+    const registration = getRegistrationForPlayer(player, data.registrations);
+    const status = String(player.payment_status || registration?.payment_status || 'pending').toLowerCase();
+    const hasBirthCertificate = !!registration?.birth_cert_path && registration.birth_cert_path !== 'not_provided';
+
+    if (status === 'paid' || status === 'waived') summary.cleared += 1;
+    else if (status === 'cancelled' || status === 'canceled' || status === 'paused') summary.inactive += 1;
+    else summary.pending += 1;
+
+    if (!hasBirthCertificate) summary.missingDocs += 1;
+    return summary;
+  }, { cleared: 0, pending: 0, inactive: 0, missingDocs: 0 });
 
   return (
     <div className="min-h-screen w-full bg-black px-4 py-6 text-white sm:px-6 lg:px-8">
@@ -1625,11 +1722,25 @@ export default function AdminDashboard() {
               <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="text-xl font-black uppercase italic text-white">Player Roster</h2>
-                  <p className="text-sm text-gray-500">All registered athletes with photos, age, teams, and parent contact.</p>
+                  <p className="text-sm text-gray-500">Track athletes, Stripe payment status, documents, teams, and parent contact.</p>
                 </div>
                 <span className="rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-500">
                   {data.roster.length} players
                 </span>
+              </div>
+              <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  ['Cleared', paymentSummary.cleared, 'Paid or waived', 'text-green-300'],
+                  ['Pending fees', paymentSummary.pending, 'Needs Stripe sync or checkout', 'text-yellow-300'],
+                  ['Inactive billing', paymentSummary.inactive, 'Paused or cancelled', 'text-red-300'],
+                  ['Missing docs', paymentSummary.missingDocs, 'Birth certificate needed', 'text-blue-300'],
+                ].map(([label, value, helper, color]) => (
+                  <div key={label} className="rounded-xl border border-gray-800 bg-black p-4">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">{label}</div>
+                    <div className={`mt-1 text-2xl font-black ${color}`}>{value}</div>
+                    <div className="mt-1 text-[10px] font-bold text-gray-500">{helper}</div>
+                  </div>
+                ))}
               </div>
               {data.roster.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">No players have been registered yet.</div>
@@ -1641,7 +1752,11 @@ export default function AdminDashboard() {
                   data.parents.find((parent) => parent.id === p.parent_id || parent.id === p.user_id);
                 const playerName = getPlayerDisplayName(p);
                 const isInactive = ['inactive', 'cancelled', 'canceled'].includes((p.status || '').toLowerCase());
-                const paymentStatus = p.payment_status || 'Pending';
+                const registration = getRegistrationForPlayer(p, data.registrations);
+                const paymentStatus = p.payment_status || registration?.payment_status || 'Pending';
+                const rosterStatus = p.status || registration?.status || 'pending';
+                const stripeSubscriptionId = p.stripe_subscription_id || registration?.stripe_subscription_id;
+                const hasBirthCertificate = !!registration?.birth_cert_path && registration.birth_cert_path !== 'not_provided';
 
                 return (
                   <div key={p.id} className="bg-black border border-gray-800 rounded-2xl p-4 flex gap-4 transition-colors hover:border-[#EF4444]/70">
@@ -1718,10 +1833,20 @@ export default function AdminDashboard() {
                               {paymentStatus}
                             </div>
                             <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-gray-600">
-                              Status: {p.status || 'pending'}
+                              Status: {rosterStatus}
+                            </div>
+                            <div className="mt-1 max-w-[160px] truncate text-[9px] font-bold text-gray-500" title={stripeSubscriptionId || 'No Stripe subscription linked'}>
+                              Stripe: {stripeSubscriptionId ? stripeSubscriptionId : 'Not linked'}
                             </div>
                           </div>
                           <div className="flex flex-col gap-2">
+                            <button
+                              onClick={() => handleSyncPlayerPayment(p)}
+                              className="inline-flex items-center justify-center gap-1 rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-blue-500 hover:text-blue-300"
+                            >
+                              <RefreshCw size={12} />
+                              Sync Stripe
+                            </button>
                             <button
                               onClick={() => handleWaivePlayerFees(p)}
                               className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-400"
@@ -1767,6 +1892,46 @@ export default function AdminDashboard() {
                         ) : (
                           <div className="mt-1 text-xs font-bold text-gray-400">Not purchased at checkout</div>
                         )}
+                      </div>
+
+                      <div className="mt-3 rounded-lg border border-gray-800 bg-neutral-950 p-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Birth Certificate</div>
+                            <div className={`mt-1 text-xs font-black uppercase ${hasBirthCertificate ? 'text-green-300' : 'text-yellow-300'}`}>
+                              {hasBirthCertificate ? 'Uploaded' : 'Missing'}
+                            </div>
+                            <div className="mt-1 max-w-[180px] truncate text-[9px] text-gray-500" title={registration?.birth_cert_path || ''}>
+                              {registration?.birth_cert_path && registration.birth_cert_path !== 'not_provided'
+                                ? registration.birth_cert_path
+                                : 'No file attached'}
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <button
+                              type="button"
+                              disabled={!hasBirthCertificate}
+                              onClick={() => handleOpenBirthCertificate(registration)}
+                              className="inline-flex items-center justify-center gap-1 rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37] disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <FileText size={12} />
+                              View
+                            </button>
+                            <label className="inline-flex cursor-pointer items-center justify-center gap-1 rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-300">
+                              <Upload size={12} />
+                              Upload
+                              <input
+                                type="file"
+                                accept="image/*,.pdf"
+                                className="hidden"
+                                onChange={(event) => handleBirthCertificateUpload(p, registration, event)}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-[9px] font-black uppercase tracking-widest text-gray-600">
+                          Waiver: {registration?.waiver_signed_at ? 'Signed' : p.waiver_signed ? 'Signed' : 'Not signed'}
+                        </div>
                       </div>
 
                       <div className="mt-3 border-t border-gray-800 pt-3">
