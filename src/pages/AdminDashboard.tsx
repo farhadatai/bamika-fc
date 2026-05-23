@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone, Star, HandHeart, FileText, RefreshCw } from 'lucide-react';
+import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone, Star, HandHeart, FileText, RefreshCw, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { TEAM_OPTIONS, getYoutubeId, getYoutubeThumbnail } from '../lib/utils';
@@ -695,6 +695,7 @@ export default function AdminDashboard() {
   const [isSpotlightModalOpen, setIsSpotlightModalOpen] = useState(false);
   const [selectedParent, setSelectedParent] = useState(null);
   const [selectedCoach, setSelectedCoach] = useState(null);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
   const [spotlightUploading, setSpotlightUploading] = useState(false);
   const [coachPhotoUploading, setCoachPhotoUploading] = useState(false);
@@ -1482,6 +1483,125 @@ export default function AdminDashboard() {
     }
   };
 
+  const getLinkedParent = (player) => (
+    player?.profiles ||
+    data.parents.find((parent) => parent.id === player?.parent_id || parent.id === player?.user_id)
+  );
+
+  const csvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+  const downloadCsv = (filename, headers, rows) => {
+    const csv = [
+      headers.map(csvValue).join(','),
+      ...rows.map((row) => headers.map((header) => csvValue(row[header])).join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const openPrintableReport = (title, headers, rows) => {
+    const reportWindow = window.open('', '_blank', 'noopener,noreferrer');
+    if (!reportWindow) return;
+
+    const tableRows = rows.map((row) => `
+      <tr>${headers.map((header) => `<td>${String(row[header] ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]))}</td>`).join('')}</tr>
+    `).join('');
+
+    reportWindow.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
+            h1 { font-size: 22px; text-transform: uppercase; }
+            table { border-collapse: collapse; width: 100%; font-size: 11px; }
+            th, td { border: 1px solid #ddd; padding: 7px; text-align: left; vertical-align: top; }
+            th { background: #111; color: #fff; text-transform: uppercase; }
+          </style>
+        </head>
+        <body>
+          <h1>${title}</h1>
+          <p>Generated ${new Date().toLocaleString()}</p>
+          <table>
+            <thead><tr>${headers.map((header) => `<th>${header}</th>`).join('')}</tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    reportWindow.document.close();
+    reportWindow.focus();
+    reportWindow.print();
+  };
+
+  const buildExport = (type) => {
+    if (type === 'parents') {
+      const headers = ['Last Name', 'First Name', 'Email', 'Phone', 'Players'];
+      const rows = data.parents.map((parent) => {
+        const displayName = getParentDisplayName(parent);
+        const familyPlayers = data.roster
+          .filter((player) => player.parent_id === parent.id || player.user_id === parent.id)
+          .map(getPlayerDisplayName)
+          .join('; ');
+        return {
+          'Last Name': displayName.lastName,
+          'First Name': displayName.firstName,
+          Email: parent.email || '',
+          Phone: parent.phone || '',
+          Players: familyPlayers,
+        };
+      });
+      return { filename: 'bamika-parents.csv', title: 'Bamika FC Parent Report', headers, rows };
+    }
+
+    if (type === 'coaches') {
+      const headers = ['Name', 'Role', 'Team', 'Email'];
+      const rows = data.coaches.map((coach) => ({
+        Name: coach.name || coach.full_name || 'Bamika Coach',
+        Role: coach.role || coach.specialty || 'Coach',
+        Team: coach.team_id || 'Unassigned',
+        Email: coach.profiles?.email || '',
+      }));
+      return { filename: 'bamika-coaches.csv', title: 'Bamika FC Coach Report', headers, rows };
+    }
+
+    const headers = ['Player', 'Age', 'Team', 'Payment', 'Status', 'Birth Certificate', 'Parent', 'Phone', 'Email'];
+    const rows = [...data.roster]
+      .sort((a, b) => getPlayerDisplayName(a).localeCompare(getPlayerDisplayName(b)))
+      .map((player) => {
+        const parent = getLinkedParent(player);
+        const registration = getRegistrationForPlayer(player, data.registrations);
+        const hasBirthCertificate = !!registration?.birth_cert_path && registration.birth_cert_path !== 'not_provided';
+        return {
+          Player: getPlayerDisplayName(player),
+          Age: formatAge(player.date_of_birth || player.dob),
+          Team: player.team_assigned || 'Unassigned',
+          Payment: player.payment_status || registration?.payment_status || 'Pending',
+          Status: player.status || registration?.status || 'pending',
+          'Birth Certificate': hasBirthCertificate ? 'Uploaded' : 'Missing',
+          Parent: parent?.first_name || parent?.last_name ? `${parent?.first_name || ''} ${parent?.last_name || ''}`.trim() : parent?.full_name || '',
+          Phone: parent?.phone || '',
+          Email: parent?.email || '',
+        };
+      });
+    return { filename: 'bamika-players.csv', title: 'Bamika FC Player Report', headers, rows };
+  };
+
+  const exportReport = (type, format) => {
+    const report = buildExport(type);
+    if (format === 'pdf') {
+      openPrintableReport(report.title, report.headers, report.rows);
+      return;
+    }
+    downloadCsv(report.filename, report.headers, report.rows);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -1501,6 +1621,7 @@ export default function AdminDashboard() {
     { label: 'News', value: data.announcements.length },
     { label: 'Spotlights', value: data.spotlights.length },
   ];
+  const sortedRoster = [...data.roster].sort((a, b) => getPlayerDisplayName(a).localeCompare(getPlayerDisplayName(b)));
   const paymentSummary = data.roster.reduce((summary, player) => {
     const registration = getRegistrationForPlayer(player, data.registrations);
     const status = String(player.payment_status || registration?.payment_status || 'pending').toLowerCase();
@@ -1543,6 +1664,34 @@ export default function AdminDashboard() {
               <div className="mt-2 text-3xl font-black text-white">{stat.value}</div>
             </div>
           ))}
+        </div>
+
+        <div className="rounded-2xl border border-gray-800 bg-neutral-950 p-4">
+          <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-sm font-black uppercase italic text-white">Reports</h2>
+              <p className="text-xs text-gray-500">Download clean records for Excel or print/save as PDF.</p>
+            </div>
+          </div>
+          <div className="grid gap-2 md:grid-cols-3">
+            {[
+              ['players', 'Players'],
+              ['parents', 'Parents'],
+              ['coaches', 'Coaches'],
+            ].map(([type, label]) => (
+              <div key={type} className="flex items-center justify-between gap-2 rounded-xl border border-gray-800 bg-black p-3">
+                <span className="text-xs font-black uppercase tracking-widest text-gray-300">{label}</span>
+                <div className="flex gap-2">
+                  <button onClick={() => exportReport(type, 'csv')} className="inline-flex items-center gap-1 rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">
+                    <Download size={13} /> Excel
+                  </button>
+                  <button onClick={() => exportReport(type, 'pdf')} className="inline-flex items-center gap-1 rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-[#EF4444]">
+                    <FileText size={13} /> PDF
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {databaseNotice && (
@@ -1742,14 +1891,26 @@ export default function AdminDashboard() {
                   </div>
                 ))}
               </div>
-              {data.roster.length === 0 ? (
+              {sortedRoster.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">No players have been registered yet.</div>
               ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {data.roster.map((p) => {
+              <div className="overflow-x-auto rounded-xl border border-gray-800 bg-black">
+                <table className="min-w-[980px] w-full text-left">
+                  <thead className="bg-neutral-950">
+                    <tr>
+                      <th className="p-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Player</th>
+                      <th className="p-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Age</th>
+                      <th className="p-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Payment</th>
+                      <th className="p-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Team</th>
+                      <th className="p-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Parent</th>
+                      <th className="p-3 text-[10px] font-black uppercase tracking-widest text-gray-500">Docs</th>
+                      <th className="p-3 text-right text-[10px] font-black uppercase tracking-widest text-gray-500">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+              {sortedRoster.map((p) => {
                 const linkedParent =
-                  p.profiles ||
-                  data.parents.find((parent) => parent.id === p.parent_id || parent.id === p.user_id);
+                  getLinkedParent(p);
                 const playerName = getPlayerDisplayName(p);
                 const isInactive = ['inactive', 'cancelled', 'canceled'].includes((p.status || '').toLowerCase());
                 const registration = getRegistrationForPlayer(p, data.registrations);
@@ -1759,208 +1920,80 @@ export default function AdminDashboard() {
                 const hasBirthCertificate = !!registration?.birth_cert_path && registration.birth_cert_path !== 'not_provided';
 
                 return (
-                  <div key={p.id} className="bg-black border border-gray-800 rounded-2xl p-4 flex gap-4 transition-colors hover:border-[#EF4444]/70">
-                    <PlayerPhoto player={p} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="truncate text-lg font-black uppercase italic text-white">
+                  <tr key={p.id} className="border-t border-gray-900 hover:bg-neutral-950/80">
+                    <td className="p-3">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPlayer(p)}
+                        className="flex items-center gap-3 text-left"
+                      >
+                        <PlayerPhoto player={p} size="small" />
+                        <span>
+                          <span className="block text-sm font-black uppercase italic text-white hover:text-[#D4AF37]">
                             {playerName}
-                          </h3>
-                          <p className="text-xs font-bold uppercase text-gray-500">
-                            {formatAge(p.date_of_birth || p.dob)}
-                          </p>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-[#EF4444]/10 px-2 py-1 text-[9px] font-black uppercase text-[#EF4444]">
-                          {isInactive ? 'Inactive' : (p.team_assigned || 'Unassigned')}
+                          </span>
+                          <span className="block text-[10px] font-bold uppercase text-gray-500">{rosterStatus}</span>
                         </span>
+                      </button>
+                    </td>
+                    <td className="p-3 text-xs font-bold uppercase text-gray-400">{formatAge(p.date_of_birth || p.dob)}</td>
+                    <td className="p-3">
+                      <div className={`text-xs font-black uppercase ${getPaymentStatusClass(paymentStatus)}`}>{paymentStatus}</div>
+                      <div className="mt-1 max-w-[140px] truncate text-[10px] text-gray-600" title={stripeSubscriptionId || 'No Stripe subscription linked'}>{stripeSubscriptionId ? 'Stripe linked' : 'Not linked'}</div>
+                    </td>
+                    <td className="p-3">
+                      <select
+                        value={p.team_assigned || 'Unassigned'}
+                        onChange={(e) => handleAssignPlayerTeam(p.id, e.target.value)}
+                        className="w-full rounded-lg border border-gray-800 bg-neutral-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#EF4444]"
+                      >
+                        {TEAM_OPTIONS.map((team) => (
+                          <option key={team} value={team}>{team}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="p-3">
+                      <div className="max-w-[180px] truncate text-xs font-bold text-gray-300">
+                        {linkedParent?.first_name || linkedParent?.last_name
+                          ? `${linkedParent?.first_name || ''} ${linkedParent?.last_name || ''}`.trim()
+                          : linkedParent?.full_name || 'Parent not linked'}
                       </div>
-
-                      <div className="mt-4">
-                        <label className="mb-2 block text-[9px] font-black uppercase tracking-widest text-gray-600">Team Assignment</label>
-                        <select
-                          value={p.team_assigned || 'Unassigned'}
-                          onChange={(e) => handleAssignPlayerTeam(p.id, e.target.value)}
-                          className="w-full rounded-lg border border-gray-800 bg-neutral-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#EF4444]"
+                      <div className="max-w-[180px] truncate text-[10px] text-gray-600">{linkedParent?.phone || linkedParent?.email || 'No contact'}</div>
+                    </td>
+                    <td className="p-3">
+                      <div className={`text-xs font-black uppercase ${hasBirthCertificate ? 'text-green-300' : 'text-yellow-300'}`}>{hasBirthCertificate ? 'Cert uploaded' : 'Cert missing'}</div>
+                      <div className="mt-1 text-[10px] text-gray-600">Waiver: {registration?.waiver_signed_at || p.waiver_signed ? 'Signed' : 'Missing'}</div>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => handleSyncPlayerPayment(p)}
+                          className="inline-flex items-center gap-1 rounded-md border border-gray-700 px-2 py-2 text-[9px] font-black uppercase text-gray-300 hover:border-blue-500 hover:text-blue-300"
+                          title="Sync Stripe payment"
                         >
-                          {TEAM_OPTIONS.map((team) => (
-                            <option key={team} value={team}>{team}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
-                        <div className="rounded-lg border border-gray-800 bg-neutral-950 p-2">
-                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</div>
-                          <select
-                            value={p.position || 'TBD'}
-                            onChange={(e) => handleUpdatePlayer(p.id, { position: e.target.value })}
-                            className="mt-1 w-full rounded-md border border-gray-800 bg-black px-2 py-1 font-bold text-gray-300 outline-none focus:border-[#EF4444]"
-                          >
-                            {POSITION_OPTIONS.map((position) => (
-                              <option key={position} value={position}>{position}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="rounded-lg border border-gray-800 bg-neutral-950 p-2">
-                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Number</div>
-                          <input
-                            defaultValue={p.jersey_number || ''}
-                            placeholder="-"
-                            onBlur={(e) => handleUpdatePlayer(p.id, { jersey_number: e.target.value || '-' })}
-                            className="mt-1 w-full rounded-md border border-gray-800 bg-black px-2 py-1 font-bold text-gray-300 outline-none focus:border-[#EF4444]"
-                          />
-                        </div>
-                        <div className="rounded-lg border border-gray-800 bg-neutral-950 p-2">
-                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Size</div>
-                          <select
-                            value={p.jersey_size || 'YM'}
-                            onChange={(e) => handleUpdatePlayer(p.id, { jersey_size: e.target.value })}
-                            className="mt-1 w-full rounded-md border border-gray-800 bg-black px-2 py-1 font-bold text-gray-300 outline-none focus:border-[#EF4444]"
-                          >
-                            {JERSEY_SIZE_OPTIONS.map((size) => (
-                              <option key={size} value={size}>{size}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 rounded-lg border border-gray-800 bg-neutral-950 p-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Fees</div>
-                            <div className={`mt-1 text-xs font-black uppercase ${getPaymentStatusClass(paymentStatus)}`}>
-                              {paymentStatus}
-                            </div>
-                            <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-gray-600">
-                              Status: {rosterStatus}
-                            </div>
-                            <div className="mt-1 max-w-[160px] truncate text-[9px] font-bold text-gray-500" title={stripeSubscriptionId || 'No Stripe subscription linked'}>
-                              Stripe: {stripeSubscriptionId ? stripeSubscriptionId : 'Not linked'}
-                            </div>
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            <button
-                              onClick={() => handleSyncPlayerPayment(p)}
-                              className="inline-flex items-center justify-center gap-1 rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-blue-500 hover:text-blue-300"
-                            >
-                              <RefreshCw size={12} />
-                              Sync Stripe
-                            </button>
-                            <button
-                              onClick={() => handleWaivePlayerFees(p)}
-                              className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-400"
-                            >
-                              Waive
-                            </button>
-                            {isInactive ? (
-                              <button
-                                onClick={() => handleReactivatePlayer(p)}
-                                className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-blue-500 hover:text-blue-300"
-                              >
-                                Reactivate
-                              </button>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => handleCancelPlayerBilling(p)}
-                                  className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-red-500 hover:text-red-300"
-                                >
-                                  Cancel billing
-                                </button>
-                                <button
-                                  onClick={() => handlePausePlayer(p)}
-                                  className="rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-yellow-500 hover:text-yellow-300"
-                                >
-                                  Inactive only
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 rounded-lg border border-gray-800 bg-neutral-950 p-2">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Uniform</div>
-                        {p.uniform_purchased ? (
-                          <>
-                            <div className="mt-1 text-xs font-black uppercase text-green-300">Purchased</div>
-                            <div className="mt-1 break-all text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
-                              Code: {p.uniform_confirmation_code || 'Pending confirmation'}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="mt-1 text-xs font-bold text-gray-400">Not purchased at checkout</div>
-                        )}
-                      </div>
-
-                      <div className="mt-3 rounded-lg border border-gray-800 bg-neutral-950 p-2">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Birth Certificate</div>
-                            <div className={`mt-1 text-xs font-black uppercase ${hasBirthCertificate ? 'text-green-300' : 'text-yellow-300'}`}>
-                              {hasBirthCertificate ? 'Uploaded' : 'Missing'}
-                            </div>
-                            <div className="mt-1 max-w-[180px] truncate text-[9px] text-gray-500" title={registration?.birth_cert_path || ''}>
-                              {registration?.birth_cert_path && registration.birth_cert_path !== 'not_provided'
-                                ? registration.birth_cert_path
-                                : 'No file attached'}
-                            </div>
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            <button
-                              type="button"
-                              disabled={!hasBirthCertificate}
-                              onClick={() => handleOpenBirthCertificate(registration)}
-                              className="inline-flex items-center justify-center gap-1 rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37] disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                              <FileText size={12} />
-                              View
-                            </button>
-                            <label className="inline-flex cursor-pointer items-center justify-center gap-1 rounded-md border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-300">
-                              <Upload size={12} />
-                              Upload
-                              <input
-                                type="file"
-                                accept="image/*,.pdf"
-                                className="hidden"
-                                onChange={(event) => handleBirthCertificateUpload(p, registration, event)}
-                              />
-                            </label>
-                          </div>
-                        </div>
-                        <div className="mt-2 text-[9px] font-black uppercase tracking-widest text-gray-600">
-                          Waiver: {registration?.waiver_signed_at ? 'Signed' : p.waiver_signed ? 'Signed' : 'Not signed'}
-                        </div>
-                      </div>
-
-                      <div className="mt-3 border-t border-gray-800 pt-3">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Parent</div>
-                        <div className="mt-1 truncate text-sm font-bold text-gray-300">
-                          {linkedParent?.first_name || linkedParent?.last_name
-                            ? `${linkedParent?.first_name || ''} ${linkedParent?.last_name || ''}`.trim()
-                            : linkedParent?.full_name || 'Parent not linked'}
-                        </div>
-                        <div className="mt-1 truncate text-xs text-gray-500">
-                          {linkedParent?.phone || 'No phone listed'}
-                        </div>
-                        <div className="mt-1 truncate text-xs text-gray-500">
-                          {linkedParent?.email || 'No email listed'}
-                        </div>
-                      </div>
-                      <div className="mt-3 flex justify-end">
+                          <RefreshCw size={12} />
+                          Sync
+                        </button>
+                        <button
+                          onClick={() => setSelectedPlayer(p)}
+                          className="rounded-md border border-gray-700 px-3 py-2 text-[9px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]"
+                        >
+                          View
+                        </button>
                         <button
                           onClick={() => handleDeletePlayer(p)}
-                          className="inline-flex items-center gap-1 rounded-md border border-red-500/20 px-2 py-1 text-[9px] font-black uppercase text-red-300 hover:border-red-500 hover:text-red-200"
+                          className="inline-flex items-center gap-1 rounded-md border border-red-500/20 px-2 py-2 text-[9px] font-black uppercase text-red-300 hover:border-red-500 hover:text-red-200"
                         >
                           <Trash2 size={12} />
-                          Delete duplicate
+                          Delete
                         </button>
                       </div>
-                    </div>
-                  </div>
+                    </td>
+                  </tr>
                 );
               })}
+                  </tbody>
+                </table>
               </div>
               )}
             </div>
@@ -2364,6 +2397,139 @@ export default function AdminDashboard() {
             onSave={handleSaveParent}
           />
         )}
+
+        {selectedPlayer && (() => {
+          const p = selectedPlayer;
+          const linkedParent = getLinkedParent(p);
+          const registration = getRegistrationForPlayer(p, data.registrations);
+          const paymentStatus = p.payment_status || registration?.payment_status || 'Pending';
+          const rosterStatus = p.status || registration?.status || 'pending';
+          const stripeSubscriptionId = p.stripe_subscription_id || registration?.stripe_subscription_id;
+          const hasBirthCertificate = !!registration?.birth_cert_path && registration.birth_cert_path !== 'not_provided';
+          const isInactive = ['inactive', 'cancelled', 'canceled'].includes((p.status || '').toLowerCase());
+
+          return (
+            <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
+              <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-gray-800 bg-neutral-900 shadow-2xl">
+                <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gray-800 bg-neutral-900 p-5">
+                  <div className="flex items-center gap-4">
+                    <PlayerPhoto player={p} />
+                    <div>
+                      <h2 className="text-2xl font-black uppercase italic text-white">{getPlayerDisplayName(p)}</h2>
+                      <p className="mt-1 text-xs font-black uppercase tracking-widest text-gray-500">{formatAge(p.date_of_birth || p.dob)} - {rosterStatus}</p>
+                    </div>
+                  </div>
+                  <X className="cursor-pointer text-gray-500 hover:text-white" onClick={() => setSelectedPlayer(null)} />
+                </div>
+                <div className="grid gap-4 p-5 lg:grid-cols-[1fr_0.85fr]">
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-gray-800 bg-black p-4">
+                      <h3 className="mb-4 text-sm font-black uppercase italic text-white">Roster Details</h3>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="block">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Team</span>
+                          <select value={p.team_assigned || 'Unassigned'} onChange={(e) => handleAssignPlayerTeam(p.id, e.target.value)} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#EF4444]">
+                            {TEAM_OPTIONS.map((team) => <option key={team} value={team}>{team}</option>)}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</span>
+                          <select value={p.position || 'TBD'} onChange={(e) => handleUpdatePlayer(p.id, { position: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#EF4444]">
+                            {POSITION_OPTIONS.map((position) => <option key={position} value={position}>{position}</option>)}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Jersey Number</span>
+                          <input defaultValue={p.jersey_number || ''} placeholder="-" onBlur={(e) => handleUpdatePlayer(p.id, { jersey_number: e.target.value || '-' })} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#EF4444]" />
+                        </label>
+                        <label className="block">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Jersey Size</span>
+                          <select value={p.jersey_size || 'YM'} onChange={(e) => handleUpdatePlayer(p.id, { jersey_size: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#EF4444]">
+                            {JERSEY_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-800 bg-black p-4">
+                      <h3 className="mb-3 text-sm font-black uppercase italic text-white">Parent Contact</h3>
+                      <div className="text-sm font-bold text-gray-300">
+                        {linkedParent?.first_name || linkedParent?.last_name ? `${linkedParent?.first_name || ''} ${linkedParent?.last_name || ''}`.trim() : linkedParent?.full_name || 'Parent not linked'}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">{linkedParent?.phone || 'No phone listed'}</div>
+                      <div className="mt-1 text-xs text-gray-500">{linkedParent?.email || 'No email listed'}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-gray-800 bg-black p-4">
+                      <h3 className="mb-3 text-sm font-black uppercase italic text-white">Payment</h3>
+                      <div className={`text-xl font-black uppercase ${getPaymentStatusClass(paymentStatus)}`}>{paymentStatus}</div>
+                      <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-600">Status: {rosterStatus}</div>
+                      <div className="mt-2 break-all text-[10px] text-gray-500">Stripe: {stripeSubscriptionId || 'Not linked'}</div>
+                      <div className="mt-4 grid gap-2">
+                        <button onClick={() => handleSyncPlayerPayment(p)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-700 px-3 py-2 text-xs font-black uppercase text-gray-300 hover:border-blue-500 hover:text-blue-300">
+                          <RefreshCw size={14} /> Sync Stripe
+                        </button>
+                        <button onClick={() => handleWaivePlayerFees(p)} className="rounded-lg border border-gray-700 px-3 py-2 text-xs font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-400">
+                          Waive Fees
+                        </button>
+                        {isInactive ? (
+                          <button onClick={() => handleReactivatePlayer(p)} className="rounded-lg border border-gray-700 px-3 py-2 text-xs font-black uppercase text-gray-300 hover:border-blue-500 hover:text-blue-300">
+                            Reactivate
+                          </button>
+                        ) : (
+                          <>
+                            <button onClick={() => handleCancelPlayerBilling(p)} className="rounded-lg border border-gray-700 px-3 py-2 text-xs font-black uppercase text-gray-300 hover:border-red-500 hover:text-red-300">
+                              Cancel Billing
+                            </button>
+                            <button onClick={() => handlePausePlayer(p)} className="rounded-lg border border-gray-700 px-3 py-2 text-xs font-black uppercase text-gray-300 hover:border-yellow-500 hover:text-yellow-300">
+                              Inactive Only
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-800 bg-black p-4">
+                      <h3 className="mb-3 text-sm font-black uppercase italic text-white">Documents</h3>
+                      <div className={`text-xs font-black uppercase ${hasBirthCertificate ? 'text-green-300' : 'text-yellow-300'}`}>
+                        Birth certificate: {hasBirthCertificate ? 'Uploaded' : 'Missing'}
+                      </div>
+                      <div className="mt-1 break-all text-[10px] text-gray-500">{registration?.birth_cert_path && registration.birth_cert_path !== 'not_provided' ? registration.birth_cert_path : 'No file attached'}</div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button disabled={!hasBirthCertificate} onClick={() => handleOpenBirthCertificate(registration)} className="inline-flex items-center gap-1 rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37] disabled:cursor-not-allowed disabled:opacity-40">
+                          <FileText size={13} /> View
+                        </button>
+                        <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-300">
+                          <Upload size={13} /> Upload
+                          <input type="file" accept="image/*,.pdf" className="hidden" onChange={(event) => handleBirthCertificateUpload(p, registration, event)} />
+                        </label>
+                      </div>
+                      <div className="mt-3 text-[10px] font-black uppercase tracking-widest text-gray-600">Waiver: {registration?.waiver_signed_at || p.waiver_signed ? 'Signed' : 'Not signed'}</div>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-800 bg-black p-4">
+                      <h3 className="mb-2 text-sm font-black uppercase italic text-white">Uniform</h3>
+                      {p.uniform_purchased ? (
+                        <div>
+                          <div className="text-xs font-black uppercase text-green-300">Purchased</div>
+                          <div className="mt-1 break-all text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Code: {p.uniform_confirmation_code || 'Pending confirmation'}</div>
+                        </div>
+                      ) : (
+                        <div className="text-xs font-bold text-gray-400">Not purchased at checkout</div>
+                      )}
+                    </div>
+
+                    <button onClick={() => handleDeletePlayer(p)} className="w-full rounded-lg border border-red-500/30 px-3 py-3 text-xs font-black uppercase text-red-300 hover:border-red-500 hover:text-red-200">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {isGameModalOpen && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
