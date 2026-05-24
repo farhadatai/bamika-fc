@@ -126,6 +126,9 @@ export default function Dashboard() {
 
   const firstName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'Bamika Family';
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const isAdmin = userRole === 'admin';
+  const isCoach = userRole === 'coach';
+  const isParent = !isAdmin && !isCoach;
 
   useEffect(() => {
     const fetchHubData = async () => {
@@ -181,9 +184,9 @@ export default function Dashboard() {
       ]);
 
       let teamAnnouncements: Announcement[] = [];
-      const basePlayers = playersResponse.data || [];
+      const basePlayers = isParent ? playersResponse.data || [] : [];
 
-      if (userRole !== 'admin') {
+      if (isParent) {
         const teams = [...new Set(basePlayers.map((player) => player.team_assigned).filter((team) => team && team !== 'Unassigned'))];
 
         if (teams.length > 0) {
@@ -235,7 +238,7 @@ export default function Dashboard() {
     };
 
     fetchHubData();
-  }, [today, user, userRole]);
+  }, [today, user, userRole, isParent]);
 
   const primaryPlayer = players[0];
   const getPlayerMessages = (player: PlayerSummary) => teamMessages
@@ -244,32 +247,43 @@ export default function Dashboard() {
 
   const quickActions = [
     ...(userRole === 'admin'
-      ? [{ title: 'Admin Dashboard', body: 'Manage families, coaches, teams, and club content.', to: '/admin', icon: Shield }]
+      ? [{ title: 'Open Admin Tools', body: 'Manage registrations, rosters, coaches, schedules, payments, sponsors, and club content.', to: '/admin', icon: Shield }]
       : []),
     ...(userRole === 'coach'
-      ? [{ title: 'Coach Dashboard', body: 'View roster, team communication, and your schedule.', to: '/coach', icon: Users }]
+      ? [{ title: 'Open Coach Tools', body: 'Manage your assigned roster, player details, and team communication.', to: '/coach', icon: Users }]
       : []),
-    { title: 'Register Athlete', body: 'Add another player to your family account.', to: '/register-new-athlete', icon: User },
-    { title: 'Training Lab', body: 'Watch Bamika FC drills and player tutorials.', to: '/training-lab', icon: Play },
+    ...(isParent
+      ? [
+        { title: players.length > 0 ? 'Add Athlete' : 'Register Athlete', body: players.length > 0 ? 'Add another player to your family account.' : 'Start the player registration process for your family.', to: '/register-new-athlete', icon: User },
+        { title: 'Training Lab', body: 'Watch Bamika FC drills and player tutorials.', to: '/training-lab', icon: Play },
+      ]
+      : []),
   ];
+  const welcomeTitle = isAdmin ? 'Admin Dashboard' : isCoach ? 'Coach Dashboard' : 'Family Dashboard';
+  const welcomeBody = isAdmin
+    ? 'A clean overview for club operations. Use Admin Tools when you need to manage records, payments, rosters, schedules, sponsors, and content.'
+    : isCoach
+      ? 'A focused coach overview. Use Coach Tools for roster updates, player details, and team messages.'
+      : 'Track player status, upcoming practices, match days, announcements, and family resources in one place.';
 
   return (
     <div className="w-full py-6 text-white sm:py-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         <section className="overflow-hidden rounded-2xl border border-gray-800 bg-neutral-950">
-          <div className="grid gap-0 lg:grid-cols-[1.4fr_0.8fr]">
+          <div className={`grid gap-0 ${isParent && primaryPlayer ? 'lg:grid-cols-[1.4fr_0.8fr]' : ''}`}>
             <div className="p-6 sm:p-8 lg:p-10">
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#EF4444]/40 bg-[#EF4444]/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#FCA5A5]">
                 Central hub
               </div>
               <h1 className="max-w-3xl text-4xl font-black uppercase italic leading-tight text-white sm:text-5xl">
-                Welcome back, <span className="text-[#EF4444]">{firstName}</span>
+                {welcomeTitle}, <span className="text-[#EF4444]">{firstName}</span>
               </h1>
               <p className="mt-4 max-w-2xl text-base leading-7 text-gray-400">
-                Track player status, upcoming practices, match days, announcements, and training resources from one club command center.
+                {welcomeBody}
               </p>
 
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              <div className={`mt-8 grid gap-3 ${isParent ? 'sm:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+                {isParent && (
                 <div className="rounded-xl border border-gray-800 bg-black p-4">
                   <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
                     <Users size={15} className="text-[#EF4444]" />
@@ -277,6 +291,25 @@ export default function Dashboard() {
                   </div>
                   <div className="mt-2 text-3xl font-black">{players.length}</div>
                 </div>
+                )}
+                {isAdmin && (
+                <div className="rounded-xl border border-gray-800 bg-black p-4">
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                    <Shield size={15} className="text-[#EF4444]" />
+                    Admin tools
+                  </div>
+                  <div className="mt-2 text-3xl font-black">Open</div>
+                </div>
+                )}
+                {isCoach && (
+                <div className="rounded-xl border border-gray-800 bg-black p-4">
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                    <Users size={15} className="text-[#EF4444]" />
+                    Coach tools
+                  </div>
+                  <div className="mt-2 text-3xl font-black">Open</div>
+                </div>
+                )}
                 <div className="rounded-xl border border-gray-800 bg-black p-4">
                   <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
                     <CalendarDays size={15} className="text-[#EF4444]" />
@@ -294,7 +327,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="border-t border-gray-800 bg-[linear-gradient(140deg,#171717,#000)] p-6 sm:p-8 lg:border-l lg:border-t-0">
+            <div className={`border-t border-gray-800 bg-[linear-gradient(140deg,#171717,#000)] p-6 sm:p-8 lg:border-l lg:border-t-0 ${isParent && primaryPlayer ? '' : 'hidden'}`}>
               <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Featured athlete</div>
               {primaryPlayer ? (
                 <div className="mt-5">
@@ -373,16 +406,19 @@ export default function Dashboard() {
           </section>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className={`grid gap-6 ${isParent ? 'lg:grid-cols-[1.1fr_0.9fr]' : 'lg:grid-cols-1'}`}>
+          {isParent && (
           <section className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
             <div className="mb-5 flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-black uppercase italic">My Athletes</h2>
                 <p className="mt-1 text-sm text-gray-500">Team placement, jersey details, and registration status.</p>
               </div>
+              {players.length > 0 && (
               <Link to="/register-new-athlete" className="hidden rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-white sm:inline-flex">
                 Add Player
               </Link>
+              )}
             </div>
 
             {loading ? (
@@ -470,6 +506,7 @@ export default function Dashboard() {
               </div>
             )}
           </section>
+          )}
 
           <section className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
             <div className="mb-5 flex items-center gap-2">

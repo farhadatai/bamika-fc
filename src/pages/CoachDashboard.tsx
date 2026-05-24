@@ -643,34 +643,34 @@ export default function CoachDashboard() {
       ) : null}
 
       {/* UPCOMING GAMES SECTION */}
-      <div>
-        <h2 className="text-2xl font-black uppercase italic text-white mb-4">Upcoming Games</h2>
+      <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
+        <h2 className="text-xl font-black uppercase italic text-white mb-4">Upcoming Games</h2>
         {games.length === 0 ? (
-          <div className="bg-white p-6 rounded-xl shadow-sm text-center text-gray-500 border border-gray-200">
+          <div className="rounded-xl border border-dashed border-gray-800 bg-black p-6 text-center text-gray-500">
             No upcoming games scheduled.
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {games.map((game) => (
-              <div key={game.id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+              <div key={game.id} className="rounded-xl border border-gray-800 bg-black p-5 transition-colors hover:border-[#EF4444]/70">
                 <div className="flex flex-col gap-3">
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <span className="text-red-600">VS</span> {game.opponent}
+                  <h3 className="text-lg font-black uppercase italic text-white flex items-center gap-2">
+                    <span className="text-[#EF4444]">VS</span> {game.opponent}
                   </h3>
                   
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <Calendar size={16} className="text-gray-400" />
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Calendar size={16} className="text-[#EF4444]" />
                       <span className="font-medium">{new Date(game.date).toLocaleDateString()}</span>
                     </div>
                     
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <Clock size={16} className="text-gray-400" />
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Clock size={16} className="text-[#EF4444]" />
                       <span className="font-medium">{game.time}</span>
                     </div>
                     
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <MapPin size={16} className="text-gray-400" />
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <MapPin size={16} className="text-[#EF4444]" />
                       <span>{game.location}</span>
                     </div>
                   </div>
