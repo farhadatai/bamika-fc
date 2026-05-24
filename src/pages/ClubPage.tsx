@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, Camera, ShieldCheck, Trophy, Users } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Camera, ShieldCheck, Trophy, Users } from 'lucide-react'
 
 interface Coach {
   name: string
@@ -112,126 +111,124 @@ export default function ClubPage() {
     return () => window.clearInterval(timer)
   }, [])
 
-  const slide = slides[activeSlide]
-
   return (
     <div className="min-h-screen w-full bg-black text-white">
-      <section className="border-b border-gray-900 bg-neutral-950 px-4 py-10 sm:px-6 sm:py-14">
-        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+      <section className="relative min-h-[34rem] overflow-hidden border-b border-gray-900">
+        {slides.map((item, index) => (
+          <img
+            key={item.image}
+            src={item.image}
+            alt=""
+            aria-hidden="true"
+            className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ${item.fit === 'contain' ? 'object-cover' : 'object-cover'} ${index === activeSlide ? 'opacity-100' : 'opacity-0'}`}
+            style={{ objectPosition: item.position }}
+          />
+        ))}
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.94)_0%,rgba(0,0,0,0.82)_45%,rgba(0,0,0,0.42)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.9)_0%,transparent_38%)]" />
+        <div className="relative z-10 mx-auto flex min-h-[34rem] max-w-7xl items-end px-4 py-14 sm:px-6 sm:py-20">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/65 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-200 backdrop-blur">
               <ShieldCheck size={14} className="text-[#D4AF37]" />
               About us
             </div>
-            <h1 className="mt-5 text-4xl font-black uppercase italic leading-tight sm:text-6xl">
+            <h1 className="mt-5 text-5xl font-black uppercase italic leading-[0.95] sm:text-7xl">
               About <span className="text-[#EF4444]">Bamika FC</span>
             </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-gray-400 sm:text-lg">
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-gray-200">
               A community youth soccer club built to help players grow as athletes, leaders, teammates, and confident young people.
             </p>
-            <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {[
-                ['U6-U16', 'Player pathway'],
-                ['7', 'Coaches'],
-                ['Family', 'Club culture'],
-              ].map(([value, label]) => (
-                <div key={label} className="rounded-xl border border-gray-800 bg-black p-4">
-                  <div className="text-2xl font-black">{value}</div>
-                  <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-500">{label}</div>
-                </div>
+            <div className="mt-7 flex flex-wrap gap-3">
+              {['Community', 'Development', 'Respect', 'Leadership'].map((value) => (
+                <span key={value} className="rounded-full border border-white/15 bg-black/55 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-200 backdrop-blur">
+                  {value}
+                </span>
               ))}
-            </div>
-            <Link to="/register" className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#EF4444] px-5 py-4 text-sm font-black uppercase text-white sm:w-auto">
-              Register Player <ArrowRight size={18} />
-            </Link>
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border border-gray-800 bg-black">
-            <div className="relative aspect-[4/3] bg-black sm:aspect-video">
-              {slides.map((item, index) => (
-                <img
-                  key={item.image}
-                  src={item.image}
-                  alt={item.label}
-                  className={`absolute inset-0 h-full w-full transition-opacity duration-1000 ${item.fit === 'contain' ? 'object-contain' : 'object-cover'} ${index === activeSlide ? 'opacity-100' : 'opacity-0'}`}
-                  style={{ objectPosition: item.position }}
-                />
-              ))}
-              <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.82),rgba(0,0,0,0.08)_55%,rgba(0,0,0,0.15))]" />
-              <div className="absolute bottom-4 left-4 right-4">
-                <div className="mb-2 inline-flex rounded-full border border-white/15 bg-black/70 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
-                  {slide.label}
-                </div>
-                <h2 className="text-2xl font-black uppercase italic sm:text-4xl">{slide.title}</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-300">{slide.description}</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-3 border-t border-gray-800 p-4">
-              <button onClick={() => setActiveSlide((current) => (current - 1 + slides.length) % slides.length)} className="h-11 w-11 rounded-full border border-gray-700 text-xl font-black hover:border-[#EF4444]">
-                &lsaquo;
-              </button>
-              <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">{String(activeSlide + 1).padStart(2, '0')} / {slides.length}</div>
-              <button onClick={() => setActiveSlide((current) => (current + 1) % slides.length)} className="h-11 w-11 rounded-full border border-gray-700 text-xl font-black hover:border-[#EF4444]">
-                &rsaquo;
-              </button>
             </div>
           </div>
         </div>
       </section>
 
       <section className="border-b border-gray-900 bg-black px-4 py-14 sm:px-6 sm:py-20">
-        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-          <div>
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-10 max-w-4xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
               <ShieldCheck size={14} className="text-[#D4AF37]" />
               Our story
             </div>
-            <h2 className="text-3xl font-black uppercase italic leading-tight sm:text-5xl">
+            <h2 className="text-4xl font-black uppercase italic leading-tight sm:text-6xl">
               Positive. Structured. <span className="text-[#EF4444]">Community Driven.</span>
             </h2>
-            <p className="mt-5 text-base leading-8 text-gray-400">
-              Bamika FC was founded in 2022 with a vision of creating a positive, structured, and supportive environment for youth through soccer. What began as a small community-based program quickly grew into a passionate and diverse club serving families throughout the Sacramento and Elk Grove area.
-            </p>
-            <p className="mt-5 text-base leading-8 text-gray-400">
-              Bamika FC was created to give young players an opportunity to develop not only as athletes, but also as confident, respectful, and disciplined individuals. Our club welcomes players from all backgrounds and focuses on teamwork, leadership, personal growth, and strong community connection.
-            </p>
-            <p className="mt-5 text-base leading-8 text-gray-400">
-              Since its founding, Bamika FC has organized successful tournaments and community events with clubs from across Northern California. Our coaches are dedicated volunteers who give their time and experience to help guide and mentor the next generation.
-            </p>
-            <p className="mt-5 text-base leading-8 text-gray-400">
-              Today, Bamika FC is proudly affiliated with US Club Soccer, providing our players with access to official player registration, sanctioned tournaments, coaching education pathways, and a more professional development environment under the U.S. Soccer system.
-            </p>
           </div>
 
-          <div className="rounded-2xl border border-gray-800 bg-neutral-950 p-5 sm:p-7">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
-              <Trophy size={14} className="text-[#EF4444]" />
-              Our goal
-            </div>
-            <h3 className="text-2xl font-black uppercase italic text-white sm:text-3xl">
-              Building a pathway for ages 6-18
-            </h3>
-            <p className="mt-4 text-base leading-8 text-gray-400">
-              Our goal is to create a strong pathway for youth players ages 6-18 to grow both on and off the field. We aim to provide affordable, high-quality soccer development while building a safe, family-oriented, and community-driven club culture.
-            </p>
-            <div className="mt-6 grid gap-3">
-              {[
-                'Developing players through structured training and competition',
-                'Supporting licensed coaching education and player development pathways',
-                'Creating opportunities for youth throughout the community',
-                'Promoting discipline, teamwork, respect, and leadership',
-                'Building a long-term foundation for competitive youth soccer in our region',
-              ].map((goal) => (
-                <div key={goal} className="flex gap-3 rounded-xl border border-gray-800 bg-black p-4">
-                  <ShieldCheck className="mt-0.5 shrink-0 text-[#D4AF37]" size={18} />
-                  <p className="text-sm font-bold leading-6 text-gray-300">{goal}</p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-6 rounded-xl border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-sm font-bold leading-7 text-gray-200">
-              At Bamika FC, soccer is more than just a game. It is a way to inspire youth, unite families, and build a stronger community together.
-            </p>
+          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+            <article className="rounded-2xl border border-gray-800 bg-neutral-950 p-5 sm:p-8">
+              <p className="text-lg leading-8 text-gray-300">
+                Bamika FC was founded in 2022 with a vision of creating a positive, structured, and supportive environment for youth through soccer. What began as a small community-based program quickly grew into a passionate and diverse club serving families throughout the Sacramento and Elk Grove area.
+              </p>
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <p className="rounded-xl border border-gray-800 bg-black p-5 text-sm leading-7 text-gray-400">
+                  Bamika FC was created to give young players an opportunity to develop not only as athletes, but also as confident, respectful, and disciplined individuals.
+                </p>
+                <p className="rounded-xl border border-gray-800 bg-black p-5 text-sm leading-7 text-gray-400">
+                  Our club welcomes players from all backgrounds and focuses on teamwork, leadership, personal growth, and strong community connection.
+                </p>
+              </div>
+            </article>
+
+            <article className="overflow-hidden rounded-2xl border border-gray-800 bg-neutral-950">
+              <img
+                src="/slideshow/web/bamika-slide-13.jpg"
+                alt="Bamika FC players and coaches"
+                className="h-64 w-full object-cover sm:h-80"
+              />
+              <div className="p-5 sm:p-6">
+                <h3 className="text-2xl font-black uppercase italic text-white">Built by community</h3>
+                <p className="mt-3 text-sm leading-7 text-gray-400">
+                  Since its founding, Bamika FC has organized successful tournaments and community events with clubs from across Northern California. Our coaches are dedicated volunteers who help guide and mentor the next generation.
+                </p>
+              </div>
+            </article>
           </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+            <article className="rounded-2xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 p-5 sm:p-7">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/30 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
+                <Trophy size={14} />
+                US Club Soccer
+              </div>
+              <p className="text-base leading-8 text-gray-200">
+                Today, Bamika FC is proudly affiliated with US Club Soccer, providing players with access to official player registration, sanctioned tournaments, coaching education pathways, and a more professional development environment under the U.S. Soccer system.
+              </p>
+            </article>
+
+            <article className="rounded-2xl border border-gray-800 bg-neutral-950 p-5 sm:p-7">
+              <h3 className="text-2xl font-black uppercase italic text-white sm:text-3xl">
+                Our Goal
+              </h3>
+              <p className="mt-4 text-base leading-8 text-gray-400">
+                Our goal is to create a strong pathway for youth players to grow both on and off the field. We aim to provide affordable, high-quality soccer development while building a safe, family-oriented, and community-driven club culture.
+              </p>
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {[
+                  'Structured training and competition',
+                  'Licensed coaching education pathways',
+                  'Opportunities for youth throughout the community',
+                  'Discipline, teamwork, respect, and leadership',
+                  'A long-term foundation for competitive youth soccer',
+                ].map((goal) => (
+                  <div key={goal} className="flex gap-3 rounded-xl border border-gray-800 bg-black p-4">
+                    <ShieldCheck className="mt-0.5 shrink-0 text-[#D4AF37]" size={18} />
+                    <p className="text-sm font-bold leading-6 text-gray-300">{goal}</p>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
+
+          <p className="mt-6 rounded-2xl border border-[#EF4444]/30 bg-[#EF4444]/10 p-5 text-center text-base font-bold leading-8 text-gray-100">
+            At Bamika FC, soccer is more than just a game. It is a way to inspire youth, unite families, and build a stronger community together.
+          </p>
         </div>
       </section>
 
@@ -276,14 +273,6 @@ export default function ClubPage() {
         </div>
       </section>
 
-      <section className="px-4 py-14 text-center sm:px-6">
-        <Trophy className="mx-auto text-[#D4AF37]" size={34} />
-        <h2 className="mt-5 text-3xl font-black uppercase italic">Ready to Join?</h2>
-        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-gray-500">Create a parent account and start your player registration.</p>
-        <Link to="/register" className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-[#EF4444] px-6 py-4 text-sm font-black uppercase text-white">
-          Register Player <ArrowRight size={18} />
-        </Link>
-      </section>
     </div>
   )
 }
