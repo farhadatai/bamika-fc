@@ -26,6 +26,7 @@ interface Announcement {
   body: string;
   audience: string;
   team_id?: string | null;
+  player_id?: string | null;
   priority: string;
   is_pinned: boolean;
   created_at: string;
@@ -188,6 +189,7 @@ export default function Dashboard() {
 
       if (isParent) {
         const teams = [...new Set(basePlayers.map((player) => player.team_assigned).filter((team) => team && team !== 'Unassigned'))];
+        const playerIds = basePlayers.map((player) => player.id).filter(Boolean);
 
         if (teams.length > 0) {
           const { data: teamData, error: teamMessagesError } = await supabase
@@ -204,9 +206,26 @@ export default function Dashboard() {
             teamAnnouncements = teamData || [];
           }
         }
+
+        if (playerIds.length > 0) {
+          const { data: playerData, error: playerMessagesError } = await supabase
+            .from('announcements')
+            .select('*')
+            .eq('audience', 'player')
+            .in('player_id', playerIds)
+            .order('is_pinned', { ascending: false })
+            .order('created_at', { ascending: false });
+
+          if (playerMessagesError) {
+            console.warn('Player messages unavailable:', playerMessagesError);
+          } else {
+            teamAnnouncements = [...teamAnnouncements, ...(playerData || [])];
+          }
+        }
       }
 
-      const mergedAnnouncements = [...(announcementsResponse.data || []), ...teamAnnouncements]
+      const teamWideAnnouncements = teamAnnouncements.filter((announcement) => announcement.audience !== 'player');
+      const mergedAnnouncements = [...(announcementsResponse.data || []), ...teamWideAnnouncements]
         .filter((announcement, index, all) => all.findIndex((item) => item.id === announcement.id) === index)
         .sort((a, b) => Number(b.is_pinned) - Number(a.is_pinned) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 4);
@@ -242,7 +261,10 @@ export default function Dashboard() {
 
   const primaryPlayer = players[0];
   const getPlayerMessages = (player: PlayerSummary) => teamMessages
-    .filter((message) => message.team_id && message.team_id === player.team_assigned)
+    .filter((message) => (
+      (message.audience === 'player' && message.player_id === player.id)
+      || (message.audience === 'team' && message.team_id && message.team_id === player.team_assigned)
+    ))
     .slice(0, 2);
 
   const quickActions = [

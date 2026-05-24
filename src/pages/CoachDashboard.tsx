@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth';
 import { uploadPhoto } from '../lib/upload';
 import { useNavigate } from 'react-router-dom';
-import { Loader, Phone, FileText, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2 } from 'lucide-react';
+import { Loader, Phone, FileText, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2, X, CreditCard, Shirt, Target } from 'lucide-react';
 
 interface Player {
   id: string;
@@ -19,6 +19,7 @@ interface Player {
   jersey_number?: string;
   jersey_size?: string;
   team_assigned?: string;
+  payment_status?: string;
   profiles: {
     first_name: string;
     last_name: string;
@@ -63,6 +64,13 @@ const getParentName = (profiles?: Player['profiles']) => (
   `${profiles?.first_name || ''} ${profiles?.last_name || ''}`.trim()
 );
 
+const getRosterStatusClass = (status = '') => {
+  const normalized = status.toLowerCase();
+  if (normalized === 'active' || normalized === 'paid' || normalized === 'waived') return 'border-green-500/30 bg-green-500/10 text-green-300';
+  if (normalized === 'pending' || normalized === 'pending_payment') return 'border-yellow-500/30 bg-yellow-500/10 text-yellow-200';
+  return 'border-gray-700 bg-gray-500/10 text-gray-300';
+};
+
 interface Game {
   id: string;
   date: string;
@@ -75,6 +83,8 @@ interface Announcement {
   id: string;
   title: string;
   body: string;
+  audience?: string;
+  player_id?: string | null;
   priority: string;
   is_pinned: boolean;
   created_at: string;
@@ -95,6 +105,9 @@ export default function CoachDashboard() {
   const [teamId, setTeamId] = useState<string | null>(null);
   const [teamAnnouncements, setTeamAnnouncements] = useState<Announcement[]>([]);
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', body: '', priority: 'normal' });
+  const [messageTarget, setMessageTarget] = useState('team');
+  const [selectedMessagePlayerId, setSelectedMessagePlayerId] = useState('');
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<CoachProfile | null>(null);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -258,18 +271,26 @@ export default function CoachDashboard() {
   const handlePostTeamAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teamId) return;
+    const selectedPlayerForMessage = players.find((player) => player.id === selectedMessagePlayerId);
+
+    if (messageTarget === 'player' && !selectedPlayerForMessage) {
+      alert('Choose a player for the individual message.');
+      return;
+    }
 
     const coachName = getCoachDisplayName(profile, user?.email);
     const { error } = await supabase.from('announcements').insert([{
       ...newAnnouncement,
       body: `${COACH_MESSAGE_PREFIX}${coachName}\n\n${newAnnouncement.body}`,
-      audience: 'team',
+      audience: messageTarget === 'player' ? 'player' : 'team',
       team_id: teamId,
+      player_id: messageTarget === 'player' ? selectedPlayerForMessage?.id : null,
       is_pinned: false,
     }]);
 
     if (!error) {
       setNewAnnouncement({ title: '', body: '', priority: 'normal' });
+      if (messageTarget === 'player') setSelectedMessagePlayerId('');
       fetchTeamData();
     } else {
       alert(error.message);
@@ -316,6 +337,10 @@ export default function CoachDashboard() {
     const ageDate = new Date(ageDifMs);
     return Math.abs(ageDate.getUTCFullYear() - 1970);
   };
+
+  const selectedPlayerMessages = selectedPlayer
+    ? teamAnnouncements.filter((announcement) => announcement.audience === 'player' && announcement.player_id === selectedPlayer.id)
+    : [];
 
   if (loading) {
     return (
@@ -453,6 +478,32 @@ export default function CoachDashboard() {
               <h2 className="text-lg font-black uppercase italic text-white">Message Team</h2>
             </div>
             <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <select
+                  value={messageTarget}
+                  className="input-primary"
+                  onChange={(e) => {
+                    setMessageTarget(e.target.value);
+                    if (e.target.value === 'team') setSelectedMessagePlayerId('');
+                  }}
+                >
+                  <option value="team">Whole team</option>
+                  <option value="player">Individual player</option>
+                </select>
+                {messageTarget === 'player' && (
+                  <select
+                    required
+                    value={selectedMessagePlayerId}
+                    className="input-primary"
+                    onChange={(e) => setSelectedMessagePlayerId(e.target.value)}
+                  >
+                    <option value="">Choose player</option>
+                    {players.map((player) => (
+                      <option key={player.id} value={player.id}>{getPlayerName(player)}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <input
                 required
                 value={newAnnouncement.title}
@@ -476,19 +527,21 @@ export default function CoachDashboard() {
                 <option value="normal">Normal</option>
                 <option value="important">Important</option>
               </select>
-              <button type="submit" className="btn-primary w-full">Post Team Message</button>
+              <button type="submit" className="btn-primary w-full">
+                {messageTarget === 'player' ? 'Send Player Message' : 'Post Team Message'}
+              </button>
             </div>
           </form>
 
           <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
             <h2 className="mb-4 text-lg font-black uppercase italic text-white">Team Announcements</h2>
-            {teamAnnouncements.length === 0 ? (
+            {teamAnnouncements.filter((announcement) => announcement.audience !== 'player').length === 0 ? (
               <div className="rounded-xl border border-dashed border-gray-800 bg-black p-6 text-center text-sm text-gray-500">
                 No team messages yet.
               </div>
             ) : (
               <div className="space-y-3">
-                {teamAnnouncements.map((announcement) => (
+                {teamAnnouncements.filter((announcement) => announcement.audience !== 'player').map((announcement) => (
                   <article key={announcement.id} className={`rounded-xl border p-4 ${announcement.priority === 'important' ? 'border-[#EF4444]/70 bg-[#EF4444]/10' : 'border-gray-800 bg-black'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -519,128 +572,202 @@ export default function CoachDashboard() {
         </div>
       )}
       
-      {teamId && players.length === 0 ? (
-        <div className="bg-black p-6 rounded-xl shadow-sm text-center text-gray-500">
-          No players assigned to {teamId} yet.
-        </div>
-      ) : teamId ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {players.map((player) => (
-            <div key={player.id} className="rounded-2xl border border-gray-800 bg-black p-5 shadow-sm transition-colors hover:border-[#EF4444]/70">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h3 className="text-xl font-black uppercase italic text-white">{getPlayerName(player)}</h3>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500 font-bold">{calculateAge(player.dob)} Years Old</span>
-                    {player.age_group && (
-                      <span className="px-2 py-0.5 text-xs font-black text-[#D4AF37] bg-[#D4AF37]/10 rounded-full border border-[#D4AF37]/30">
-                        {player.age_group}
-                      </span>
-                    )}
+      {teamId && (
+        <section className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
+          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-xl font-black uppercase italic text-white">Team Roster</h2>
+              <p className="text-sm text-gray-500">Click a player name to open the full player card. Coaches can update jersey details and message families from here.</p>
+            </div>
+            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">{players.length} players</div>
+          </div>
+
+          {players.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-800 bg-black p-6 text-center text-gray-500">
+              No players assigned to {teamId} yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-gray-800 bg-black">
+              <table className="min-w-[980px] w-full text-left text-sm">
+                <thead className="border-b border-gray-800 bg-neutral-950 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3">Player</th>
+                    <th className="px-4 py-3">Age</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Payment</th>
+                    <th className="px-4 py-3">Position</th>
+                    <th className="px-4 py-3">Number</th>
+                    <th className="px-4 py-3">Size</th>
+                    <th className="px-4 py-3">Parent</th>
+                    <th className="px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-900">
+                  {players.map((player) => (
+                    <tr key={player.id} className="align-middle hover:bg-neutral-950/80">
+                      <td className="px-4 py-3">
+                        <button type="button" onClick={() => setSelectedPlayer(player)} className="flex items-center gap-3 text-left">
+                          {player.photo_url ? (
+                            <img src={player.photo_url} alt={getPlayerName(player)} className="h-10 w-10 rounded-lg border border-gray-800 object-cover" />
+                          ) : (
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-800 bg-neutral-900">
+                              <User className="h-5 w-5 text-gray-500" />
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-black uppercase italic text-white hover:text-[#EF4444]">{getPlayerName(player)}</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-gray-600">{player.age_group || teamId}</div>
+                          </div>
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-gray-300">{calculateAge(player.dob)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.status)}`}>{player.status || 'Pending'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.payment_status || player.status)}`}>{player.payment_status || player.status || 'Pending'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <select value={player.position || 'TBD'} onChange={(e) => handleUpdatePlayer(player.id, { position: e.target.value })} className="w-32 rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
+                          {POSITION_OPTIONS.map((position) => <option key={position} value={position}>{position}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          value={player.jersey_number || ''}
+                          placeholder="-"
+                          onChange={(e) => {
+                            const jerseyNumber = e.target.value;
+                            setPlayers((currentPlayers) => currentPlayers.map((currentPlayer) => currentPlayer.id === player.id ? { ...currentPlayer, jersey_number: jerseyNumber } : currentPlayer));
+                          }}
+                          onBlur={(e) => handleUpdatePlayer(player.id, { jersey_number: e.target.value || '-' })}
+                          className="w-20 rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <select value={player.jersey_size || 'YM'} onChange={(e) => handleUpdatePlayer(player.id, { jersey_size: e.target.value })} className="w-24 rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
+                          {JERSEY_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-4 py-3 text-gray-300">
+                        <div className="font-bold">{getParentName(player.profiles) || 'Parent not listed'}</div>
+                        <div className="text-xs text-gray-500">{player.profiles.phone || 'No phone listed'}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => setSelectedPlayer(player)} className="rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">View</button>
+                          <button type="button" onClick={() => { setMessageTarget('player'); setSelectedMessagePlayerId(player.id); }} className="rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-[#EF4444]">Message</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {selectedPlayer && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onClick={() => setSelectedPlayer(null)}>
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-gray-800 bg-neutral-950 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 border-b border-gray-800 p-5">
+              <div className="flex items-center gap-4">
+                {selectedPlayer.photo_url ? (
+                  <img src={selectedPlayer.photo_url} alt={getPlayerName(selectedPlayer)} className="h-20 w-20 rounded-2xl border border-gray-800 object-cover" />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-gray-800 bg-black">
+                    <User className="text-gray-500" size={32} />
                   </div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  {player.photo_url ? (
-                    <img 
-                      src={player.photo_url} 
-                      alt={getPlayerName(player)}
-                      className="h-14 w-14 rounded-xl object-cover border border-gray-800"
-                    />
-                  ) : (
-                    <div className="h-14 w-14 rounded-xl bg-neutral-900 flex items-center justify-center border border-gray-800">
-                      <User className="text-gray-400 h-6 w-6" />
-                    </div>
-                  )}
-                  <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded-full ${
-                    player.status === 'active' ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300'
-                  }`}>
-                    {player.status === 'active' ? 'Paid' : 'Pending'}
-                  </span>
+                )}
+                <div>
+                  <h2 className="text-2xl font-black uppercase italic text-white">{getPlayerName(selectedPlayer)}</h2>
+                  <p className="mt-1 text-sm font-bold uppercase tracking-widest text-gray-500">{calculateAge(selectedPlayer.dob)} years old - {selectedPlayer.age_group || teamId}</p>
                 </div>
               </div>
-              
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
-                  <div className="rounded-lg border border-gray-800 bg-neutral-950 p-2">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</div>
-                    <select
-                      value={player.position || 'TBD'}
-                      onChange={(e) => handleUpdatePlayer(player.id, { position: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-gray-800 bg-black px-2 py-1 font-bold text-gray-300 outline-none focus:border-[#EF4444]"
-                    >
-                      {POSITION_OPTIONS.map((position) => (
-                        <option key={position} value={position}>{position}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="rounded-lg border border-gray-800 bg-neutral-950 p-2">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Number</div>
-                    <input
-                      value={player.jersey_number || ''}
-                      placeholder="-"
-                      onChange={(e) => {
-                        const jerseyNumber = e.target.value;
-                        setPlayers((currentPlayers) => currentPlayers.map((currentPlayer) => (
-                          currentPlayer.id === player.id ? { ...currentPlayer, jersey_number: jerseyNumber } : currentPlayer
-                        )));
-                      }}
-                      onBlur={(e) => handleUpdatePlayer(player.id, { jersey_number: e.target.value || '-' })}
-                      className="mt-1 w-full rounded-md border border-gray-800 bg-black px-2 py-1 font-bold text-gray-300 outline-none focus:border-[#EF4444]"
-                    />
-                  </div>
-                  <div className="rounded-lg border border-gray-800 bg-neutral-950 p-2">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Size</div>
-                    <select
-                      value={player.jersey_size || 'YM'}
-                      onChange={(e) => handleUpdatePlayer(player.id, { jersey_size: e.target.value })}
-                      className="mt-1 w-full rounded-md border border-gray-800 bg-black px-2 py-1 font-bold text-gray-300 outline-none focus:border-[#EF4444]"
-                    >
-                      {JERSEY_SIZE_OPTIONS.map((size) => (
-                        <option key={size} value={size}>{size}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+              <button type="button" onClick={() => setSelectedPlayer(null)} className="rounded-lg border border-gray-800 p-2 text-gray-500 hover:border-[#EF4444] hover:text-[#EF4444]">
+                <X size={18} />
+              </button>
+            </div>
 
-                <div className="flex items-start gap-3 p-3 bg-neutral-950 border border-gray-800 rounded-lg">
-                  <Phone className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+            <div className="grid gap-4 p-5 md:grid-cols-2">
+              <div className="rounded-xl border border-gray-800 bg-black p-4">
+                <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  <Target size={14} />
+                  Player Details
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
                   <div>
-                    <p className="text-xs font-bold text-gray-500 uppercase">Parent Phone</p>
-                    {getParentName(player.profiles) && (
-                      <p className="font-medium text-white">{getParentName(player.profiles)}</p>
-                    )}
-                    <div className="flex flex-wrap gap-3">
-                      {player.profiles.phone ? (
-                        <a href={`tel:${player.profiles.phone}`} className="text-red-600 font-bold hover:underline">
-                          {player.profiles.phone}
-                        </a>
-                      ) : (
-                        <span className="text-sm font-bold text-gray-500">No phone listed</span>
-                      )}
-                      {player.profiles.email && (
-                        <a href={`mailto:${player.profiles.email}`} className="inline-flex items-center gap-1 text-red-600 font-bold hover:underline">
-                          <Mail size={14} />
-                          Email
-                        </a>
-                      )}
-                    </div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</div>
+                    <div className="mt-1 font-black text-white">{selectedPlayer.position || 'TBD'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Number</div>
+                    <div className="mt-1 font-black text-white">{selectedPlayer.jersey_number || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Size</div>
+                    <div className="mt-1 font-black text-white">{selectedPlayer.jersey_size || 'YM'}</div>
                   </div>
                 </div>
+              </div>
 
-                {player.medical_conditions && (
-                  <div className="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                    <FileText className="h-5 w-5 text-yellow-400 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-xs font-bold text-yellow-200 uppercase">Medical Notes</p>
-                      <p className="text-sm text-gray-300">{player.medical_conditions}</p>
-                    </div>
+              <div className="rounded-xl border border-gray-800 bg-black p-4">
+                <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  <CreditCard size={14} />
+                  Status
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(selectedPlayer.status)}`}>{selectedPlayer.status || 'Pending'}</span>
+                  <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(selectedPlayer.payment_status || selectedPlayer.status)}`}>{selectedPlayer.payment_status || selectedPlayer.status || 'Payment pending'}</span>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-800 bg-black p-4">
+                <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  <Phone size={14} />
+                  Parent Contact
+                </div>
+                <div className="font-black text-white">{getParentName(selectedPlayer.profiles) || 'Parent not listed'}</div>
+                <div className="mt-2 flex flex-wrap gap-3 text-sm font-bold">
+                  {selectedPlayer.profiles.phone && <a href={`tel:${selectedPlayer.profiles.phone}`} className="text-[#EF4444] hover:underline">{selectedPlayer.profiles.phone}</a>}
+                  {selectedPlayer.profiles.email && <a href={`mailto:${selectedPlayer.profiles.email}`} className="inline-flex items-center gap-1 text-[#EF4444] hover:underline"><Mail size={14} /> Email</a>}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-800 bg-black p-4">
+                <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  <Megaphone size={14} />
+                  Individual Messages
+                </div>
+                {selectedPlayerMessages.length === 0 ? (
+                  <p className="text-sm text-gray-500">No individual messages yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {selectedPlayerMessages.slice(0, 3).map((message) => (
+                      <div key={message.id} className="rounded-lg border border-gray-800 bg-neutral-950 p-3">
+                        <div className="font-black uppercase italic text-white">{message.title}</div>
+                        <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs leading-5 text-gray-400">{parseCoachMessage(message.body).body}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             </div>
-          ))}
+
+            <div className="flex flex-wrap gap-3 border-t border-gray-800 p-5">
+              <button type="button" onClick={() => { setMessageTarget('player'); setSelectedMessagePlayerId(selectedPlayer.id); setSelectedPlayer(null); }} className="rounded-lg bg-[#EF4444] px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700">
+                Message This Player
+              </button>
+              {selectedPlayer.profiles.phone && (
+                <a href={`tel:${selectedPlayer.profiles.phone}`} className="rounded-lg border border-gray-800 px-4 py-3 text-xs font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">
+                  Call Parent
+                </a>
+              )}
+            </div>
+          </div>
         </div>
-      ) : null}
+      )}
 
       {/* UPCOMING GAMES SECTION */}
       <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
