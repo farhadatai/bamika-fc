@@ -680,6 +680,7 @@ export default function AdminDashboard() {
     drills: [],
     announcements: [],
     spotlights: [],
+    sponsorRequests: [],
     registrations: [],
   });
   const [loading, setLoading] = useState(true);
@@ -793,6 +794,15 @@ export default function AdminDashboard() {
       notices.push('Spotlights need the latest Supabase schema update.');
     }
 
+    const { data: sponsorRequests, error: sponsorRequestsError } = await supabase
+      .from('sponsor_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (sponsorRequestsError && isMissingTableError(sponsorRequestsError, 'sponsor_requests')) {
+      notices.push('Sponsor requests need the latest Supabase schema update.');
+    }
+
     setData({
       parents,
       coaches: c || [],
@@ -802,6 +812,7 @@ export default function AdminDashboard() {
       drills: d || [],
       announcements: announcementsError ? [] : a || [],
       spotlights: spotlightsError ? [] : spotlights || [],
+      sponsorRequests: sponsorRequestsError ? [] : sponsorRequests || [],
       registrations: registrationsError ? [] : registrations || [],
     });
     setDatabaseNotice(notices.join(' '));
@@ -1429,6 +1440,30 @@ export default function AdminDashboard() {
     fetchData();
   };
 
+  const handleSponsorRequestStatus = async (id, status) => {
+    const { error } = await supabase
+      .from('sponsor_requests')
+      .update({ status })
+      .eq('id', id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    fetchData();
+  };
+
+  const handleDeleteSponsorRequest = async (id) => {
+    if (!window.confirm('Delete sponsor request?')) return;
+    const { error } = await supabase.from('sponsor_requests').delete().eq('id', id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    fetchData();
+  };
+
   const handleDeleteAnnouncement = async (id) => {
     if (!window.confirm('Delete announcement?')) return;
     await supabase.from('announcements').delete().eq('id', id);
@@ -1619,7 +1654,7 @@ export default function AdminDashboard() {
     { label: 'Players', value: data.roster.length },
     { label: 'Coaches', value: data.coaches.length },
     { label: 'News', value: data.announcements.length },
-    { label: 'Spotlights', value: data.spotlights.length },
+    { label: 'Sponsor Requests', value: data.sponsorRequests.length },
   ];
   const sortedRoster = [...data.roster].sort((a, b) => getPlayerDisplayName(a).localeCompare(getPlayerDisplayName(b)));
   const paymentSummary = data.roster.reduce((summary, player) => {
@@ -1706,7 +1741,7 @@ export default function AdminDashboard() {
         {/* 2. TAB NAVIGATION */}
         <div className="overflow-x-auto rounded-2xl border border-gray-800 bg-neutral-900 p-1"> 
           <div className="flex min-w-max gap-2">
-            {['parents', 'coaches', 'roster', 'schedule', 'drills', 'announcements', 'spotlights'].map((tab) => ( 
+            {['parents', 'coaches', 'roster', 'schedule', 'drills', 'announcements', 'sponsor requests', 'spotlights'].map((tab) => ( 
               <button 
                 key={tab} 
                 onClick={() => setActiveTab(tab)} 
@@ -2316,6 +2351,88 @@ export default function AdminDashboard() {
                             <Trash2 size={16} />
                           </button>
                         </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'sponsor requests' && (
+            <div className="rounded-2xl border border-gray-800 bg-neutral-900">
+              <div className="flex flex-col gap-2 border-b border-gray-800 bg-neutral-950 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black uppercase italic text-white">Sponsor Requests</h2>
+                  <p className="text-sm text-gray-500">Businesses that asked for Bamika FC sponsor information.</p>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  {data.sponsorRequests.length} total
+                </span>
+              </div>
+
+              {data.sponsorRequests.length === 0 ? (
+                <div className="p-8 text-center">
+                  <HandHeart className="mx-auto mb-4 text-[#D4AF37]" size={36} />
+                  <h3 className="text-lg font-black uppercase italic text-white">No sponsor requests yet</h3>
+                  <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500">
+                    When someone fills out the Become a Sponsor form on the homepage, it will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-4 p-5 lg:grid-cols-2">
+                  {data.sponsorRequests.map((request) => (
+                    <article key={request.id} className="rounded-2xl border border-gray-800 bg-black p-5">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
+                            {request.status || 'new'}
+                          </div>
+                          <h3 className="mt-1 text-2xl font-black uppercase italic text-white">
+                            {request.business_name}
+                          </h3>
+                          <p className="mt-1 text-sm font-bold text-gray-400">
+                            {request.contact_name}
+                          </p>
+                        </div>
+                        <select
+                          value={request.status || 'new'}
+                          onChange={(event) => handleSponsorRequestStatus(request.id, event.target.value)}
+                          className="rounded-lg border border-gray-800 bg-neutral-950 px-3 py-2 text-xs font-black uppercase text-white outline-none"
+                        >
+                          <option value="new">New</option>
+                          <option value="contacted">Contacted</option>
+                          <option value="closed">Closed</option>
+                        </select>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 text-sm text-gray-400">
+                        <a href={`mailto:${request.email}`} className="inline-flex items-center gap-2 font-bold text-gray-300 hover:text-[#D4AF37]">
+                          <Mail size={15} />
+                          {request.email}
+                        </a>
+                        {request.phone && <div className="font-bold">{request.phone}</div>}
+                        {request.message && (
+                          <p className="whitespace-pre-line rounded-xl border border-gray-800 bg-neutral-950 p-4 leading-6">
+                            {request.message}
+                          </p>
+                        )}
+                        <div className="text-[10px] font-black uppercase tracking-widest text-gray-600">
+                          Received {request.created_at ? new Date(request.created_at).toLocaleString() : 'recently'}
+                        </div>
+                      </div>
+
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        <a
+                          href={`mailto:${request.email}?subject=Bamika FC Sponsorship Information`}
+                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#D4AF37] px-4 py-3 text-xs font-black uppercase text-black hover:bg-white"
+                        >
+                          <Mail size={15} />
+                          Email Sponsor Info
+                        </a>
+                        <button onClick={() => handleDeleteSponsorRequest(request.id)} className="rounded-lg border border-gray-800 p-3 text-gray-500 hover:border-red-500 hover:text-red-500">
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </article>
                   ))}
