@@ -19,9 +19,20 @@ export default function LiveStream() {
     const video = videoRef.current
     if (!video) return
 
+    // React doesn't reliably write the `muted` attribute to the DOM, and
+    // mobile browsers only allow autoplay when muted — set it explicitly.
+    video.muted = true
+
     let hls: Hls | null = null
     let retryId: number | undefined
     let cancelled = false
+
+    const goLive = () => {
+      setIsLive(true)
+      video.play().catch(() => {
+        // Autoplay blocked — controls are visible and a tap anywhere plays.
+      })
+    }
 
     const retry = () => {
       setIsLive(false)
@@ -31,14 +42,30 @@ export default function LiveStream() {
     function start() {
       if (cancelled || !video) return
 
-      if (Hls.isSupported()) {
-        hls = new Hls({ lowLatencyMode: true })
+      // Prefer the native HLS player on Apple devices (iPhone/iPad/Safari).
+      // Newer iOS Safari also passes Hls.isSupported(), but the native
+      // player is far more reliable there, so check native support FIRST.
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        const onReady = () => { cleanup(); goLive() }
+        const onError = () => {
+          cleanup()
+          video.removeAttribute('src')
+          video.load()
+          retry()
+        }
+        const cleanup = () => {
+          video.removeEventListener('loadedmetadata', onReady)
+          video.removeEventListener('error', onError)
+        }
+        video.addEventListener('loadedmetadata', onReady)
+        video.addEventListener('error', onError)
+        video.src = STREAM_URL
+        video.load()
+      } else if (Hls.isSupported()) {
+        hls = new Hls()
         hls.loadSource(STREAM_URL)
         hls.attachMedia(video)
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          setIsLive(true)
-          video.play().catch(() => {})
-        })
+        hls.on(Hls.Events.MANIFEST_PARSED, goLive)
         hls.on(Hls.Events.ERROR, (_event, data) => {
           if (data.fatal) {
             hls?.destroy()
@@ -46,18 +73,6 @@ export default function LiveStream() {
             retry()
           }
         })
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        // Safari / iOS play HLS natively
-        video.src = STREAM_URL
-        video.addEventListener('loadedmetadata', () => {
-          setIsLive(true)
-          video.play().catch(() => {})
-        }, { once: true })
-        video.addEventListener('error', () => {
-          video.removeAttribute('src')
-          video.load()
-          retry()
-        }, { once: true })
       }
     }
 
@@ -69,6 +84,12 @@ export default function LiveStream() {
       hls?.destroy()
     }
   }, [])
+
+  // A tap anywhere on the player (including the offline overlay) counts as a
+  // user gesture, which unblocks playback on phones that refused autoplay.
+  const tapToPlay = () => {
+    videoRef.current?.play().catch(() => {})
+  }
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 py-10">
@@ -83,16 +104,20 @@ export default function LiveStream() {
         )}
       </div>
 
-      <div className="relative w-full aspect-video bg-neutral-950 rounded-2xl overflow-hidden border border-gray-800 shadow-2xl">
+      <div
+        className="relative w-full aspect-video bg-neutral-950 rounded-2xl overflow-hidden border border-gray-800 shadow-2xl"
+        onClick={tapToPlay}
+      >
         <video
           ref={videoRef}
-          controls
+          autoPlay
           muted
           playsInline
+          controls
           className="h-full w-full"
         />
         {!isLive && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-neutral-900 to-black text-center px-6">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-neutral-900 to-black text-center px-6 pointer-events-none">
             <img src="/logo.png" alt="Bamika FC" className="h-20 w-auto opacity-80" />
             <h2 className="text-2xl heading-bamika">
               Stream is <span className="text-[#D4AF37]">offline</span>
