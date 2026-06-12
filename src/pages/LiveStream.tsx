@@ -119,12 +119,19 @@ export default function LiveStream() {
         {!isLive && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-neutral-900 to-black text-center px-6 pointer-events-none">
             <img src="/logo.png" alt="Bamika FC" className="h-20 w-auto opacity-80" />
+            <div className="flex items-center gap-2 text-gray-400 text-sm">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gray-500 opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-gray-400" />
+              </span>
+              Waiting for broadcast
+            </div>
             <h2 className="text-2xl heading-bamika">
-              Stream is <span className="text-[#D4AF37]">offline</span>
+              No match <span className="text-[#D4AF37]">live</span> right now
             </h2>
             <p className="text-gray-400 max-w-md">
-              The broadcast hasn&apos;t started yet. Keep this page open &mdash; the
-              match will start playing automatically as soon as we go live.
+              When Bamika FC goes live, the match starts playing here automatically &mdash;
+              no need to refresh. Keep this page open, or check back at kickoff.
             </p>
           </div>
         )}

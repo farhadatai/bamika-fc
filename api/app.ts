@@ -8,6 +8,7 @@ import express, {
   type NextFunction,
 } from 'express'
 import cors from 'cors'
+import rateLimit from 'express-rate-limit'
 import path from 'path'
 
 import { fileURLToPath } from 'url'
@@ -41,8 +42,23 @@ app.use(cors({
   },
 }))
 
-// Webhook must be defined before body parsers
+// Webhook must be defined before body parsers (and before rate limiting, so
+// Stripe's event deliveries are never throttled).
 app.use('/webhook', webhookRoutes)
+
+// Defense-in-depth rate limit on the API. Caps abuse of public endpoints such
+// as checkout-session creation (spamming Stripe) from a single IP. The real
+// login/signup flow runs through Supabase Auth, which is rate limited there.
+// Note: on serverless the in-memory counter is per warm instance, so this
+// blunts casual scripted abuse rather than a distributed attack.
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests, please try again later.' },
+})
+app.use('/api', apiLimiter)
 
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
