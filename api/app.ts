@@ -25,7 +25,21 @@ const __dirname = path.dirname(__filename)
 
 const app: express.Application = express()
 
-app.use(cors())
+// Restrict cross-origin API access to the club's own sites. Server-to-server
+// callers (Stripe webhooks, curl) send no Origin header and are unaffected.
+const allowedOrigins = [
+  'https://bamikafc.com',
+  'https://www.bamikafc.com',
+  ...(process.env.ALLOWED_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean) ?? []),
+]
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return callback(null, true)
+    return callback(new Error('Not allowed by CORS'))
+  },
+}))
 
 // Webhook must be defined before body parsers
 app.use('/webhook', webhookRoutes)
@@ -49,12 +63,6 @@ app.use(
     res.status(200).json({
       success: true,
       message: 'ok',
-      env: {
-        hasSupabaseUrl: Boolean(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL),
-        hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY),
-        hasStripeSecretKey: Boolean(process.env.STRIPE_SECRET_KEY),
-        hasStripeWebhookSecret: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
-      },
     })
   },
 )
