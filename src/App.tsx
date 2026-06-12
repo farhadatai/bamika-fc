@@ -6,7 +6,6 @@ import { useAuthStore } from './store/auth'
 import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
-import Home from './pages/Home'
 import LandingPage from './pages/LandingPage'
 import ClubPage from './pages/ClubPage'
 import Login from './pages/Login'
@@ -18,8 +17,10 @@ import CoachDashboard from './pages/CoachDashboard'
 import Payment from './pages/Payment'
 import RegistrationSuccess from './pages/registration/Success'
 import TrainingLab from './pages/TrainingLab'
+import LiveStream from './pages/LiveStream'
 import ParentDetailView from './pages/ParentDetailView'
 import CoachSetupPassword from './pages/CoachSetupPassword'
+import ParentSetupPassword from './pages/ParentSetupPassword'
 
 const isMissingProfileColumnError = (message?: string) => (
   !!message
@@ -41,6 +42,7 @@ function App() {
   useEffect(() => {
     const maybeOpenCoachSetup = (role?: string | null, signedInUser?: User | null) => {
       const metadataRole = typeof signedInUser?.user_metadata?.role === 'string' ? signedInUser.user_metadata.role : ''
+      const invitedByCoach = Boolean(signedInUser?.user_metadata?.invited_by_coach)
       const authReturn = `${window.location.search}${window.location.hash}`
       const isInviteReturn = authReturn.includes('type=invite')
         || authReturn.includes('type=recovery')
@@ -49,6 +51,10 @@ function App() {
 
       if ((role === 'coach' || metadataRole === 'coach') && isInviteReturn && window.location.pathname !== '/coach/setup-password') {
         navigate('/coach/setup-password', { replace: true })
+      }
+
+      if (invitedByCoach && isInviteReturn && window.location.pathname !== '/parent/setup-password') {
+        navigate('/parent/setup-password', { replace: true })
       }
     }
 
@@ -168,13 +174,15 @@ function App() {
       <Route element={<Layout />}>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
-        <Route path="/home" element={<Home />} />
+        <Route path="/home" element={<LandingPage />} />
         <Route path="/club" element={<ClubPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/registration/success" element={<RegistrationSuccess />} />
         <Route path="/training-lab" element={<TrainingLab />} />
+        <Route path="/live" element={<LiveStream />} />
         <Route path="/coach/setup-password" element={<CoachSetupPassword />} />
+        <Route path="/parent/setup-password" element={<ParentSetupPassword />} />
 
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
