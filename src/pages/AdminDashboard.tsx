@@ -1541,7 +1541,9 @@ export default function AdminDashboard() {
   };
 
   const openPrintableReport = (title, headers, rows) => {
-    const reportWindow = window.open('', '_blank', 'noopener,noreferrer');
+    // Do NOT pass 'noopener' here: with noopener, window.open returns null and
+    // the report can't be written into the new tab, leaving it blank.
+    const reportWindow = window.open('', '_blank');
     if (!reportWindow) return;
 
     const tableRows = rows.map((row) => `
