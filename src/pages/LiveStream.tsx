@@ -6,8 +6,8 @@ import Hls from 'hls.js'
 const STREAM_URL =
   import.meta.env.VITE_STREAM_URL
   ?? (import.meta.env.DEV
-    ? 'http://localhost:8888/live/index.m3u8'
-    : 'https://stream.bamikafc.com/live/index.m3u8')
+    ? 'http://localhost:8888/live/cam/index.m3u8'
+    : 'https://stream.bamikafc.com/live/cam/index.m3u8')
 
 const RETRY_MS = 5000
 
