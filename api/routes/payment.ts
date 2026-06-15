@@ -257,7 +257,7 @@ router.post('/create-checkout-session', async (req, res) => {
               ? `Promo monthly membership for ${registration.first_name} ${registration.last_name}`
               : `Monthly membership for ${registration.first_name} ${registration.last_name}`,
           },
-          unit_amount: isPromoSignup ? 5000 : 5900, // Promo $50.00, regular $59.00
+          unit_amount: 2500, // $25.00/month flat
           recurring: {
             interval: 'month',
           },
