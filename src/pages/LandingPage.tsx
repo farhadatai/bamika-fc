@@ -717,18 +717,18 @@ export default function LandingPage() {
                 <h3 className="text-2xl font-black uppercase italic text-white">Family Cost</h3>
                 <div className="mt-6 space-y-4">
                   <div className="rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 p-4">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Promo through June 30</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Family support pricing</div>
                     <p className="mt-2 text-sm font-bold text-white">
-                      Registration fee waived and monthly club fee is $50/mo for families who sign up by June 30.
+                      Registration fee waived and monthly club fee reduced to $25/mo to keep soccer affordable for families.
                     </p>
                   </div>
                   <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <span className="font-bold text-gray-300">Promo registration fee</span>
+                    <span className="font-bold text-gray-300">Registration fee</span>
                     <span className="text-2xl font-black text-white">$0</span>
                   </div>
                   <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <span className="font-bold text-gray-300">Promo monthly fee</span>
-                    <span className="text-2xl font-black text-white">$50/mo</span>
+                    <span className="font-bold text-gray-300">Monthly club fee</span>
+                    <span className="text-2xl font-black text-white">$25/mo</span>
                   </div>
                   <div className="border-b border-white/10 pb-4">
                     <div className="flex items-center justify-between">
@@ -740,7 +740,7 @@ export default function LandingPage() {
                     </p>
                   </div>
                   <p className="text-xs font-bold uppercase leading-5 tracking-widest text-gray-500">
-                    Starting July 1: $99 registration fee plus the regular monthly club fee.
+                    Families who already paid $50 will receive a $25 credit toward their next monthly payment.
                   </p>
                   <Link
                     to="/register"

@@ -248,8 +248,8 @@ export default function RegisterNewAthlete() {
               <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Checkout summary</div>
               <div className="mt-5 space-y-3">
                 <div className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
-                  <div className="text-sm font-bold text-gray-300">June promo monthly fee</div>
-                  <div className="mt-1 text-3xl font-black text-[#EF4444]">$50/mo</div>
+                  <div className="text-sm font-bold text-gray-300">Monthly club fee</div>
+                  <div className="mt-1 text-3xl font-black text-[#EF4444]">$25/mo</div>
                 </div>
                 <div className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
                   <div className="text-sm font-bold text-gray-300">Optional uniform package</div>
@@ -257,7 +257,7 @@ export default function RegisterNewAthlete() {
                   <p className="mt-2 text-xs leading-5 text-gray-500">Add only if your player needs a new game and practice uniform.</p>
                 </div>
                 <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-sm font-black uppercase tracking-widest text-green-300">
-                  Registration fee waived through June 30
+                  Registration fee waived
                 </div>
               </div>
             </div>
@@ -533,11 +533,11 @@ export default function RegisterNewAthlete() {
                     </div>
                     <div className="flex items-center justify-between border-b border-gray-800 pb-3">
                       <span className="text-sm font-bold text-gray-500">Monthly Fee</span>
-                      <span className="font-black">$50/mo</span>
+                      <span className="font-black">$25/mo</span>
                     </div>
                     <div className="flex items-center justify-between pt-2">
                       <span className="text-lg font-black uppercase italic">Due Now</span>
-                      <span className="text-2xl font-black text-[#EF4444]">{formData.includeUniform ? '$100 + $50/mo' : '$50/mo'}</span>
+                      <span className="text-2xl font-black text-[#EF4444]">{formData.includeUniform ? '$100 + $25/mo' : '$25/mo'}</span>
                     </div>
                     <div className="rounded-xl border border-gray-800 bg-neutral-950 p-3 text-xs leading-5 text-gray-500">
                       <Shirt className="mb-2 text-[#D4AF37]" size={18} />
