@@ -124,6 +124,44 @@ export default function Dashboard() {
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [sponsors, setSponsors] = useState<SponsorSpotlight[]>([]);
   const [loading, setLoading] = useState(true);
+  const [payLoadingId, setPayLoadingId] = useState<string | null>(null);
+  const [payError, setPayError] = useState('');
+
+  // Lets a parent start the monthly membership payment for a player who
+  // registered but never finished the Stripe checkout. Reuses the same
+  // checkout endpoint as registration; once paid, the player is marked paid
+  // automatically by the Stripe-sync bridge (no manual sync needed).
+  const isPlayerPaid = (player: PlayerSummary) =>
+    (player.payment_status || '').toLowerCase() === 'paid'
+    || (player.payment_status || '').toLowerCase() === 'active';
+
+  const handlePayNow = async (player: PlayerSummary) => {
+    setPayError('');
+    setPayLoadingId(player.id);
+    try {
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playerId: player.id,
+          registrationData: {
+            first_name: player.first_name || '',
+            last_name: player.last_name || '',
+            status: 'pending_payment',
+            payment_status: 'pending',
+          },
+          successUrl: `${window.location.origin}/dashboard?paid=true`,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not start payment.');
+      if (!data.url) throw new Error('Payment link was not returned. Please try again.');
+      window.location.href = data.url;
+    } catch (err: unknown) {
+      setPayError(err instanceof Error ? err.message : 'Could not start payment.');
+      setPayLoadingId(null);
+    }
+  };
 
   const firstName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'Bamika Family';
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -489,6 +527,26 @@ export default function Dashboard() {
                         {player.payment_status || 'Payment pending'}
                       </span>
                     </div>
+
+                    {!isPlayerPaid(player) && (
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => handlePayNow(player)}
+                          disabled={payLoadingId === player.id}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-2.5 text-sm font-black uppercase tracking-widest text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <CreditCard size={15} />
+                          {payLoadingId === player.id ? 'Starting payment…' : 'Set up monthly payment'}
+                        </button>
+                        <p className="mt-1.5 text-center text-[11px] font-bold text-gray-500">
+                          Finish setting up {player.first_name || 'your player'}&apos;s membership payment.
+                        </p>
+                        {payError && payLoadingId === null && (
+                          <p className="mt-1 text-center text-[11px] font-bold text-[#FCA5A5]">{payError}</p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="mt-3 rounded-lg border border-gray-800 bg-neutral-950 p-3">
                       <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Uniform</div>
