@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth';
 import { uploadPhoto } from '../lib/upload';
 import { useNavigate } from 'react-router-dom';
-import { Loader, Phone, FileText, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2, X, CreditCard, Shirt, Target } from 'lucide-react';
+import { Loader, Phone, FileText, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2, X, CreditCard, Target, Plus } from 'lucide-react';
 
 interface Player {
   id: string;
@@ -97,6 +97,18 @@ interface CoachProfile {
   photo_url?: string;
 }
 
+const emptyCoachPlayerInvite = {
+  player_first_name: '',
+  player_last_name: '',
+  date_of_birth: '',
+  position: 'TBD',
+  jersey_size: 'YM',
+  parent_first_name: '',
+  parent_last_name: '',
+  parent_email: '',
+  parent_phone: '',
+};
+
 export default function CoachDashboard() {
   const { user, userRole } = useAuthStore();
   const navigate = useNavigate();
@@ -112,6 +124,9 @@ export default function CoachDashboard() {
   const [profile, setProfile] = useState<CoachProfile | null>(null);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [newPlayerInvite, setNewPlayerInvite] = useState(emptyCoachPlayerInvite);
+  const [submittingInvite, setSubmittingInvite] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -330,6 +345,44 @@ export default function CoachDashboard() {
     )));
   };
 
+  const handleCoachAddPlayer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingInvite(true);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        alert('Please log in as a coach again before adding a player.');
+        return;
+      }
+
+      const response = await fetch('/api/auth/invite-parent-player', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(newPlayerInvite),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        alert(result.error || 'Unable to add player and invite parent.');
+        return;
+      }
+
+      setNewPlayerInvite(emptyCoachPlayerInvite);
+      setShowAddPlayer(false);
+      await fetchTeamData();
+      alert(result.message || 'Player added and parent invite sent.');
+    } finally {
+      setSubmittingInvite(false);
+    }
+  };
+
   const calculateAge = (dob: string) => {
     if (!dob) return 0;
     const birthDate = new Date(dob);
@@ -368,7 +421,7 @@ export default function CoachDashboard() {
     <div className="space-y-6 pb-20">
       <div className="flex flex-col gap-4 rounded-2xl border border-gray-800 bg-neutral-950 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black uppercase italic text-white">Coach Dashboard</h1>
+          <h1 className="text-2xl font-black uppercase italic text-white sm:text-3xl">Coach Dashboard</h1>
           <p className="mt-1 text-sm font-bold uppercase tracking-widest text-gray-500">
             {teamId ? teamId : 'No team assigned yet'}
           </p>
@@ -376,7 +429,7 @@ export default function CoachDashboard() {
         {profile && (
           <button 
             onClick={() => setShowEditProfile(!showEditProfile)}
-            className="flex items-center gap-2 px-4 py-2 bg-black border border-gray-300 rounded-lg hover:bg-gray-900 text-gray-300 font-bold shadow-sm"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-700 bg-black px-4 py-3 text-sm font-bold text-gray-300 shadow-sm hover:bg-gray-900 sm:w-auto sm:py-2"
           >
             <User size={18} />
             My Profile
@@ -579,7 +632,17 @@ export default function CoachDashboard() {
               <h2 className="text-xl font-black uppercase italic text-white">Team Roster</h2>
               <p className="text-sm text-gray-500">Click a player name to open the full player card. Coaches can update jersey details and message families from here.</p>
             </div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">{players.length} players</div>
+            <div className="flex flex-col gap-2 sm:items-end">
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">{players.length} players</div>
+              <button
+                type="button"
+                onClick={() => setShowAddPlayer(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700 sm:py-2"
+              >
+                <Plus size={15} />
+                Add Player
+              </button>
+            </div>
           </div>
 
           {players.length === 0 ? (
@@ -588,40 +651,70 @@ export default function CoachDashboard() {
             </div>
           ) : (
             <>
-            {/* Mobile: stacked roster cards (tap a player to open the full detail view) */}
             <div className="space-y-3 lg:hidden">
               {players.map((player) => (
-                <div key={player.id} className="rounded-xl border border-gray-800 bg-black p-4">
+                <article key={player.id} className="rounded-xl border border-gray-800 bg-black p-4">
                   <button type="button" onClick={() => setSelectedPlayer(player)} className="flex w-full items-center gap-3 text-left">
                     {player.photo_url ? (
-                      <img src={player.photo_url} alt={getPlayerName(player)} className="h-12 w-12 shrink-0 rounded-lg border border-gray-800 object-cover" />
+                      <img src={player.photo_url} alt={getPlayerName(player)} className="h-14 w-14 rounded-xl border border-gray-800 object-cover" />
                     ) : (
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gray-800 bg-neutral-900"><User className="h-5 w-5 text-gray-500" /></div>
+                      <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-gray-800 bg-neutral-900">
+                        <User className="h-6 w-6 text-gray-500" />
+                      </div>
                     )}
-                    <div className="min-w-0">
-                      <div className="truncate font-black uppercase italic text-white">{getPlayerName(player)}</div>
-                      <div className="text-[10px] font-black uppercase tracking-widest text-gray-600">{player.age_group || teamId} • Age {calculateAge(player.dob)}</div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate font-black uppercase italic text-white">{getPlayerName(player)}</h3>
+                      <p className="text-xs font-bold uppercase text-gray-500">{calculateAge(player.dob)} years old - {player.age_group || teamId}</p>
                     </div>
                   </button>
-                  <div className="mt-3 flex flex-wrap gap-2">
+
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.status)}`}>{player.status || 'Pending'}</span>
                     <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.payment_status || player.status)}`}>{player.payment_status || player.status || 'Pending'}</span>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-300">
-                    <div><span className="text-gray-600">Position:</span> {player.position || 'TBD'}</div>
-                    <div><span className="text-gray-600">Number:</span> {player.jersey_number || '-'}</div>
-                    <div><span className="text-gray-600">Size:</span> {player.jersey_size || 'YM'}</div>
-                    <div className="truncate"><span className="text-gray-600">Parent:</span> {getParentName(player.profiles) || 'N/A'}</div>
+
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    <label className="block">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</span>
+                      <select value={player.position || 'TBD'} onChange={(e) => handleUpdatePlayer(player.id, { position: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
+                        {POSITION_OPTIONS.map((position) => <option key={position} value={position}>{position}</option>)}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Number</span>
+                      <input
+                        value={player.jersey_number || ''}
+                        placeholder="-"
+                        onChange={(e) => {
+                          const jerseyNumber = e.target.value;
+                          setPlayers((currentPlayers) => currentPlayers.map((currentPlayer) => currentPlayer.id === player.id ? { ...currentPlayer, jersey_number: jerseyNumber } : currentPlayer));
+                        }}
+                        onBlur={(e) => handleUpdatePlayer(player.id, { jersey_number: e.target.value || '-' })}
+                        className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Size</span>
+                      <select value={player.jersey_size || 'YM'} onChange={(e) => handleUpdatePlayer(player.id, { jersey_size: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
+                        {JERSEY_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
+                      </select>
+                    </label>
                   </div>
-                  <div className="mt-3 flex gap-2">
-                    <button type="button" onClick={() => setSelectedPlayer(player)} className="flex-1 rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">View</button>
-                    <button type="button" onClick={() => { setMessageTarget('player'); setSelectedMessagePlayerId(player.id); }} className="flex-1 rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-[#EF4444]">Message</button>
+
+                  <div className="mt-4 rounded-lg border border-gray-900 bg-neutral-950 p-3">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Parent</div>
+                    <div className="mt-1 text-sm font-bold text-gray-300">{getParentName(player.profiles) || 'Parent not listed'}</div>
+                    <div className="text-xs text-gray-500">{player.profiles.phone || 'No phone listed'}</div>
                   </div>
-                </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setSelectedPlayer(player)} className="rounded-lg border border-gray-800 px-3 py-3 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">View</button>
+                    <button type="button" onClick={() => { setMessageTarget('player'); setSelectedMessagePlayerId(player.id); }} className="rounded-lg border border-gray-800 px-3 py-3 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-[#EF4444]">Message</button>
+                  </div>
+                </article>
               ))}
             </div>
 
-            {/* Desktop: full editable roster table */}
             <div className="hidden overflow-x-auto rounded-xl border border-gray-800 bg-black lg:block">
               <table className="min-w-[980px] w-full text-left text-sm">
                 <thead className="border-b border-gray-800 bg-neutral-950 text-[10px] font-black uppercase tracking-widest text-gray-500">
@@ -702,6 +795,57 @@ export default function CoachDashboard() {
             </>
           )}
         </section>
+      )}
+
+      {showAddPlayer && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm" onClick={() => setShowAddPlayer(false)}>
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-gray-800 bg-neutral-950 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 border-b border-gray-800 p-5">
+              <div>
+                <h2 className="text-2xl font-black uppercase italic text-white">Add Player</h2>
+                <p className="mt-1 text-sm text-gray-500">Create the player record and send the parent an account setup invite.</p>
+              </div>
+              <button type="button" onClick={() => setShowAddPlayer(false)} className="rounded-lg border border-gray-800 p-2 text-gray-500 hover:border-[#EF4444] hover:text-[#EF4444]">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCoachAddPlayer} className="space-y-5 p-5">
+              <div className="rounded-xl border border-gray-800 bg-black p-4">
+                <h3 className="mb-4 text-sm font-black uppercase italic text-white">Player Details</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input required value={newPlayerInvite.player_first_name} placeholder="Player first name" className="input-primary" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, player_first_name: e.target.value })} />
+                  <input required value={newPlayerInvite.player_last_name} placeholder="Player last name" className="input-primary" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, player_last_name: e.target.value })} />
+                  <input required type="date" value={newPlayerInvite.date_of_birth} className="input-primary" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, date_of_birth: e.target.value })} />
+                  <select value={newPlayerInvite.position} className="input-primary" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, position: e.target.value })}>
+                    {POSITION_OPTIONS.map((position) => <option key={position} value={position}>{position}</option>)}
+                  </select>
+                  <select value={newPlayerInvite.jersey_size} className="input-primary sm:col-span-2" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, jersey_size: e.target.value })}>
+                    {JERSEY_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-800 bg-black p-4">
+                <h3 className="mb-4 text-sm font-black uppercase italic text-white">Parent Contact</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input required value={newPlayerInvite.parent_first_name} placeholder="Parent first name" className="input-primary" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, parent_first_name: e.target.value })} />
+                  <input required value={newPlayerInvite.parent_last_name} placeholder="Parent last name" className="input-primary" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, parent_last_name: e.target.value })} />
+                  <input required type="email" value={newPlayerInvite.parent_email} placeholder="Parent email" className="input-primary" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, parent_email: e.target.value })} />
+                  <input value={newPlayerInvite.parent_phone} placeholder="Parent phone" className="input-primary" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, parent_phone: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 p-4 text-sm leading-6 text-yellow-100">
+                The parent receives the account setup email. After they create their password, the player appears in their dashboard with payment pending.
+              </div>
+
+              <button type="submit" disabled={submittingInvite} className="btn-primary w-full py-4">
+                {submittingInvite ? 'Sending Invite...' : 'Add Player & Invite Parent'}
+              </button>
+            </form>
+          </div>
+        </div>
       )}
 
       {selectedPlayer && (

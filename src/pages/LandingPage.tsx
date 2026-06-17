@@ -353,7 +353,7 @@ export default function LandingPage() {
           <div className="absolute inset-x-0 bottom-0 h-48 bg-[linear-gradient(0deg,#000,transparent)]"></div>
         </div>
 
-        <div className="relative z-10 mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-7xl items-center px-4 py-12 sm:px-6 sm:py-16">
+        <div className="relative z-10 mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-7xl items-center px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
           <div className="max-w-4xl text-white">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/60 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-200 backdrop-blur">
               <Trophy size={15} className="text-[#D4AF37]" />
@@ -406,7 +406,7 @@ export default function LandingPage() {
 
       {/* ANNOUNCEMENTS */}
       <section id="announcements" className="bg-neutral-950 py-16 w-full border-y border-gray-900">
-        <div className="w-full px-6">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
             <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
@@ -457,7 +457,7 @@ export default function LandingPage() {
 
       {/* SPONSORS & PLAYER OF THE MONTH */}
       <section id="sponsors" className="bg-black py-20 w-full border-b border-gray-900">
-        <div className="mx-auto max-w-7xl px-6">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-10">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
               <Star size={14} className="text-[#EF4444]" />
@@ -601,7 +601,7 @@ export default function LandingPage() {
 
       {/* CLUB APPROACH */}
       <section className="bg-black py-20 w-full">
-        <div className="mx-auto max-w-7xl px-6">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
             <div>
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
@@ -635,7 +635,7 @@ export default function LandingPage() {
 
       {/* PROGRAMS */}
       <section id="programs" className="py-24 bg-neutral-950 w-full">
-        <div className="w-full px-6">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
               <Target size={14} className="text-[#EF4444]" />
@@ -676,7 +676,7 @@ export default function LandingPage() {
 
       {/* PROGRAM DETAILS & PRICING */}
       <section id="pricing" className="py-20 bg-black w-full border-y border-gray-900">
-        <div className="w-full px-6">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
             <div className="mb-12 text-center">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
@@ -745,7 +745,7 @@ export default function LandingPage() {
 
       {/* SCHEDULE */}
       <section id="schedule" className="py-24 bg-neutral-950 w-full">
-        <div className="w-full px-6">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
               <CalendarDays size={14} className="text-[#EF4444]" />
@@ -869,7 +869,7 @@ export default function LandingPage() {
       
       {/* COACHES */}
       <section id="coaches" className="hidden">
-        <div className="w-full px-6">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
               <Users size={14} className="text-[#EF4444]" />
@@ -891,7 +891,7 @@ export default function LandingPage() {
 
       {/* FOOTER */}
       <footer id="contact" className="bg-neutral-950 text-white py-12 border-t border-gray-800 w-full">
-        <div className="w-full px-6">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8 max-w-7xl mx-auto">
             <div className="text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-2 mb-4">

@@ -126,7 +126,7 @@ export default function ClubPage() {
         ))}
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.94)_0%,rgba(0,0,0,0.82)_45%,rgba(0,0,0,0.42)_100%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.9)_0%,transparent_38%)]" />
-        <div className="relative z-10 mx-auto flex min-h-[34rem] max-w-7xl items-end px-4 py-14 sm:px-6 sm:py-20">
+        <div className="relative z-10 mx-auto flex min-h-[34rem] max-w-7xl items-end px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/65 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-200 backdrop-blur">
               <ShieldCheck size={14} className="text-[#D4AF37]" />
@@ -149,7 +149,7 @@ export default function ClubPage() {
         </div>
       </section>
 
-      <section className="border-b border-gray-900 bg-black px-4 py-14 sm:px-6 sm:py-20">
+      <section className="border-b border-gray-900 bg-black px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <div className="mb-10 max-w-4xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
@@ -232,7 +232,7 @@ export default function ClubPage() {
         </div>
       </section>
 
-      <section className="px-4 py-14 sm:px-6 sm:py-20">
+      <section className="px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <div className="mb-10 text-center">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-neutral-950 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
@@ -247,7 +247,7 @@ export default function ClubPage() {
         </div>
       </section>
 
-      <section className="border-t border-gray-900 bg-neutral-950 px-4 py-14 sm:px-6 sm:py-20">
+      <section className="border-t border-gray-900 bg-neutral-950 px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>

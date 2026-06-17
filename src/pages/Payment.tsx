@@ -132,7 +132,7 @@ export default function Payment() {
           <div className="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
             <div className="mb-2 flex justify-between gap-4">
               <span className="text-gray-600">Membership</span>
-              <span className="font-bold">$50/mo promo</span>
+              <span className="font-bold">$25/mo</span>
             </div>
             <div className="mb-2 flex justify-between gap-4">
               <span className="text-gray-600">Registration Fee</span>
@@ -145,9 +145,9 @@ export default function Payment() {
             <p className="mb-3 text-xs text-gray-500">Includes game jersey, shorts, socks, and practice jersey.</p>
             <div className="flex flex-col gap-2 border-t border-gray-200 pt-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-lg font-bold">Checkout</span>
-              <span className="text-2xl font-bold text-primary">$100 + $50/mo</span>
+              <span className="text-2xl font-bold text-primary">$100 + $25/mo</span>
             </div>
-            <p className="mt-2 text-xs text-gray-500">Promo applies to signups through June 30. Starting July 1, new signups pay the registration fee and regular monthly rate.</p>
+            <p className="mt-2 text-xs text-gray-500">Registration fee is waived. Monthly club fee is $25.</p>
           </div>
 
           <button

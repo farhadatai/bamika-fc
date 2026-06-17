@@ -424,18 +424,18 @@ export default function PlayerRegistration() {
               </div>
               <div className="flex justify-between pt-2">
                 <span className="text-lg font-bold">Monthly Membership</span>
-                <span className="text-lg font-bold text-primary">$50.00/mo promo</span>
+                <span className="text-lg font-bold text-primary">$25.00/mo</span>
               </div>
               <div className="flex justify-between pt-2">
                 <span className="text-lg font-bold">Registration Fee</span>
-                <span className="text-lg font-bold text-green-600">Waived through June 30</span>
+                <span className="text-lg font-bold text-green-600">Waived</span>
               </div>
               <div className="flex justify-between pt-2">
                 <span className="text-lg font-bold">Uniform Package</span>
                 <span className="text-lg font-bold text-primary">$100.00</span>
               </div>
               <p className="text-xs text-gray-500">Uniform includes game jersey, shorts, socks, and practice jersey.</p>
-              <p className="text-xs text-gray-500">Starting July 1, new signups pay the registration fee and regular monthly rate.</p>
+              <p className="text-xs text-gray-500">Registration fee is waived. Monthly club fee is $25.</p>
             </div>
 
             <p className="text-sm text-gray-500 text-center">

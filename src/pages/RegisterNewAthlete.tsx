@@ -53,7 +53,6 @@ export default function RegisterNewAthlete() {
     birthCertPath: '',
     photoUrl: '',
     waiverSignedAt: '',
-    includeUniform: false,
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -190,7 +189,7 @@ export default function RegisterNewAthlete() {
         birth_cert_path: formData.birthCertPath || 'not_provided',
         photo_url: formData.photoUrl,
         waiver_signed_at: formData.waiverSignedAt,
-        include_uniform: formData.includeUniform,
+        include_uniform: false,
         status: 'pending_payment',
         payment_status: 'pending',
       };
@@ -200,7 +199,7 @@ export default function RegisterNewAthlete() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ registrationData: payload, playerId: newPlayer.id, includeUniform: formData.includeUniform }),
+        body: JSON.stringify({ registrationData: payload, playerId: newPlayer.id, includeUniform: false }),
       });
 
       const data = await response.json();
@@ -291,7 +290,7 @@ export default function RegisterNewAthlete() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-black uppercase italic">Athlete Information</h2>
-                  <p className="text-sm text-gray-500">Basic player details and uniform sizing.</p>
+                  <p className="text-sm text-gray-500">Basic player details and jersey sizing for team records.</p>
                 </div>
               </div>
 
@@ -513,6 +512,9 @@ export default function RegisterNewAthlete() {
                     <div className="flex items-center justify-between pt-2">
                       <span className="text-lg font-black uppercase italic">Due Now</span>
                       <span className="text-2xl font-black text-[#EF4444]">$25/mo</span>
+                    </div>
+                    <div className="rounded-xl border border-gray-800 bg-neutral-950 p-3 text-xs leading-5 text-gray-500">
+                      Uniform orders are handled after registration in the parent dashboard so families can choose the correct player, size, and jersey number.
                     </div>
                   </div>
                 </div>

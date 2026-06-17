@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Play, X } from 'lucide-react';
+import { Dumbbell, Play, Target, X } from 'lucide-react';
 import { getYoutubeId, getYoutubeThumbnail } from '../lib/utils';
 
 interface Drill {
@@ -81,37 +81,60 @@ export default function TrainingLab() {
   }, [filter]);
 
   return (
-    <div className="min-h-screen bg-black p-4 text-white sm:p-6 md:p-10">
-      <div className="mb-12">
-        <h1 className="text-3xl font-black italic uppercase tracking-tighter sm:text-4xl md:text-6xl">
-          TRAINING <span className="text-[#EF4444]">LAB</span>
-        </h1>
-        <p className="text-gray-500 uppercase tracking-widest text-xs font-bold mt-2">
-          Master the fundamentals. Chase greatness.
-        </p>
-      </div>
+    <div className="min-h-screen w-full bg-black text-white">
+      <section className="border-b border-gray-900 bg-neutral-950 px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
+          <div>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+              <Dumbbell size={14} className="text-[#EF4444]" />
+              Training
+            </div>
+            <h1 className="text-4xl font-black italic uppercase leading-tight tracking-tight sm:text-6xl">
+              Training <span className="text-[#EF4444]">Lab</span>
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-gray-400 sm:text-lg">
+              Drills, tutorials, and informational videos for players and families to review between practices.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              ['Skills', 'Ball mastery'],
+              ['Videos', 'Coach selected'],
+              ['Growth', 'Practice habits'],
+            ].map(([title, body]) => (
+              <div key={title} className="rounded-2xl border border-gray-800 bg-black p-4">
+                <Target size={18} className="text-[#EF4444]" />
+                <div className="mt-4 text-lg font-black uppercase italic text-white">{title}</div>
+                <div className="mt-1 text-xs font-bold text-gray-500">{body}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      <div className="mb-10 flex flex-wrap gap-2 sm:gap-4">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setFilter(cat)}
-            className={`px-4 py-2 rounded-full text-[10px] font-black uppercase italic tracking-widest transition-all sm:px-6 ${
-              filter === cat
-                ? 'bg-[#EF4444] text-white shadow-lg shadow-red-500/20'
-                : 'bg-black text-gray-500 border border-gray-800 hover:border-gray-600'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
+      <section className="px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 flex flex-wrap gap-2 sm:gap-3">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setFilter(cat)}
+                className={`rounded-full px-4 py-2 text-[10px] font-black uppercase italic tracking-widest transition-all sm:px-5 ${
+                  filter === cat
+                    ? 'bg-[#EF4444] text-white shadow-lg shadow-red-500/20'
+                    : 'border border-gray-800 bg-black text-gray-500 hover:border-gray-600 hover:text-white'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
 
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-6">
         {loading ? (
           <p className="text-sm font-bold uppercase tracking-widest text-gray-500">Loading tutorials...</p>
         ) : drills.length === 0 ? (
-          <div className="rounded-3xl border border-gray-800 bg-neutral-900 p-8 text-center md:col-span-2 lg:col-span-3">
+          <div className="rounded-2xl border border-gray-800 bg-neutral-950 p-8 text-center md:col-span-2 lg:col-span-3">
             <h2 className="text-xl font-black uppercase italic text-white">No tutorials yet</h2>
             <p className="mx-auto mt-2 max-w-lg text-sm text-gray-500">
               New YouTube drills and player tutorials will appear here after they are added from the admin dashboard.
@@ -122,7 +145,7 @@ export default function TrainingLab() {
           const thumbnail = getDrillThumbnail(drill);
 
           return (
-            <div key={drill.id} className="bg-neutral-900 rounded-3xl overflow-hidden border border-gray-800 group hover:border-[#EF4444] transition-all">
+            <div key={drill.id} className="group overflow-hidden rounded-2xl border border-gray-800 bg-neutral-950 transition-all hover:border-[#EF4444]">
               <button type="button" className="relative aspect-video w-full bg-black overflow-hidden text-left" onClick={() => setActiveVideo(drillVideoUrl)}>
                 {thumbnail ? (
                   <img src={thumbnail} alt={drill.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
@@ -166,7 +189,9 @@ export default function TrainingLab() {
             </div>
           );
         })}
-       </div> 
+          </div>
+        </div>
+      </section>
 
        <VideoModal videoUrl={activeVideo} onClose={() => setActiveVideo(null)} />
     </div>
