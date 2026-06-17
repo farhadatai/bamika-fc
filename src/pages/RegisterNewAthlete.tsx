@@ -9,7 +9,6 @@ import {
   CreditCard,
   FileText,
   Shield,
-  Shirt,
   Upload,
   User,
 } from 'lucide-react';
@@ -251,11 +250,6 @@ export default function RegisterNewAthlete() {
                   <div className="text-sm font-bold text-gray-300">Monthly club fee</div>
                   <div className="mt-1 text-3xl font-black text-[#EF4444]">$25/mo</div>
                 </div>
-                <div className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
-                  <div className="text-sm font-bold text-gray-300">Optional uniform package</div>
-                  <div className="mt-1 text-3xl font-black text-white">$100</div>
-                  <p className="mt-2 text-xs leading-5 text-gray-500">Add only if your player needs a new game and practice uniform.</p>
-                </div>
                 <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-sm font-black uppercase tracking-widest text-green-300">
                   Registration fee waived
                 </div>
@@ -338,20 +332,6 @@ export default function RegisterNewAthlete() {
                       <option key={size} value={size}>{size}</option>
                     ))}
                   </select>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-gray-800 bg-black p-4 transition hover:border-[#EF4444]/60">
-                    <input
-                      type="checkbox"
-                      checked={formData.includeUniform}
-                      onChange={(e) => setFormData({ ...formData, includeUniform: e.target.checked })}
-                      className="mt-1 h-5 w-5 rounded border-gray-700 bg-black text-[#EF4444] focus:ring-[#EF4444]"
-                    />
-                    <span>
-                      <span className="block text-sm font-black uppercase text-white">Add full uniform package for $100</span>
-                      <span className="mt-1 block text-xs leading-5 text-gray-500">Leave unchecked if your player already has a uniform. If purchased, Stripe will generate a confirmation code after payment.</span>
-                    </span>
-                  </label>
                 </div>
                 <div className="md:col-span-2">
                   <label className={labelClass}>Medical Conditions</label>
@@ -505,7 +485,6 @@ export default function RegisterNewAthlete() {
                       ['Player Name', `${formData.firstName} ${formData.lastName}`],
                       ['Position', formData.position],
                       ['Jersey Size', formData.jerseySize],
-                      ['Uniform', formData.includeUniform ? 'Add full package' : 'Already have uniform'],
                       ['Waiver', `Signed by ${signature}`],
                     ].map(([label, value]) => (
                       <div key={label} className="flex items-center justify-between gap-4 border-b border-gray-800 pb-3 text-sm">
@@ -528,22 +507,12 @@ export default function RegisterNewAthlete() {
                       <span className="font-black text-green-300">Waived</span>
                     </div>
                     <div className="flex items-center justify-between border-b border-gray-800 pb-3">
-                      <span className="text-sm font-bold text-gray-500">Full Uniform</span>
-                      <span className="font-black">{formData.includeUniform ? '$100.00' : 'Skipped'}</span>
-                    </div>
-                    <div className="flex items-center justify-between border-b border-gray-800 pb-3">
                       <span className="text-sm font-bold text-gray-500">Monthly Fee</span>
                       <span className="font-black">$25/mo</span>
                     </div>
                     <div className="flex items-center justify-between pt-2">
                       <span className="text-lg font-black uppercase italic">Due Now</span>
-                      <span className="text-2xl font-black text-[#EF4444]">{formData.includeUniform ? '$100 + $25/mo' : '$25/mo'}</span>
-                    </div>
-                    <div className="rounded-xl border border-gray-800 bg-neutral-950 p-3 text-xs leading-5 text-gray-500">
-                      <Shirt className="mb-2 text-[#D4AF37]" size={18} />
-                      {formData.includeUniform
-                        ? 'Uniform includes game jersey, shorts, socks, and practice jersey. Your confirmation code appears after payment.'
-                        : 'Uniform purchase is optional. You can skip it if your player already has one.'}
+                      <span className="text-2xl font-black text-[#EF4444]">$25/mo</span>
                     </div>
                   </div>
                 </div>
