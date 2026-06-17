@@ -587,7 +587,42 @@ export default function CoachDashboard() {
               No players assigned to {teamId} yet.
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-800 bg-black">
+            <>
+            {/* Mobile: stacked roster cards (tap a player to open the full detail view) */}
+            <div className="space-y-3 lg:hidden">
+              {players.map((player) => (
+                <div key={player.id} className="rounded-xl border border-gray-800 bg-black p-4">
+                  <button type="button" onClick={() => setSelectedPlayer(player)} className="flex w-full items-center gap-3 text-left">
+                    {player.photo_url ? (
+                      <img src={player.photo_url} alt={getPlayerName(player)} className="h-12 w-12 shrink-0 rounded-lg border border-gray-800 object-cover" />
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gray-800 bg-neutral-900"><User className="h-5 w-5 text-gray-500" /></div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="truncate font-black uppercase italic text-white">{getPlayerName(player)}</div>
+                      <div className="text-[10px] font-black uppercase tracking-widest text-gray-600">{player.age_group || teamId} • Age {calculateAge(player.dob)}</div>
+                    </div>
+                  </button>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.status)}`}>{player.status || 'Pending'}</span>
+                    <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.payment_status || player.status)}`}>{player.payment_status || player.status || 'Pending'}</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-300">
+                    <div><span className="text-gray-600">Position:</span> {player.position || 'TBD'}</div>
+                    <div><span className="text-gray-600">Number:</span> {player.jersey_number || '-'}</div>
+                    <div><span className="text-gray-600">Size:</span> {player.jersey_size || 'YM'}</div>
+                    <div className="truncate"><span className="text-gray-600">Parent:</span> {getParentName(player.profiles) || 'N/A'}</div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button type="button" onClick={() => setSelectedPlayer(player)} className="flex-1 rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">View</button>
+                    <button type="button" onClick={() => { setMessageTarget('player'); setSelectedMessagePlayerId(player.id); }} className="flex-1 rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-[#EF4444]">Message</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: full editable roster table */}
+            <div className="hidden overflow-x-auto rounded-xl border border-gray-800 bg-black lg:block">
               <table className="min-w-[980px] w-full text-left text-sm">
                 <thead className="border-b border-gray-800 bg-neutral-950 text-[10px] font-black uppercase tracking-widest text-gray-500">
                   <tr>
@@ -664,6 +699,7 @@ export default function CoachDashboard() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </section>
       )}
