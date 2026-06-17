@@ -726,22 +726,10 @@ export default function LandingPage() {
                     <span className="font-bold text-gray-300">Registration fee</span>
                     <span className="text-2xl font-black text-white">$0</span>
                   </div>
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div className="flex items-center justify-between pb-1">
                     <span className="font-bold text-gray-300">Monthly club fee</span>
                     <span className="text-2xl font-black text-white">$25/mo</span>
                   </div>
-                  <div className="border-b border-white/10 pb-4">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-gray-300">Full uniform package</span>
-                      <span className="text-2xl font-black text-white">$100</span>
-                    </div>
-                    <p className="mt-2 text-sm text-gray-400">
-                      Includes game jersey, shorts, socks, and a practice jersey.
-                    </p>
-                  </div>
-                  <p className="text-xs font-bold uppercase leading-5 tracking-widest text-gray-500">
-                    Families who already paid $50 will receive a $25 credit toward their next monthly payment.
-                  </p>
                   <Link
                     to="/register"
                     className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#EF4444] px-6 py-4 text-sm font-black uppercase text-white transition-all hover:-translate-y-0.5 hover:bg-red-700"
