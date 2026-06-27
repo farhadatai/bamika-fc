@@ -56,6 +56,39 @@ const formatAge = (dateOfBirth) => {
   return `${age} years old`;
 };
 
+const formatGodsportDob = (dateOfBirth) => {
+  if (!dateOfBirth) return '';
+
+  const value = String(dateOfBirth).trim();
+  const isoDate = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (isoDate) return `${isoDate[1]}-${isoDate[2]}-${isoDate[3]}`;
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value) || /^\d{4}\/\d{2}\/\d{2}$/.test(value)) return value;
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return '';
+
+  const year = parsedDate.getUTCFullYear();
+  const month = String(parsedDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(parsedDate.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const GODSPORT_PLAYER_HEADERS = [
+  'First Name',
+  'Last Name',
+  'Gender',
+  'DOB',
+  'Competitive Level',
+  'Address',
+  'City',
+  'State',
+  'Zip',
+  'Phone Number',
+  'Parent One First Name',
+  'Parent One Last Name',
+  'Parent One Email/UserID',
+];
+
 const PlayerPhoto = ({ player, size = 'large' }) => {
   const [hasImageError, setHasImageError] = useState(false);
   const displayName = splitFullName(getPlayerDisplayName(player));
@@ -1608,6 +1641,42 @@ export default function AdminDashboard() {
       return { filename: 'bamika-coaches.csv', title: 'Bamika FC Coach Report', headers, rows };
     }
 
+    if (type === 'godsport') {
+      const rows = [...data.roster]
+        .sort((a, b) => getPlayerDisplayName(a).localeCompare(getPlayerDisplayName(b)))
+        .map((player) => {
+          const linkedParent = getLinkedParent(player);
+          const parent = data.parents.find((candidate) => (
+            candidate.id === player.parent_id || candidate.id === player.user_id
+          )) || linkedParent || {};
+          const playerName = splitFullName(getPlayerDisplayName(player));
+          const parentName = getParentDisplayName(parent);
+
+          return {
+            'First Name': player.first_name || playerName.firstName,
+            'Last Name': player.last_name || playerName.lastName,
+            Gender: player.gender || '',
+            DOB: formatGodsportDob(player.date_of_birth || player.dob),
+            'Competitive Level': player.competitive_level || player.level || '',
+            Address: player.address || parent.address || '',
+            City: player.city || parent.city || '',
+            State: player.state || parent.state || '',
+            Zip: player.zip || player.zip_code || player.postal_code || parent.zip || parent.zip_code || parent.postal_code || '',
+            'Phone Number': player.phone || parent.phone || '',
+            'Parent One First Name': parentName.firstName,
+            'Parent One Last Name': parentName.lastName,
+            'Parent One Email/UserID': parent.email || '',
+          };
+        });
+
+      return {
+        filename: 'godsport-player-report.csv',
+        title: 'Godsport Player Report',
+        headers: GODSPORT_PLAYER_HEADERS,
+        rows,
+      };
+    }
+
     const headers = ['Player', 'Age', 'Team', 'Payment', 'Status', 'Birth Certificate', 'Parent', 'Phone', 'Email'];
     const rows = [...data.roster]
       .sort((a, b) => getPlayerDisplayName(a).localeCompare(getPlayerDisplayName(b)))
@@ -1728,6 +1797,12 @@ export default function AdminDashboard() {
                 </div>
               </div>
             ))}
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-800 bg-black p-3">
+              <span className="text-xs font-black uppercase tracking-widest text-gray-300">Godsport Players</span>
+              <button onClick={() => exportReport('godsport', 'csv')} className="inline-flex items-center gap-1 rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">
+                <Download size={13} /> CSV
+              </button>
+            </div>
           </div>
         </div>
 
