@@ -56,7 +56,7 @@ const formatAge = (dateOfBirth) => {
   return `${age} years old`;
 };
 
-const formatGodsportDob = (dateOfBirth) => {
+const formatGotSportDob = (dateOfBirth) => {
   if (!dateOfBirth) return '';
 
   const value = String(dateOfBirth).trim();
@@ -73,7 +73,7 @@ const formatGodsportDob = (dateOfBirth) => {
   return `${year}-${month}-${day}`;
 };
 
-const GODSPORT_PLAYER_HEADERS = [
+const GOTSPORT_PLAYER_HEADERS = [
   'First Name',
   'Last Name',
   'Gender',
@@ -88,6 +88,60 @@ const GODSPORT_PLAYER_HEADERS = [
   'Parent One Last Name',
   'Parent One Email/UserID',
 ];
+
+const GOTSPORT_REQUIRED_FIELDS = [
+  'First Name',
+  'Last Name',
+  'Gender',
+  'DOB',
+  'Competitive Level',
+  'Address',
+  'City',
+  'State',
+  'Zip',
+  'Phone Number',
+];
+
+const GOTSPORT_PARENT_FIELDS = [
+  'Parent One First Name',
+  'Parent One Last Name',
+  'Parent One Email/UserID',
+];
+
+const parseGotSportAddress = (value) => {
+  const rawAddress = String(value || '').trim();
+  const parts = rawAddress.split(',').map((part) => part.trim()).filter(Boolean);
+
+  if (parts.length < 3) {
+    return { address: rawAddress, city: '', state: '', zip: '' };
+  }
+
+  const stateAndZip = /^(.*?)(?:\s+)(\d{5}(?:-\d{4})?)$/.exec(parts.at(-1) || '');
+  if (!stateAndZip) {
+    return { address: rawAddress, city: '', state: '', zip: '' };
+  }
+
+  return {
+    address: parts.slice(0, -2).join(', '),
+    city: parts.at(-2) || '',
+    state: stateAndZip[1].trim(),
+    zip: stateAndZip[2],
+  };
+};
+
+const isEighteenOrYounger = (dateOfBirth) => {
+  const value = String(dateOfBirth || '').trim();
+  const birthDate = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T12:00:00Z`)
+    : new Date(value);
+  if (Number.isNaN(birthDate.getTime())) return true;
+
+  const today = new Date();
+  let age = today.getUTCFullYear() - birthDate.getUTCFullYear();
+  const monthDiff = today.getUTCMonth() - birthDate.getUTCMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getUTCDate() < birthDate.getUTCDate())) age -= 1;
+  return age <= 18;
+};
 
 const PlayerPhoto = ({ player, size = 'large' }) => {
   const [hasImageError, setHasImageError] = useState(false);
@@ -746,6 +800,7 @@ export default function AdminDashboard() {
   const emptySpotlight = { type: 'player', title: '', subtitle: '', body: '', image_url: '', link_url: '', is_published: true };
   const [newSpotlight, setNewSpotlight] = useState(emptySpotlight);
   const [databaseNotice, setDatabaseNotice] = useState('');
+  const [gotSportFallback, setGotSportFallback] = useState({ address: '', city: '', state: '', zip: '' });
 
   const handleSort = (column) => {
     setSortOrder(prev => ({
@@ -1651,17 +1706,18 @@ export default function AdminDashboard() {
           )) || linkedParent || {};
           const playerName = splitFullName(getPlayerDisplayName(player));
           const parentName = getParentDisplayName(parent);
+          const parsedAddress = parseGotSportAddress(player.address || parent.address);
 
           return {
             'First Name': player.first_name || playerName.firstName,
             'Last Name': player.last_name || playerName.lastName,
             Gender: player.gender || '',
-            DOB: formatGodsportDob(player.date_of_birth || player.dob),
-            'Competitive Level': player.competitive_level || player.level || '',
-            Address: player.address || parent.address || '',
-            City: player.city || parent.city || '',
-            State: player.state || parent.state || '',
-            Zip: player.zip || player.zip_code || player.postal_code || parent.zip || parent.zip_code || parent.postal_code || '',
+            DOB: formatGotSportDob(player.date_of_birth || player.dob),
+            'Competitive Level': 'Competitive',
+            Address: parsedAddress.address || gotSportFallback.address.trim(),
+            City: player.city || parent.city || parsedAddress.city || gotSportFallback.city.trim(),
+            State: player.state || parent.state || parsedAddress.state || gotSportFallback.state.trim(),
+            Zip: player.zip || player.zip_code || player.postal_code || parent.zip || parent.zip_code || parent.postal_code || parsedAddress.zip || gotSportFallback.zip.trim(),
             'Phone Number': player.phone || parent.phone || '',
             'Parent One First Name': parentName.firstName,
             'Parent One Last Name': parentName.lastName,
@@ -1670,9 +1726,9 @@ export default function AdminDashboard() {
         });
 
       return {
-        filename: 'godsport-player-report.csv',
-        title: 'Godsport Player Report',
-        headers: GODSPORT_PLAYER_HEADERS,
+        filename: 'gotsport-player-report.csv',
+        title: 'GotSport Player Report',
+        headers: GOTSPORT_PLAYER_HEADERS,
         rows,
       };
     }
@@ -1701,6 +1757,24 @@ export default function AdminDashboard() {
 
   const exportReport = (type, format) => {
     const report = buildExport(type);
+    if (type === 'godsport') {
+      const invalidRows = report.rows.map((row, index) => {
+        const requiredFields = isEighteenOrYounger(row.DOB)
+          ? [...GOTSPORT_REQUIRED_FIELDS, ...GOTSPORT_PARENT_FIELDS]
+          : GOTSPORT_REQUIRED_FIELDS;
+        const missingFields = requiredFields.filter((field) => !String(row[field] || '').trim());
+        return { csvRow: index + 2, player: `${row['First Name']} ${row['Last Name']}`.trim(), missingFields };
+      }).filter((row) => row.missingFields.length > 0);
+
+      if (invalidRows.length > 0) {
+        const details = invalidRows.slice(0, 8).map((row) => (
+          `Row ${row.csvRow} ${row.player || 'Unnamed player'}: ${row.missingFields.join(', ')}`
+        )).join('\n');
+        const moreRows = invalidRows.length > 8 ? `\n...and ${invalidRows.length - 8} more` : '';
+        alert(`GotSport CSV was not downloaded because ${invalidRows.length} player row${invalidRows.length === 1 ? '' : 's'} still have required fields missing.\n\n${details}${moreRows}\n\nAdd the fallback address below or update the missing family contact information, then download again.`);
+        return;
+      }
+    }
     if (format === 'pdf') {
       openPrintableReport(report.title, report.headers, report.rows);
       return;
@@ -1797,11 +1871,30 @@ export default function AdminDashboard() {
                 </div>
               </div>
             ))}
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-800 bg-black p-3">
-              <span className="text-xs font-black uppercase tracking-widest text-gray-300">Godsport Players</span>
-              <button onClick={() => exportReport('godsport', 'csv')} className="inline-flex items-center gap-1 rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">
-                <Download size={13} /> CSV
-              </button>
+            <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 md:col-span-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-black uppercase tracking-widest text-white">GotSport Players</span>
+                    <span className="rounded-full border border-blue-400/30 bg-blue-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-blue-200">USCLUB - Competitive</span>
+                  </div>
+                  <p className="mt-2 max-w-3xl text-xs leading-5 text-gray-400">
+                    Enter a fallback mailing address for players whose family record has no complete address. It is used only when a saved street, city, state, or ZIP is missing.
+                  </p>
+                </div>
+                <button onClick={() => exportReport('godsport', 'csv')} className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-blue-400/50 px-4 py-3 text-[10px] font-black uppercase text-blue-100 hover:bg-blue-500/10">
+                  <Download size={13} /> Download CSV
+                </button>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <input value={gotSportFallback.address} onChange={(event) => setGotSportFallback((current) => ({ ...current, address: event.target.value }))} placeholder="Fallback street address" className="rounded-lg border border-gray-800 bg-black px-3 py-2 text-xs font-bold text-white outline-none focus:border-blue-400" />
+                <input value={gotSportFallback.city} onChange={(event) => setGotSportFallback((current) => ({ ...current, city: event.target.value }))} placeholder="City" className="rounded-lg border border-gray-800 bg-black px-3 py-2 text-xs font-bold text-white outline-none focus:border-blue-400" />
+                <input value={gotSportFallback.state} onChange={(event) => setGotSportFallback((current) => ({ ...current, state: event.target.value }))} placeholder="State (example: CA)" className="rounded-lg border border-gray-800 bg-black px-3 py-2 text-xs font-bold uppercase text-white outline-none focus:border-blue-400" />
+                <input value={gotSportFallback.zip} onChange={(event) => setGotSportFallback((current) => ({ ...current, zip: event.target.value }))} placeholder="ZIP code" inputMode="numeric" className="rounded-lg border border-gray-800 bg-black px-3 py-2 text-xs font-bold text-white outline-none focus:border-blue-400" />
+              </div>
+              <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                In GotSport, check "First row contains column headings" and choose "Comma" as the delimiter.
+              </p>
             </div>
           </div>
         </div>
