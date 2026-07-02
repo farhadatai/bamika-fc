@@ -66,6 +66,14 @@ interface RegistrationRow {
   created_at?: string | null;
 }
 
+interface FamilyAddressRow {
+  parent_id?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+}
+
 // --- SUB-COMPONENTS (Modals) ---
 
 const getInitials = (firstName = '', lastName = '') => {
@@ -837,6 +845,7 @@ export default function AdminDashboard() {
     spotlights: [],
     sponsorRequests: [],
     uniformOrders: [],
+    familyAddresses: [],
     registrations: [],
   });
   const [loading, setLoading] = useState(true);
@@ -973,6 +982,14 @@ export default function AdminDashboard() {
       notices.push('Uniform orders need the latest Supabase schema update.');
     }
 
+    const { data: familyAddresses, error: familyAddressesError } = await supabase
+      .from('family_addresses')
+      .select('parent_id, address, city, state, zip');
+
+    if (familyAddressesError) {
+      notices.push('Family addresses could not be loaded. Parents may need the latest profile update.');
+    }
+
     setData({
       parents,
       coaches: c || [],
@@ -984,6 +1001,7 @@ export default function AdminDashboard() {
       spotlights: spotlightsError ? [] : spotlights || [],
       sponsorRequests: sponsorRequestsError ? [] : sponsorRequests || [],
       uniformOrders: uniformOrdersError ? [] : uniformOrders || [],
+      familyAddresses: familyAddressesError ? [] : familyAddresses || [],
       registrations: registrationsError ? [] : registrations || [],
     });
     setDatabaseNotice(notices.join(' '));
@@ -1882,6 +1900,9 @@ export default function AdminDashboard() {
           const playerName = splitFullName(getPlayerDisplayName(player));
           const parentName = getParentDisplayName(parent);
           const parsedAddress = parseGotSportAddress(player.address || parent.address);
+          const familyAddress: FamilyAddressRow = data.familyAddresses.find((savedAddress) => (
+            savedAddress.parent_id === player.parent_id || savedAddress.parent_id === player.user_id
+          )) || {};
 
           return {
             'First Name': player.first_name || playerName.firstName,
@@ -1889,10 +1910,10 @@ export default function AdminDashboard() {
             Gender: player.gender || '',
             DOB: formatGotSportDob(player.date_of_birth || player.dob),
             'Competitive Level': 'Competitive',
-            Address: parsedAddress.address || gotSportFallback.address.trim(),
-            City: player.city || parent.city || parsedAddress.city || gotSportFallback.city.trim(),
-            State: player.state || parent.state || parsedAddress.state || gotSportFallback.state.trim(),
-            Zip: player.zip || player.zip_code || player.postal_code || parent.zip || parent.zip_code || parent.postal_code || parsedAddress.zip || gotSportFallback.zip.trim(),
+            Address: familyAddress.address || parsedAddress.address || gotSportFallback.address.trim(),
+            City: familyAddress.city || player.city || parent.city || parsedAddress.city || gotSportFallback.city.trim(),
+            State: familyAddress.state || player.state || parent.state || parsedAddress.state || gotSportFallback.state.trim(),
+            Zip: familyAddress.zip || player.zip || player.zip_code || player.postal_code || parent.zip || parent.zip_code || parent.postal_code || parsedAddress.zip || gotSportFallback.zip.trim(),
             'Phone Number': player.phone || parent.phone || '',
             'Parent One First Name': parentName.firstName,
             'Parent One Last Name': parentName.lastName,
@@ -2107,7 +2128,7 @@ export default function AdminDashboard() {
                     <span className="rounded-full border border-blue-400/30 bg-blue-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-blue-200">USCLUB - Competitive</span>
                   </div>
                   <p className="mt-2 max-w-3xl text-xs leading-5 text-gray-400">
-                    Enter a fallback mailing address for players whose family record has no complete address. It is used only when a saved street, city, state, or ZIP is missing.
+                    Parent profile addresses are linked automatically. Enter a fallback only for families that have not completed their address yet.
                   </p>
                 </div>
                 <button onClick={() => exportReport('godsport', 'csv')} className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-blue-400/50 px-4 py-3 text-[10px] font-black uppercase text-blue-100 hover:bg-blue-500/10">

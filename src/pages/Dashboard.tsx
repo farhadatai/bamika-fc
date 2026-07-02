@@ -10,6 +10,7 @@ import {
   MapPin,
   Megaphone,
   Play,
+  Save,
   Shield,
   Shirt,
   Target,
@@ -89,6 +90,20 @@ interface ProfileSummary {
   email?: string | null;
 }
 
+interface FamilyAddress {
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
+const EMPTY_FAMILY_ADDRESS: FamilyAddress = {
+  address: '',
+  city: '',
+  state: '',
+  zip: '',
+};
+
 const getInitials = (firstName = '', lastName = '') => {
   const first = firstName.trim()[0] || '';
   const last = lastName.trim()[0] || '';
@@ -160,6 +175,10 @@ const getProfileFirstName = (profile?: ProfileSummary | null, email?: string | n
 export default function Dashboard() {
   const { user, userRole } = useAuthStore();
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
+  const [familyAddress, setFamilyAddress] = useState<FamilyAddress>(EMPTY_FAMILY_ADDRESS);
+  const [addressSaving, setAddressSaving] = useState(false);
+  const [addressMessage, setAddressMessage] = useState('');
+  const [addressError, setAddressError] = useState('');
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [teamMessages, setTeamMessages] = useState<Announcement[]>([]);
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
@@ -228,6 +247,7 @@ export default function Dashboard() {
 
       const [
         profileResponse,
+        addressResponse,
         announcementsResponse,
         playersResponse,
         practicesResponse,
@@ -238,6 +258,11 @@ export default function Dashboard() {
           .from('profiles')
           .select('first_name, last_name, full_name, email')
           .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('family_addresses')
+          .select('address, city, state, zip')
+          .eq('parent_id', user.id)
           .maybeSingle(),
         supabase
           .from('announcements')
@@ -279,6 +304,13 @@ export default function Dashboard() {
         setProfile(null);
       } else {
         setProfile(profileResponse.data || null);
+      }
+
+      if (addressResponse.error) {
+        console.warn('Family address unavailable:', addressResponse.error);
+        setFamilyAddress(EMPTY_FAMILY_ADDRESS);
+      } else {
+        setFamilyAddress(addressResponse.data || EMPTY_FAMILY_ADDRESS);
       }
 
       let teamAnnouncements: Announcement[] = [];
@@ -451,6 +483,50 @@ export default function Dashboard() {
     }
   };
 
+  const handleAddressSave = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!user) return;
+
+    setAddressMessage('');
+    setAddressError('');
+
+    const normalizedAddress = {
+      address: familyAddress.address.trim(),
+      city: familyAddress.city.trim(),
+      state: familyAddress.state.trim().toUpperCase(),
+      zip: familyAddress.zip.trim(),
+    };
+
+    if (Object.values(normalizedAddress).some((value) => !value)) {
+      setAddressError('Street address, city, state, and ZIP are all required.');
+      return;
+    }
+
+    if (!/^\d{5}(?:-\d{4})?$/.test(normalizedAddress.zip)) {
+      setAddressError('Enter a valid 5-digit ZIP code or ZIP+4.');
+      return;
+    }
+
+    setAddressSaving(true);
+    const { data: savedAddress, error } = await supabase
+      .from('family_addresses')
+      .upsert({
+        parent_id: user.id,
+        ...normalizedAddress,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'parent_id' })
+      .select('address, city, state, zip')
+      .single();
+
+    if (error) {
+      setAddressError(error.message || 'Unable to save the family address.');
+    } else {
+      setFamilyAddress(savedAddress || normalizedAddress);
+      setAddressMessage(`Address saved and linked to ${players.length} athlete${players.length === 1 ? '' : 's'}.`);
+    }
+    setAddressSaving(false);
+  };
+
   return (
     <div className="w-full py-6 text-white sm:py-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -588,6 +664,49 @@ export default function Dashboard() {
                 </article>
               ))}
             </div>
+          </section>
+        )}
+
+        {isParent && (
+          <section className="rounded-2xl border border-blue-500/30 bg-neutral-950 p-5 sm:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-300">
+                  <MapPin size={15} /> Family profile
+                </div>
+                <h2 className="mt-2 text-xl font-black uppercase italic text-white">Mailing Address</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
+                  This address is securely linked to every athlete in your family and is used for required GotSport registration exports.
+                </p>
+              </div>
+              <span className={`w-fit rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${Object.values(familyAddress).every(Boolean) ? 'border-green-500/30 bg-green-500/10 text-green-300' : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-200'}`}>
+                {Object.values(familyAddress).every(Boolean) ? 'Address complete' : 'Address needed'}
+              </span>
+            </div>
+
+            <form onSubmit={handleAddressSave} className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_0.55fr_0.7fr_auto]">
+              <label className="block">
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-500">Street address</span>
+                <input required value={familyAddress.address} onChange={(event) => setFamilyAddress((current) => ({ ...current, address: event.target.value }))} autoComplete="street-address" className="w-full rounded-lg border border-gray-800 bg-black px-3 py-3 text-sm font-bold text-white outline-none focus:border-blue-400" />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-500">City</span>
+                <input required value={familyAddress.city} onChange={(event) => setFamilyAddress((current) => ({ ...current, city: event.target.value }))} autoComplete="address-level2" className="w-full rounded-lg border border-gray-800 bg-black px-3 py-3 text-sm font-bold text-white outline-none focus:border-blue-400" />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-500">State</span>
+                <input required maxLength={2} value={familyAddress.state} onChange={(event) => setFamilyAddress((current) => ({ ...current, state: event.target.value.toUpperCase() }))} autoComplete="address-level1" placeholder="CA" className="w-full rounded-lg border border-gray-800 bg-black px-3 py-3 text-sm font-bold uppercase text-white outline-none focus:border-blue-400" />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-500">ZIP</span>
+                <input required value={familyAddress.zip} onChange={(event) => setFamilyAddress((current) => ({ ...current, zip: event.target.value }))} autoComplete="postal-code" inputMode="numeric" className="w-full rounded-lg border border-gray-800 bg-black px-3 py-3 text-sm font-bold text-white outline-none focus:border-blue-400" />
+              </label>
+              <button disabled={addressSaving} className="mt-auto inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg bg-blue-500 px-5 py-3 text-xs font-black uppercase text-white hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60">
+                <Save size={15} /> {addressSaving ? 'Saving...' : 'Save Address'}
+              </button>
+            </form>
+            {addressError && <p className="mt-3 text-sm font-bold text-red-300">{addressError}</p>}
+            {addressMessage && <p className="mt-3 text-sm font-bold text-green-300">{addressMessage}</p>}
           </section>
         )}
 
