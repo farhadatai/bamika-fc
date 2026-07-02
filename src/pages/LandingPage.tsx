@@ -719,12 +719,8 @@ export default function LandingPage() {
                   <div className="rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 p-4">
                     <div className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">Family support pricing</div>
                     <p className="mt-2 text-sm font-bold text-white">
-                      Registration fee waived and monthly club fee reduced to $25/mo to keep soccer affordable for families.
+                      Monthly club membership is $25/mo with no additional signup charge.
                     </p>
-                  </div>
-                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <span className="font-bold text-gray-300">Registration fee</span>
-                    <span className="text-2xl font-black text-white">$0</span>
                   </div>
                   <div className="flex items-center justify-between pb-1">
                     <span className="font-bold text-gray-300">Monthly club fee</span>

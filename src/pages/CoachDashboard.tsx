@@ -418,7 +418,7 @@ export default function CoachDashboard() {
   }
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="w-full space-y-6 pb-20">
       <div className="flex flex-col gap-4 rounded-2xl border border-gray-800 bg-neutral-950 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black uppercase italic text-white sm:text-3xl">Coach Dashboard</h1>
@@ -673,7 +673,7 @@ export default function CoachDashboard() {
                     <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.payment_status || player.status)}`}>{player.payment_status || player.status || 'Pending'}</span>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-3 gap-2">
+                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
                     <label className="block">
                       <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</span>
                       <select value={player.position || 'TBD'} onChange={(e) => handleUpdatePlayer(player.id, { position: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">

@@ -67,6 +67,31 @@ const isMissingCoachColumnError = (message?: string) => (
   )
 )
 
+const normalizeBirthDate = (value: string) => {
+  const trimmed = value.trim()
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed)
+
+  if (!match) {
+    throw new Error('Please choose a valid date of birth before continuing.')
+  }
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const parsed = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+
+  if (
+    Number.isNaN(parsed.getTime())
+    || parsed.getUTCFullYear() !== year
+    || parsed.getUTCMonth() !== month - 1
+    || parsed.getUTCDate() !== day
+  ) {
+    throw new Error('Please choose a valid date of birth before continuing.')
+  }
+
+  return parsed.toISOString()
+}
+
 const requireAdmin = async (req: Request, res: Response) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
 
@@ -90,6 +115,35 @@ const requireAdmin = async (req: Request, res: Response) => {
 
   if (profileError || profile?.role !== 'admin') {
     res.status(403).json({ error: 'Only admins can invite coaches.' })
+    return null
+  }
+
+  return authData.user
+}
+
+const requireCoach = async (req: Request, res: Response) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+
+  if (!token) {
+    res.status(401).json({ error: 'Missing coach session.' })
+    return null
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getUser(token)
+
+  if (authError || !authData.user) {
+    res.status(401).json({ error: 'Invalid coach session.' })
+    return null
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', authData.user.id)
+    .single()
+
+  if (profileError || profile?.role !== 'coach') {
+    res.status(403).json({ error: 'Only coaches can add players from the coach dashboard.' })
     return null
   }
 
@@ -237,6 +291,198 @@ router.post('/invite-coach', async (req: Request, res: Response): Promise<void> 
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to invite coach.'
+    res.status(500).json({ error: message })
+  }
+})
+
+router.post('/invite-parent-player', async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!hasServiceRoleKey()) {
+      res.status(500).json({
+        error: 'Parent invites require SUPABASE_SERVICE_ROLE_KEY on the server.',
+      })
+      return
+    }
+
+    const coachUser = await requireCoach(req, res)
+    if (!coachUser) return
+
+    const { data: coachRow, error: coachError } = await supabase
+      .from('coaches')
+      .select('team_id')
+      .eq('id', coachUser.id)
+      .single()
+
+    if (coachError || !coachRow?.team_id) {
+      res.status(400).json({ error: 'You need an assigned team before adding players.' })
+      return
+    }
+
+    const parentFirstName = String(req.body.parent_first_name || '').trim()
+    const parentLastName = String(req.body.parent_last_name || '').trim()
+    const parentEmail = String(req.body.parent_email || '').trim().toLowerCase()
+    const parentPhone = String(req.body.parent_phone || '').trim()
+    const playerFirstName = String(req.body.player_first_name || '').trim()
+    const playerLastName = String(req.body.player_last_name || '').trim()
+    const dateOfBirth = String(req.body.date_of_birth || '').trim()
+    const position = String(req.body.position || 'TBD').trim()
+    const jerseySize = String(req.body.jersey_size || 'YM').trim()
+
+    if (!parentFirstName || !parentLastName || !parentEmail || !playerFirstName || !playerLastName || !dateOfBirth) {
+      res.status(400).json({ error: 'Parent name, parent email, player name, and date of birth are required.' })
+      return
+    }
+
+    const parentFullName = `${parentFirstName} ${parentLastName}`.trim()
+    const playerFullName = `${playerFirstName} ${playerLastName}`.trim()
+    const safeDob = normalizeBirthDate(dateOfBirth)
+
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id, role, email')
+      .ilike('email', parentEmail)
+      .maybeSingle()
+
+    let parentId = existingProfile?.id || ''
+    let inviteSent = false
+
+    if (existingProfile?.role === 'admin') {
+      res.status(400).json({ error: 'This email belongs to an admin account. Use the parent or guardian email for the player invite.' })
+      return
+    }
+
+    if (!parentId) {
+      const { data: listedUsers } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
+      const authUsers = (listedUsers?.users || []) as Array<{ id?: string, email?: string }>
+      const existingAuthUser = authUsers.find((authUser) => authUser.email?.toLowerCase() === parentEmail)
+      if (existingAuthUser?.id) {
+        parentId = existingAuthUser.id
+      }
+    }
+
+    if (!parentId) {
+      const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(parentEmail, {
+        data: {
+          first_name: parentFirstName,
+          last_name: parentLastName,
+          full_name: parentFullName,
+          phone: parentPhone,
+          role: 'user',
+          invited_by_coach: coachUser.id,
+        },
+        redirectTo: `${getBaseUrl()}/parent/setup-password`,
+      })
+
+      if (inviteError || !inviteData.user) {
+        res.status(400).json({ error: inviteError?.message || 'Unable to send parent invite.' })
+        return
+      }
+
+      parentId = inviteData.user.id
+      inviteSent = true
+    }
+
+    const isExistingCoachOrAdmin = existingProfile?.role === 'admin' || existingProfile?.role === 'coach'
+    if (!isExistingCoachOrAdmin) {
+      const profileUpdate = {
+        id: parentId,
+        first_name: parentFirstName,
+        last_name: parentLastName,
+        full_name: parentFullName,
+        email: parentEmail,
+        phone: parentPhone,
+        role: 'user',
+      }
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert(profileUpdate, { onConflict: 'id' })
+
+      if (profileError) {
+        res.status(500).json({ error: `Parent invite was prepared, but profile setup failed: ${profileError.message}` })
+        return
+      }
+    }
+
+    const playerInsert = {
+      parent_id: parentId,
+      first_name: playerFirstName,
+      last_name: playerLastName,
+      full_name: playerFullName,
+      date_of_birth: safeDob,
+      dob: safeDob,
+      position,
+      jersey_size: jerseySize,
+      jersey_number: '-',
+      team_assigned: coachRow.team_id,
+      age_group: coachRow.team_id,
+      status: 'pending_payment',
+      payment_status: 'pending',
+      medical_conditions: '',
+    }
+
+    let playerId = ''
+    const { data: newPlayer, error: playerError } = await supabase
+      .from('players')
+      .insert(playerInsert)
+      .select('id')
+      .single()
+
+    if (playerError) {
+      const { first_name: _first, last_name: _last, dob: _dob, age_group: _ageGroup, ...fallbackPlayerInsert } = playerInsert
+      const { data: fallbackPlayer, error: fallbackPlayerError } = await supabase
+        .from('players')
+        .insert(fallbackPlayerInsert)
+        .select('id')
+        .single()
+
+      if (fallbackPlayerError || !fallbackPlayer?.id) {
+        res.status(500).json({ error: fallbackPlayerError?.message || playerError.message })
+        return
+      }
+
+      playerId = fallbackPlayer.id
+    } else {
+      playerId = newPlayer.id
+    }
+
+    const registrationPayload = {
+      parent_id: parentId,
+      player_id: playerId,
+      checkout_player_id: playerId,
+      first_name: playerFirstName,
+      last_name: playerLastName,
+      dob: safeDob,
+      gender: 'Not specified',
+      position,
+      jersey_size: jerseySize,
+      birth_cert_path: 'not_provided',
+      waiver_signed_at: new Date().toISOString(),
+      medical_conditions: '',
+      status: 'pending_payment',
+      payment_status: 'pending',
+      created_at: new Date().toISOString(),
+    }
+
+    const { error: registrationError } = await supabase
+      .from('registrations')
+      .insert(registrationPayload)
+
+    if (registrationError) {
+      console.warn('Coach-created player registration record was not created:', registrationError.message)
+    }
+
+    res.status(200).json({
+      success: true,
+      message: inviteSent
+        ? `Player added and parent invite sent to ${parentEmail}.`
+        : `Player added and linked to the existing parent account for ${parentEmail}.`,
+      playerId,
+      parentId,
+      inviteSent,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to add player and invite parent.'
     res.status(500).json({ error: message })
   }
 })

@@ -1,10 +1,70 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone, Star, HandHeart, FileText, RefreshCw, Download } from 'lucide-react';
+import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone, Star, HandHeart, FileText, RefreshCw, Download, Search, Shirt } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { TEAM_OPTIONS, getYoutubeId, getYoutubeThumbnail } from '../lib/utils';
 import { uploadPhoto } from '../lib/upload';
+
+// --- ROW TYPES (Supabase query results) ---
+
+interface ParentRow {
+  id?: string;
+  full_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  zip_code?: string | null;
+  postal_code?: string | null;
+}
+
+interface PlayerRow {
+  id?: string;
+  parent_id?: string | null;
+  full_name?: string | null;
+  name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  photo_url?: string | null;
+  date_of_birth?: string | null;
+  dob?: string | null;
+  gender?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  zip_code?: string | null;
+  postal_code?: string | null;
+  competitive_level?: string | null;
+  level?: string | null;
+  status?: string | null;
+  payment_status?: string | null;
+  team_assigned?: string | null;
+}
+
+interface RegistrationRow {
+  id?: string;
+  parent_id?: string | null;
+  player_id?: string | null;
+  checkout_player_id?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  birth_cert_path?: string | null;
+  waiver_signed_at?: string | null;
+  status?: string | null;
+  payment_status?: string | null;
+  stripe_subscription_id?: string | null;
+  stripe_customer_id?: string | null;
+  uniform_purchased?: boolean | null;
+  uniform_confirmation_code?: string | null;
+  created_at?: string | null;
+}
 
 // --- SUB-COMPONENTS (Modals) ---
 
@@ -24,7 +84,7 @@ const splitFullName = (fullName = '') => {
   };
 };
 
-const getParentDisplayName = (parent = {}) => {
+const getParentDisplayName = (parent: ParentRow = {}) => {
   const splitName = splitFullName(parent.full_name || '');
   return {
     firstName: parent.first_name || splitName.firstName,
@@ -32,7 +92,7 @@ const getParentDisplayName = (parent = {}) => {
   };
 };
 
-const getPlayerDisplayName = (player = {}) => {
+const getPlayerDisplayName = (player: PlayerRow = {}) => {
   const splitName = splitFullName(player.full_name || player.name || '');
   const firstName = player.first_name || splitName.firstName;
   const lastName = player.last_name || splitName.lastName;
@@ -203,7 +263,9 @@ const getPaymentStatusClass = (status = '') => {
   return 'text-yellow-300';
 };
 
-const getRegistrationForPlayer = (player = {}, registrations = []) => {
+const normalizeStatus = (status = '') => String(status || '').toLowerCase().replace(/\s+/g, '_');
+
+const getRegistrationForPlayer = (player: PlayerRow = {}, registrations: RegistrationRow[] = []) => {
   const playerName = getPlayerDisplayName(player);
   const splitName = splitFullName(playerName);
 
@@ -286,7 +348,13 @@ const OnboardModal = ({ onClose, onSubmit, newCoach, setNewCoach, onPhotoUpload,
 );
 
 const EditParentModal = ({ isOpen, onClose, parent, onSave }) => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    id?: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  }>({
     first_name: '',
     last_name: '',
     email: '',
@@ -768,6 +836,7 @@ export default function AdminDashboard() {
     announcements: [],
     spotlights: [],
     sponsorRequests: [],
+    uniformOrders: [],
     registrations: [],
   });
   const [loading, setLoading] = useState(true);
@@ -800,6 +869,10 @@ export default function AdminDashboard() {
   const emptySpotlight = { type: 'player', title: '', subtitle: '', body: '', image_url: '', link_url: '', is_published: true };
   const [newSpotlight, setNewSpotlight] = useState(emptySpotlight);
   const [databaseNotice, setDatabaseNotice] = useState('');
+  const [rosterSearch, setRosterSearch] = useState('');
+  const [rosterPaymentFilter, setRosterPaymentFilter] = useState('all');
+  const [rosterTeamFilter, setRosterTeamFilter] = useState('all');
+  const [rosterDocFilter, setRosterDocFilter] = useState('all');
   const [gotSportFallback, setGotSportFallback] = useState({ address: '', city: '', state: '', zip: '' });
 
   const handleSort = (column) => {
@@ -891,6 +964,15 @@ export default function AdminDashboard() {
       notices.push('Sponsor requests need the latest Supabase schema update.');
     }
 
+    const { data: uniformOrders, error: uniformOrdersError } = await supabase
+      .from('uniform_orders')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (uniformOrdersError && isMissingTableError(uniformOrdersError, 'uniform_orders')) {
+      notices.push('Uniform orders need the latest Supabase schema update.');
+    }
+
     setData({
       parents,
       coaches: c || [],
@@ -901,6 +983,7 @@ export default function AdminDashboard() {
       announcements: announcementsError ? [] : a || [],
       spotlights: spotlightsError ? [] : spotlights || [],
       sponsorRequests: sponsorRequestsError ? [] : sponsorRequests || [],
+      uniformOrders: uniformOrdersError ? [] : uniformOrders || [],
       registrations: registrationsError ? [] : registrations || [],
     });
     setDatabaseNotice(notices.join(' '));
@@ -1259,7 +1342,7 @@ export default function AdminDashboard() {
     fetchData();
   };
 
-  const adminApiRequest = async (url, options = {}) => {
+  const adminApiRequest = async (url: string, options: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> } = {}) => {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
 
@@ -1284,6 +1367,29 @@ export default function AdminDashboard() {
     return result;
   };
 
+  const handleMoveBillingTo25 = async (dryRun = true) => {
+    if (!dryRun && !window.confirm('Update active Stripe subscriptions above $25/mo to $25/mo and apply a $25 customer credit when needed? Run Preview first if you have not already checked the list.')) return;
+
+    try {
+      const result = await adminApiRequest('/api/admin/billing/move-to-25', {
+        method: 'POST',
+        body: JSON.stringify({ dryRun }),
+      });
+
+      const lines = (result.candidates || []).slice(0, 12).map((item) => {
+        const amount = item.currentAmount ? `$${(item.currentAmount / 100).toFixed(2)}` : 'unknown';
+        const player = item.playerId ? `player ${item.playerId}` : 'player not linked';
+        const action = dryRun ? 'needs update' : item.credited ? 'updated + credited' : item.updated ? 'updated' : 'skipped';
+        return `${amount} - ${player} - ${action}${item.skippedReason ? ` (${item.skippedReason})` : ''}`;
+      });
+
+      alert(`${result.message || 'Billing update complete.'}${lines.length ? `\n\n${lines.join('\n')}` : ''}${result.count > 12 ? `\n...and ${result.count - 12} more` : ''}`);
+      fetchData();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to update Stripe billing.');
+    }
+  };
+
   const handleDeletePlayer = async (player) => {
     const playerName = getPlayerDisplayName(player);
     if (!window.confirm(`Permanently delete ${playerName}? This removes the player profile, registration records, payment references, team assignment, and uploaded player files. Use Mark inactive if the player may return.`)) return;
@@ -1304,6 +1410,37 @@ export default function AdminDashboard() {
       fetchData();
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Unable to sync Stripe payment.');
+    }
+  };
+
+  const handleSendPlayerPaymentLink = async (player) => {
+    const playerName = getPlayerDisplayName(player);
+
+    try {
+      const result = await adminApiRequest(`/api/admin/players/${player.id}/payment-link`, {
+        method: 'POST',
+      });
+
+      if (!result.url) {
+        alert('Stripe did not return a checkout link.');
+        return;
+      }
+
+      await navigator.clipboard?.writeText(result.url).catch(() => undefined);
+      const linkedParent = getLinkedParent(player);
+      const parentEmail = result.parentEmail || linkedParent?.email || '';
+
+      if (parentEmail) {
+        const subject = encodeURIComponent('Bamika FC player payment link');
+        const body = encodeURIComponent(`Hello,\n\nPlease use this secure Bamika FC Stripe checkout link to finish payment for ${playerName}:\n\n${result.url}\n\nThank you,\nBamika FC`);
+        window.location.href = `mailto:${parentEmail}?subject=${subject}&body=${body}`;
+        alert('Payment link created and copied. Your email app will open with the link ready to send.');
+        return;
+      }
+
+      alert(`Payment link created and copied:\n${result.url}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to create Stripe payment link.');
     }
   };
 
@@ -1628,41 +1765,79 @@ export default function AdminDashboard() {
     URL.revokeObjectURL(url);
   };
 
-  const openPrintableReport = (title, headers, rows) => {
-    // Do NOT pass 'noopener' here: with noopener, window.open returns null and
-    // the report can't be written into the new tab, leaving it blank.
-    const reportWindow = window.open('', '_blank');
-    if (!reportWindow) return;
+  const escapeReportHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  }[char]));
 
+  const openPrintableReport = (title, headers, rows) => {
     const tableRows = rows.map((row) => `
-      <tr>${headers.map((header) => `<td>${String(row[header] ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]))}</td>`).join('')}</tr>
+      <tr>${headers.map((header) => `<td>${escapeReportHtml(row[header])}</td>`).join('')}</tr>
     `).join('');
 
-    reportWindow.document.write(`
+    const html = `
       <html>
         <head>
-          <title>${title}</title>
+          <title>${escapeReportHtml(title)}</title>
           <style>
+            @page { size: landscape; margin: 0.35in; }
             body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
-            h1 { font-size: 22px; text-transform: uppercase; }
+            .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+            h1 { font-size: 22px; margin: 0; text-transform: uppercase; }
+            p { margin: 6px 0 0; color: #555; font-size: 12px; }
+            button { border: 0; border-radius: 8px; background: #ef4444; color: #fff; cursor: pointer; font-weight: 800; padding: 10px 14px; text-transform: uppercase; }
             table { border-collapse: collapse; width: 100%; font-size: 11px; }
             th, td { border: 1px solid #ddd; padding: 7px; text-align: left; vertical-align: top; }
             th { background: #111; color: #fff; text-transform: uppercase; }
+            tr:nth-child(even) { background: #f7f7f7; }
+            @media print {
+              body { padding: 0; }
+              .toolbar button { display: none; }
+            }
           </style>
         </head>
         <body>
-          <h1>${title}</h1>
-          <p>Generated ${new Date().toLocaleString()}</p>
+          <div class="toolbar">
+            <div>
+              <h1>${escapeReportHtml(title)}</h1>
+              <p>Generated ${escapeReportHtml(new Date().toLocaleString())} • ${rows.length} records</p>
+            </div>
+            <button onclick="window.print()">Save / Print PDF</button>
+          </div>
           <table>
-            <thead><tr>${headers.map((header) => `<th>${header}</th>`).join('')}</tr></thead>
+            <thead><tr>${headers.map((header) => `<th>${escapeReportHtml(header)}</th>`).join('')}</tr></thead>
             <tbody>${tableRows}</tbody>
           </table>
+          <script>
+            window.addEventListener('load', () => setTimeout(() => window.print(), 350));
+          </script>
         </body>
       </html>
-    `);
-    reportWindow.document.close();
-    reportWindow.focus();
-    reportWindow.print();
+    `;
+
+    // Open the tab FIRST (synchronously inside the click handler so it isn't
+    // popup-blocked), then write the HTML straight into it. Do NOT pass
+    // 'noopener' here: with noopener, window.open returns null and the new tab
+    // stays blank — that was the cause of the blank-screen report bug.
+    const reportWindow = window.open('', '_blank');
+
+    if (reportWindow) {
+      reportWindow.document.open();
+      reportWindow.document.write(html);
+      reportWindow.document.close();
+    } else {
+      // Popup blocked — fall back to downloading the report as an HTML file.
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.html`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
   };
 
   const buildExport = (type) => {
@@ -1800,20 +1975,73 @@ export default function AdminDashboard() {
     { label: 'Coaches', value: data.coaches.length },
     { label: 'News', value: data.announcements.length },
     { label: 'Sponsor Requests', value: data.sponsorRequests.length },
+    { label: 'Uniform Orders', value: data.uniformOrders.length },
   ];
   const sortedRoster = [...data.roster].sort((a, b) => getPlayerDisplayName(a).localeCompare(getPlayerDisplayName(b)));
   const paymentSummary = data.roster.reduce((summary, player) => {
     const registration = getRegistrationForPlayer(player, data.registrations);
     const status = String(player.payment_status || registration?.payment_status || 'pending').toLowerCase();
     const hasBirthCertificate = !!registration?.birth_cert_path && registration.birth_cert_path !== 'not_provided';
+    const hasWaiver = Boolean(registration?.waiver_signed_at || player.waiver_signed);
 
     if (status === 'paid' || status === 'waived') summary.cleared += 1;
     else if (status === 'cancelled' || status === 'canceled' || status === 'paused') summary.inactive += 1;
     else summary.pending += 1;
 
-    if (!hasBirthCertificate) summary.missingDocs += 1;
+    if (!hasBirthCertificate || !hasWaiver) summary.missingDocs += 1;
     return summary;
   }, { cleared: 0, pending: 0, inactive: 0, missingDocs: 0 });
+  const filteredRoster = sortedRoster.filter((player) => {
+    const registration = getRegistrationForPlayer(player, data.registrations);
+    const parent = getLinkedParent(player);
+    const paymentStatus = normalizeStatus(player.payment_status || registration?.payment_status || 'pending');
+    const rosterStatus = normalizeStatus(player.status || registration?.status || 'pending');
+    const hasBirthCertificate = !!registration?.birth_cert_path && registration.birth_cert_path !== 'not_provided';
+    const hasWaiver = Boolean(registration?.waiver_signed_at || player.waiver_signed);
+    const parentName = parent?.first_name || parent?.last_name
+      ? `${parent?.first_name || ''} ${parent?.last_name || ''}`.trim()
+      : parent?.full_name || '';
+
+    const searchTarget = [
+      getPlayerDisplayName(player),
+      parentName,
+      parent?.email,
+      parent?.phone,
+      player.team_assigned,
+      paymentStatus,
+      rosterStatus,
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    const matchesSearch = !rosterSearch.trim() || searchTarget.includes(rosterSearch.trim().toLowerCase());
+    const matchesPayment = rosterPaymentFilter === 'all'
+      || (rosterPaymentFilter === 'cleared' && ['paid', 'waived'].includes(paymentStatus))
+      || (rosterPaymentFilter === 'pending' && !['paid', 'waived', 'paused', 'cancelled', 'canceled'].includes(paymentStatus))
+      || (rosterPaymentFilter === 'inactive' && ['paused', 'cancelled', 'canceled'].includes(paymentStatus))
+      || paymentStatus === rosterPaymentFilter;
+    const matchesTeam = rosterTeamFilter === 'all' || (player.team_assigned || 'Unassigned') === rosterTeamFilter;
+    const matchesDocs = rosterDocFilter === 'all'
+      || (rosterDocFilter === 'missing_docs' && (!hasBirthCertificate || !hasWaiver))
+      || (rosterDocFilter === 'missing_birth_cert' && !hasBirthCertificate)
+      || (rosterDocFilter === 'missing_waiver' && !hasWaiver)
+      || (rosterDocFilter === 'complete_docs' && hasBirthCertificate && hasWaiver);
+
+    return matchesSearch && matchesPayment && matchesTeam && matchesDocs;
+  });
+  const activeRosterFilterCount = [
+    rosterSearch.trim(),
+    rosterPaymentFilter !== 'all',
+    rosterTeamFilter !== 'all',
+    rosterDocFilter !== 'all',
+  ].filter(Boolean).length;
+  const sortedUniformOrders = [...data.uniformOrders].sort((a, b) => (
+    new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+  ));
+  const uniformSummary = sortedUniformOrders.reduce((summary, order) => {
+    const status = normalizeStatus(order.payment_status || order.status || 'pending');
+    if (status === 'paid') summary.paid += 1;
+    else summary.pending += 1;
+    return summary;
+  }, { paid: 0, pending: 0 });
 
   return (
     <div className="min-h-screen w-full bg-black px-4 py-6 text-white sm:px-6 lg:px-8">
@@ -1859,9 +2087,9 @@ export default function AdminDashboard() {
               ['parents', 'Parents'],
               ['coaches', 'Coaches'],
             ].map(([type, label]) => (
-              <div key={type} className="flex items-center justify-between gap-2 rounded-xl border border-gray-800 bg-black p-3">
+              <div key={type} className="flex flex-col gap-3 rounded-xl border border-gray-800 bg-black p-3 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-xs font-black uppercase tracking-widest text-gray-300">{label}</span>
-                <div className="flex gap-2">
+                <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex">
                   <button onClick={() => exportReport(type, 'csv')} className="inline-flex items-center gap-1 rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">
                     <Download size={13} /> Excel
                   </button>
@@ -1899,6 +2127,25 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        <div className="rounded-2xl border border-green-500/30 bg-green-500/10 p-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-sm font-black uppercase italic text-white">Monthly Fee Update</h2>
+              <p className="mt-1 text-xs leading-5 text-green-100/80">
+                New checkouts contain only the $25 monthly membership. Use this to update existing $50 Stripe subscriptions and apply a $25 credit.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button onClick={() => handleMoveBillingTo25(true)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-green-400/50 px-4 py-3 text-[10px] font-black uppercase text-green-200 hover:bg-green-500/10">
+                Preview Stripe Updates
+              </button>
+              <button onClick={() => handleMoveBillingTo25(false)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-500 px-4 py-3 text-[10px] font-black uppercase text-black hover:bg-white">
+                Apply $25 + Credits
+              </button>
+            </div>
+          </div>
+        </div>
+
         {databaseNotice && (
           <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-100">
             <div className="font-black uppercase tracking-widest text-yellow-300">Database update needed</div>
@@ -1911,7 +2158,7 @@ export default function AdminDashboard() {
         {/* 2. TAB NAVIGATION */}
         <div className="overflow-x-auto rounded-2xl border border-gray-800 bg-neutral-900 p-1"> 
           <div className="flex min-w-max gap-2">
-            {['parents', 'coaches', 'roster', 'schedule', 'drills', 'announcements', 'sponsor requests', 'spotlights'].map((tab) => ( 
+            {['parents', 'coaches', 'roster', 'uniforms', 'schedule', 'drills', 'announcements', 'sponsor requests', 'spotlights'].map((tab) => (
               <button 
                 key={tab} 
                 onClick={() => setActiveTab(tab)} 
@@ -2079,7 +2326,7 @@ export default function AdminDashboard() {
                   <p className="text-sm text-gray-500">Track athletes, Stripe payment status, documents, teams, and parent contact.</p>
                 </div>
                 <span className="rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                  {data.roster.length} players
+                  {filteredRoster.length} of {data.roster.length} players
                 </span>
               </div>
               <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -2096,8 +2343,63 @@ export default function AdminDashboard() {
                   </div>
                 ))}
               </div>
+              <div className="mb-5 rounded-xl border border-gray-800 bg-black p-4">
+                <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr_auto]">
+                  <label className="relative block">
+                    <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+                    <input
+                      value={rosterSearch}
+                      onChange={(event) => setRosterSearch(event.target.value)}
+                      className="w-full rounded-lg border border-gray-800 bg-neutral-950 py-3 pl-10 pr-3 text-sm font-bold text-white outline-none focus:border-[#EF4444]"
+                      placeholder="Search player, parent, email, phone, team..."
+                    />
+                  </label>
+                  <select value={rosterPaymentFilter} onChange={(event) => setRosterPaymentFilter(event.target.value)} className="rounded-lg border border-gray-800 bg-neutral-950 px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#EF4444]">
+                    <option value="all">All payments</option>
+                    <option value="cleared">Paid or waived</option>
+                    <option value="pending">Pending fees</option>
+                    <option value="inactive">Paused/cancelled</option>
+                    <option value="paid">Paid only</option>
+                    <option value="waived">Waived only</option>
+                  </select>
+                  <select value={rosterTeamFilter} onChange={(event) => setRosterTeamFilter(event.target.value)} className="rounded-lg border border-gray-800 bg-neutral-950 px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#EF4444]">
+                    <option value="all">All teams</option>
+                    {TEAM_OPTIONS.map((team) => (
+                      <option key={team} value={team}>{team}</option>
+                    ))}
+                  </select>
+                  <select value={rosterDocFilter} onChange={(event) => setRosterDocFilter(event.target.value)} className="rounded-lg border border-gray-800 bg-neutral-950 px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#EF4444]">
+                    <option value="all">All documents</option>
+                    <option value="missing_docs">Missing any doc</option>
+                    <option value="missing_birth_cert">Missing birth cert</option>
+                    <option value="missing_waiver">Missing waiver</option>
+                    <option value="complete_docs">Docs complete</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRosterSearch('');
+                      setRosterPaymentFilter('all');
+                      setRosterTeamFilter('all');
+                      setRosterDocFilter('all');
+                    }}
+                    className="rounded-lg border border-gray-800 px-4 py-3 text-xs font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]"
+                  >
+                    Clear
+                  </button>
+                </div>
+                {activeRosterFilterCount > 0 && (
+                  <div className="mt-3 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                    {activeRosterFilterCount} filter{activeRosterFilterCount === 1 ? '' : 's'} active
+                  </div>
+                )}
+              </div>
               {sortedRoster.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">No players have been registered yet.</div>
+              ) : filteredRoster.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-800 bg-black p-8 text-center text-gray-500">
+                  No players match these filters.
+                </div>
               ) : (
               <div className="overflow-x-auto rounded-xl border border-gray-800 bg-black">
                 <table className="min-w-[980px] w-full text-left">
@@ -2113,7 +2415,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-              {sortedRoster.map((p) => {
+              {filteredRoster.map((p) => {
                 const linkedParent =
                   getLinkedParent(p);
                 const playerName = getPlayerDisplayName(p);
@@ -2180,6 +2482,14 @@ export default function AdminDashboard() {
                           Sync
                         </button>
                         <button
+                          onClick={() => handleSendPlayerPaymentLink(p)}
+                          className="inline-flex items-center gap-1 rounded-md border border-gray-700 px-2 py-2 text-[9px] font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-300"
+                          title="Create Stripe checkout link"
+                        >
+                          <Mail size={12} />
+                          Pay Link
+                        </button>
+                        <button
                           onClick={() => setSelectedPlayer(p)}
                           className="rounded-md border border-gray-700 px-3 py-2 text-[9px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]"
                         >
@@ -2200,6 +2510,85 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'uniforms' && (
+            <div className="rounded-2xl border border-gray-800 bg-neutral-900">
+              <div className="flex flex-col gap-2 border-b border-gray-800 bg-neutral-950 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black uppercase italic text-white">Uniform Orders</h2>
+                  <p className="text-sm text-gray-500">Track uniform purchases by player, size, jersey number, parent, and Stripe status.</p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-widest">
+                  <span className="rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-green-300">{uniformSummary.paid} paid</span>
+                  <span className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-yellow-300">{uniformSummary.pending} pending</span>
+                </div>
+              </div>
+
+              {sortedUniformOrders.length === 0 ? (
+                <div className="p-10 text-center">
+                  <Shirt className="mx-auto mb-4 text-[#D4AF37]" size={38} />
+                  <h3 className="text-lg font-black uppercase italic text-white">No uniform orders yet</h3>
+                  <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500">
+                    When parents order a uniform from their dashboard, the player name, size, number, parent contact, and payment result will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-[1060px] w-full text-left">
+                    <thead>
+                      <tr className="border-b border-gray-800 bg-neutral-900">
+                        <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Player</th>
+                        <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Uniform</th>
+                        <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Parent</th>
+                        <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Payment</th>
+                        <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Code</th>
+                        <th className="p-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Order Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedUniformOrders.map((order) => (
+                        <tr key={order.id} className="border-b border-gray-900 hover:bg-neutral-950/80">
+                          <td className="p-4">
+                            <div className="text-sm font-black uppercase italic text-white">{order.player_name || 'Player not linked'}</div>
+                            <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-gray-600">{order.team_assigned || 'Unassigned'}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="text-xs font-black uppercase text-gray-300">Size {order.jersey_size || 'TBD'}</div>
+                            <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-gray-600">Number {order.jersey_number || 'TBD'}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="max-w-[220px] truncate text-xs font-bold text-gray-300">{order.parent_name || 'Parent not linked'}</div>
+                            <div className="mt-1 max-w-[220px] truncate text-[10px] text-gray-600">{order.parent_email || order.parent_phone || 'No contact'}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className={`text-xs font-black uppercase ${getPaymentStatusClass(order.payment_status || order.status)}`}>
+                              {order.payment_status || order.status || 'pending'}
+                            </div>
+                            <div className="mt-1 text-[10px] text-gray-600">
+                              {order.amount_cents ? `$${(order.amount_cents / 100).toFixed(2)}` : '$100.00'}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="max-w-[180px] break-all text-xs font-black uppercase tracking-widest text-[#D4AF37]">
+                              {order.confirmation_code || 'Pending'}
+                            </div>
+                          </td>
+                          <td className="p-4 text-xs font-bold text-gray-400">
+                            {order.created_at ? new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                            {order.paid_at && (
+                              <div className="mt-1 text-[10px] text-green-300">
+                                Paid {new Date(order.paid_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}
@@ -2757,6 +3146,9 @@ export default function AdminDashboard() {
                       <div className="mt-4 grid gap-2">
                         <button onClick={() => handleSyncPlayerPayment(p)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-700 px-3 py-2 text-xs font-black uppercase text-gray-300 hover:border-blue-500 hover:text-blue-300">
                           <RefreshCw size={14} /> Sync Stripe
+                        </button>
+                        <button onClick={() => handleSendPlayerPaymentLink(p)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-700 px-3 py-2 text-xs font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-300">
+                          <Mail size={14} /> Send Payment Link
                         </button>
                         <button onClick={() => handleWaivePlayerFees(p)} className="rounded-lg border border-gray-700 px-3 py-2 text-xs font-black uppercase text-gray-300 hover:border-green-500 hover:text-green-400">
                           Waive Fees

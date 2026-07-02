@@ -7,6 +7,10 @@ const getErrorMessage = (error: unknown) => error instanceof Error ? error.messa
 const router = express.Router()
 const stripeOptions: Stripe.StripeConfig = { apiVersion: '2023-10-16' }
 const canonicalBaseUrl = 'https://www.bamikafc.com'
+const monthlyClubFeeCents = 2500
+const uniformPackageCents = 10000
+const previousMonthlyFeeCents = 5000
+const monthlyCreditCents = previousMonthlyFeeCents - monthlyClubFeeCents
 
 const getStripeClient = () => {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim()
@@ -119,9 +123,146 @@ type RegistrationRecord = {
   last_name: string
 }
 
+const splitName = (value?: string | null) => {
+  const parts = String(value || '').trim().split(/\s+/).filter(Boolean)
+  return {
+    firstName: parts[0] || '',
+    lastName: parts.slice(1).join(' '),
+  }
+}
+
+const getSafeDate = (...values: Array<unknown>) => {
+  for (const value of values) {
+    if (typeof value !== 'string' || !value.trim()) continue
+    const parsed = new Date(value)
+    if (!Number.isNaN(parsed.getTime())) return value
+  }
+
+  return '1900-01-01'
+}
+
+const getRequiredRegistrationDefaults = (player: Record<string, any>) => ({
+  dob: getSafeDate(player.date_of_birth, player.dob),
+  gender: player.gender || 'Not specified',
+  birth_cert_path: player.birth_cert_path || 'not_provided',
+  waiver_signed_at: player.waiver_signed_at || player.created_at || new Date().toISOString(),
+})
+
 const generateUniformConfirmationCode = () => {
   const random = Math.random().toString(36).slice(2, 8).toUpperCase()
   return `UNI-${new Date().getFullYear()}-${random}`
+}
+
+const getPlayerNameParts = (player: Record<string, any>) => {
+  const fullName = String(player.full_name || player.name || '').trim()
+  const parts = splitName(fullName)
+  return {
+    firstName: String(player.first_name || parts.firstName || '').trim(),
+    lastName: String(player.last_name || parts.lastName || '').trim(),
+  }
+}
+
+const findOrCreateRegistrationForPlayer = async (
+  playerId: string,
+  registrationData: Record<string, any> = {},
+) => {
+  const { data: player, error: playerError } = await supabase
+    .from('players')
+    .select('*')
+    .eq('id', playerId)
+    .single()
+
+  if (playerError || !player) {
+    throw new Error(playerError?.message || 'Player not found.')
+  }
+
+  const { firstName, lastName } = getPlayerNameParts(player)
+
+  const linkedRegistrations = await supabase
+    .from('registrations')
+    .select('*')
+    .or(`player_id.eq.${playerId},checkout_player_id.eq.${playerId}`)
+    .limit(1)
+
+  if (linkedRegistrations.data?.[0]) {
+    return linkedRegistrations.data[0] as RegistrationRecord
+  }
+
+  if (player.parent_id && firstName) {
+    const fallbackRegistrations = await supabase
+      .from('registrations')
+      .select('*')
+      .eq('parent_id', player.parent_id)
+      .eq('first_name', firstName)
+      .eq('last_name', lastName)
+      .limit(1)
+
+    if (fallbackRegistrations.data?.[0]) {
+      return fallbackRegistrations.data[0] as RegistrationRecord
+    }
+  }
+
+  const requiredRegistrationDefaults = getRequiredRegistrationDefaults(player)
+  const { include_uniform: _includeUniform, ...safeRegistrationData } = registrationData || {}
+  const { data: newRegistration, error: registrationError } = await supabase
+    .from('registrations')
+    .insert({
+      ...safeRegistrationData,
+      parent_id: player.parent_id || safeRegistrationData.parent_id || null,
+      player_id: playerId,
+      checkout_player_id: playerId,
+      first_name: safeRegistrationData.first_name || firstName || 'Player',
+      last_name: safeRegistrationData.last_name || lastName || '',
+      dob: safeRegistrationData.dob || requiredRegistrationDefaults.dob,
+      gender: safeRegistrationData.gender || requiredRegistrationDefaults.gender,
+      position: safeRegistrationData.position || player.position || 'TBD',
+      jersey_size: safeRegistrationData.jersey_size || player.jersey_size || 'YM',
+      medical_conditions: safeRegistrationData.medical_conditions || player.medical_conditions || '',
+      birth_cert_path: safeRegistrationData.birth_cert_path || requiredRegistrationDefaults.birth_cert_path,
+      photo_url: safeRegistrationData.photo_url || player.photo_url || null,
+      waiver_signed_at: safeRegistrationData.waiver_signed_at || requiredRegistrationDefaults.waiver_signed_at,
+      status: 'pending_payment',
+      payment_status: 'pending',
+      created_at: new Date().toISOString(),
+    })
+    .select('*')
+    .single()
+
+  if (registrationError || !newRegistration) {
+    throw new Error(registrationError?.message || 'Unable to prepare registration payment.')
+  }
+
+  return newRegistration as RegistrationRecord
+}
+
+const getOrCreateMonthlyPrice = async (stripe: Stripe) => {
+  const lookupKey = 'bamika_fc_monthly_25'
+  const existing = await stripe.prices.list({ lookup_keys: [lookupKey], active: true, limit: 1 })
+  if (existing.data[0]) return existing.data[0]
+
+  return stripe.prices.create({
+    currency: 'usd',
+    unit_amount: monthlyClubFeeCents,
+    recurring: { interval: 'month' },
+    lookup_key: lookupKey,
+    product_data: {
+      name: 'Bamika FC Monthly Club Fee',
+    },
+  })
+}
+
+const getSubscriptionPlayerId = (subscription: Stripe.Subscription) => (
+  subscription.metadata?.player_id
+  || subscription.items.data.find((item) => item.metadata?.player_id)?.metadata?.player_id
+  || ''
+)
+
+const hasMonthlyCreditAlready = async (stripe: Stripe, customerId: string, playerId: string) => {
+  const transactions = await stripe.customers.listBalanceTransactions(customerId, { limit: 100 })
+  return transactions.data.some((transaction) => (
+    transaction.metadata?.bamika_monthly_credit_2026_06 === 'true'
+    && (!playerId || transaction.metadata?.player_id === playerId)
+  ))
 }
 
 const requireAdmin = async (req: express.Request, res: express.Response) => {
@@ -147,6 +288,24 @@ const requireAdmin = async (req: express.Request, res: express.Response) => {
 
   if (profileError || profile?.role !== 'admin') {
     res.status(403).json({ error: 'Only admins can manage billing.' })
+    return null
+  }
+
+  return authData.user
+}
+
+const requireUser = async (req: express.Request, res: express.Response) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+
+  if (!token) {
+    res.status(401).json({ error: 'Missing session.' })
+    return null
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getUser(token)
+
+  if (authError || !authData.user) {
+    res.status(401).json({ error: 'Invalid session.' })
     return null
   }
 
@@ -189,12 +348,14 @@ router.post('/create-checkout-session', async (req, res) => {
   try {
     const { registrationData, registrationId, successUrl, playerId: requestPlayerId } = req.body
     const stripe = getStripeClient()
-    const includeUniform = Boolean(req.body.includeUniform ?? registrationData?.include_uniform)
-    const uniformConfirmationCode = includeUniform ? generateUniformConfirmationCode() : ''
+    const includeUniform = false
+    const uniformConfirmationCode = ''
 
     let registration: RegistrationRecord;
 
-    if (registrationId) {
+    if (requestPlayerId && !registrationId) {
+      registration = await findOrCreateRegistrationForPlayer(String(requestPlayerId), registrationData || {})
+    } else if (registrationId) {
       // Fetch existing registration
       const { data, error } = await supabase
         .from('registrations')
@@ -223,28 +384,14 @@ router.post('/create-checkout-session', async (req, res) => {
 
       if (dbError) {
         console.error('Database Error:', dbError)
-        if (!requestPlayerId) {
-          return res.status(500).json({ error: dbError.message || 'Failed to save registration data' })
-        }
-
-        registration = {
-          id: requestPlayerId,
-          player_id: requestPlayerId,
-          first_name: registrationData?.first_name || '',
-          last_name: registrationData?.last_name || '',
-        }
-      } else {
-        registration = newReg as RegistrationRecord
+        return res.status(500).json({ error: dbError.message || 'Failed to save registration data' })
       }
+
+      registration = newReg as RegistrationRecord
     }
 
     const playerId = requestPlayerId || registration.player_id || registration.checkout_player_id || registration.id;
 
-    // DYNAMIC PRICING LOGIC
-    const now = new Date();
-    const mayFirst2026 = new Date('2026-05-01T00:00:00Z');
-    const julyFirst2026 = new Date('2026-07-01T00:00:00Z');
-    const isPromoSignup = now < julyFirst2026;
     const baseUrl = getSiteBaseUrl(req);
 
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
@@ -253,11 +400,9 @@ router.post('/create-checkout-session', async (req, res) => {
           currency: 'usd',
           product_data: {
             name: 'Monthly Club Fee',
-            description: isPromoSignup
-              ? `Promo monthly membership for ${registration.first_name} ${registration.last_name}`
-              : `Monthly membership for ${registration.first_name} ${registration.last_name}`,
+            description: `Monthly membership for ${registration.first_name} ${registration.last_name}`,
           },
-          unit_amount: 2500, // $25.00/month flat
+          unit_amount: monthlyClubFeeCents,
           recurring: {
             interval: 'month',
           },
@@ -265,33 +410,6 @@ router.post('/create-checkout-session', async (req, res) => {
         quantity: 1,
       },
     ];
-
-    if (includeUniform) {
-      lineItems.push({
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: 'Full Uniform Package',
-            description: 'Game jersey, shorts, socks, and practice jersey',
-          },
-          unit_amount: 10000, // $100.00
-        },
-        quantity: 1,
-      });
-    }
-
-    if (!isPromoSignup) {
-      lineItems.push({
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: 'One-Time Registration Fee',
-          },
-          unit_amount: 9900, // $99.00
-        },
-        quantity: 1,
-      });
-    }
 
     const checkoutOptions: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],
@@ -317,18 +435,367 @@ router.post('/create-checkout-session', async (req, res) => {
       allow_promotion_codes: true,
     };
 
-    if (now < mayFirst2026) {
-      checkoutOptions.subscription_data = {
-        ...checkoutOptions.subscription_data,
-        trial_end: Math.floor(mayFirst2026.getTime() / 1000),
-      };
-    }
-
     const session = await stripe.checkout.sessions.create(checkoutOptions);
 
     res.json({ url: session.url })
   } catch (error: unknown) {
     console.error('Stripe Error:', error)
+    sendPaymentError(res, error)
+  }
+})
+
+router.post('/admin/players/:playerId/payment-link', async (req, res): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+
+    const playerId = String(req.params.playerId || '').trim()
+    const includeUniform = false
+
+    if (!playerId) {
+      res.status(400).json({ error: 'Missing player id.' })
+      return
+    }
+
+    const stripe = getStripeClient()
+
+    const { data: player, error: playerError } = await supabase
+      .from('players')
+      .select('*, profiles:parent_id(first_name, last_name, email, phone)')
+      .eq('id', playerId)
+      .single()
+
+    if (playerError || !player) {
+      res.status(404).json({ error: playerError?.message || 'Player not found.' })
+      return
+    }
+
+    const { firstName, lastName } = getPlayerNameParts(player)
+
+    const linkedRegistrations = await supabase
+      .from('registrations')
+      .select('*')
+      .or(`player_id.eq.${playerId},checkout_player_id.eq.${playerId}`)
+      .limit(1)
+
+    let registration = linkedRegistrations.data?.[0] as RegistrationRecord | undefined
+
+    if (!registration) {
+      const { data: fallbackRegistrations } = await supabase
+        .from('registrations')
+        .select('*')
+        .eq('parent_id', player.parent_id)
+        .eq('first_name', firstName)
+        .eq('last_name', lastName)
+        .limit(1)
+
+      registration = fallbackRegistrations?.[0] as RegistrationRecord | undefined
+    }
+
+    if (!registration) {
+      const requiredRegistrationDefaults = getRequiredRegistrationDefaults(player)
+      const { data: newRegistration, error: registrationError } = await supabase
+        .from('registrations')
+        .insert({
+          parent_id: player.parent_id,
+          player_id: playerId,
+          checkout_player_id: playerId,
+          first_name: firstName,
+          last_name: lastName,
+          dob: requiredRegistrationDefaults.dob,
+          gender: requiredRegistrationDefaults.gender,
+          position: player.position || 'TBD',
+          jersey_size: player.jersey_size || 'YM',
+          medical_conditions: player.medical_conditions || '',
+          birth_cert_path: requiredRegistrationDefaults.birth_cert_path,
+          waiver_signed_at: requiredRegistrationDefaults.waiver_signed_at,
+          photo_url: player.photo_url || null,
+          status: 'pending_payment',
+          payment_status: 'pending',
+          created_at: new Date().toISOString(),
+        })
+        .select('*')
+        .single()
+
+      if (registrationError || !newRegistration) {
+        res.status(500).json({ error: registrationError?.message || 'Unable to prepare a registration for checkout.' })
+        return
+      }
+
+      registration = newRegistration as RegistrationRecord
+    }
+
+    const baseUrl = getSiteBaseUrl(req)
+    const uniformConfirmationCode = includeUniform ? generateUniformConfirmationCode() : ''
+
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: 'Monthly Club Fee',
+            description: `Monthly membership for ${firstName} ${lastName}`,
+          },
+          unit_amount: monthlyClubFeeCents,
+          recurring: { interval: 'month' },
+        },
+        quantity: 1,
+      },
+    ]
+
+    const checkoutOptions: Stripe.Checkout.SessionCreateParams = {
+      payment_method_types: ['card'],
+      line_items: lineItems,
+      mode: 'subscription',
+      success_url: `${baseUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/dashboard`,
+      client_reference_id: playerId,
+      customer_email: player.profiles?.email || undefined,
+      metadata: {
+        registration_id: registration.id,
+        player_id: playerId,
+        uniform_purchased: includeUniform ? 'true' : 'false',
+        uniform_confirmation_code: uniformConfirmationCode,
+        created_by_admin: adminUser.id,
+      },
+      subscription_data: {
+        metadata: {
+          registration_id: registration.id,
+          player_id: playerId,
+          uniform_purchased: includeUniform ? 'true' : 'false',
+          uniform_confirmation_code: uniformConfirmationCode,
+          created_by_admin: adminUser.id,
+        },
+      },
+      allow_promotion_codes: true,
+    }
+
+    const session = await stripe.checkout.sessions.create(checkoutOptions)
+
+    res.json({
+      success: true,
+      url: session.url,
+      parentEmail: player.profiles?.email || '',
+      message: 'Stripe checkout link created.',
+    })
+  } catch (error: unknown) {
+    console.error('Admin payment link error:', error)
+    sendPaymentError(res, error)
+  }
+})
+
+router.post('/uniform-orders/create-checkout-session', async (req, res): Promise<void> => {
+  try {
+    const user = await requireUser(req, res)
+    if (!user) return
+
+    const playerId = String(req.body?.playerId || '').trim()
+    if (!playerId) {
+      res.status(400).json({ error: 'Choose the player who needs the uniform.' })
+      return
+    }
+
+    const stripe = getStripeClient()
+    const { data: player, error: playerError } = await supabase
+      .from('players')
+      .select('*, profiles:parent_id(first_name, last_name, full_name, email, phone)')
+      .eq('id', playerId)
+      .eq('parent_id', user.id)
+      .single()
+
+    if (playerError || !player) {
+      res.status(404).json({ error: playerError?.message || 'Player was not found on this parent account.' })
+      return
+    }
+
+    const playerName = player.full_name || `${player.first_name || ''} ${player.last_name || ''}`.trim() || 'Bamika Player'
+    const parentProfile = player.profiles || {}
+    const parentName = parentProfile.full_name || `${parentProfile.first_name || ''} ${parentProfile.last_name || ''}`.trim() || user.email || ''
+    const parentEmail = parentProfile.email || user.email || ''
+    const confirmationCode = generateUniformConfirmationCode()
+
+    const { data: order, error: orderError } = await supabase
+      .from('uniform_orders')
+      .insert({
+        parent_id: user.id,
+        player_id: playerId,
+        player_name: playerName,
+        parent_name: parentName,
+        parent_email: parentEmail,
+        parent_phone: parentProfile.phone || null,
+        jersey_size: player.jersey_size || null,
+        jersey_number: player.jersey_number || null,
+        team_assigned: player.team_assigned || null,
+        amount_cents: uniformPackageCents,
+        currency: 'usd',
+        status: 'pending_payment',
+        payment_status: 'pending',
+        confirmation_code: confirmationCode,
+      })
+      .select('id')
+      .single()
+
+    if (orderError || !order?.id) {
+      const message = orderError?.message || 'Unable to prepare the uniform order.'
+      if (message.includes('uniform_orders') || message.includes('schema cache')) {
+        res.status(503).json({ error: 'Uniform ordering needs the latest Supabase database update. Run supabase/APPLY_THIS_IN_SUPABASE.sql, then refresh.' })
+        return
+      }
+      res.status(500).json({ error: message })
+      return
+    }
+
+    const baseUrl = getSiteBaseUrl(req)
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Bamika FC Full Uniform Package',
+              description: `${playerName} - size ${player.jersey_size || 'TBD'} - number ${player.jersey_number || 'TBD'}`,
+            },
+            unit_amount: uniformPackageCents,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${baseUrl}/dashboard?uniform=success`,
+      cancel_url: `${baseUrl}/dashboard`,
+      client_reference_id: playerId,
+      customer_email: parentEmail || undefined,
+      metadata: {
+        checkout_type: 'uniform_order',
+        uniform_order_id: order.id,
+        player_id: playerId,
+        parent_id: user.id,
+        confirmation_code: confirmationCode,
+      },
+      allow_promotion_codes: true,
+    })
+
+    await supabase
+      .from('uniform_orders')
+      .update({ stripe_checkout_session_id: session.id, updated_at: new Date().toISOString() })
+      .eq('id', order.id)
+
+    res.json({ success: true, url: session.url, confirmationCode })
+  } catch (error: unknown) {
+    console.error('Uniform checkout error:', error)
+    sendPaymentError(res, error)
+  }
+})
+
+router.post('/admin/billing/move-to-25', async (req, res): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+
+    const dryRun = req.body?.dryRun !== false
+    const stripe = getStripeClient()
+    const targetPrice = dryRun ? null : await getOrCreateMonthlyPrice(stripe)
+    const statuses: Stripe.SubscriptionListParams.Status[] = ['active', 'trialing', 'past_due', 'unpaid']
+    const candidates: Array<{
+      subscriptionId: string
+      customerId: string
+      playerId: string
+      currentAmount: number
+      updated: boolean
+      credited: boolean
+      skippedReason?: string
+    }> = []
+
+    for (const status of statuses) {
+      let startingAfter: string | undefined
+      do {
+        const page = await stripe.subscriptions.list({
+          status,
+          limit: 100,
+          starting_after: startingAfter,
+        })
+
+        for (const subscription of page.data) {
+          const monthlyItem = subscription.items.data.find((item) => (
+            item.price?.recurring?.interval === 'month'
+            && (item.price?.unit_amount || 0) > monthlyClubFeeCents
+          ))
+
+          if (!monthlyItem) continue
+
+          const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id
+          const playerId = getSubscriptionPlayerId(subscription)
+
+          if (!customerId) {
+            candidates.push({
+              subscriptionId: subscription.id,
+              customerId: '',
+              playerId,
+              currentAmount: monthlyItem.price?.unit_amount || 0,
+              updated: false,
+              credited: false,
+              skippedReason: 'No Stripe customer found.',
+            })
+            continue
+          }
+
+          let credited = false
+          let skippedReason = ''
+          const alreadyCredited = await hasMonthlyCreditAlready(stripe, customerId, playerId)
+
+          if (!dryRun && targetPrice) {
+            await stripe.subscriptionItems.update(monthlyItem.id, {
+              price: targetPrice.id,
+              proration_behavior: 'none',
+            })
+
+            if (!alreadyCredited && monthlyCreditCents > 0) {
+              await stripe.customers.createBalanceTransaction(customerId, {
+                amount: -monthlyCreditCents,
+                currency: 'usd',
+                description: 'Bamika FC credit for previous $50 monthly rate. New monthly rate is $25.',
+                metadata: {
+                  bamika_monthly_credit_2026_06: 'true',
+                  player_id: playerId,
+                  subscription_id: subscription.id,
+                  created_by_admin: adminUser.id,
+                },
+              })
+              credited = true
+            } else if (alreadyCredited) {
+              skippedReason = 'Credit already applied.'
+            }
+          }
+
+          candidates.push({
+            subscriptionId: subscription.id,
+            customerId,
+            playerId,
+            currentAmount: monthlyItem.price?.unit_amount || 0,
+            updated: !dryRun,
+            credited,
+            skippedReason,
+          })
+        }
+
+        startingAfter = page.has_more ? page.data[page.data.length - 1]?.id : undefined
+      } while (startingAfter)
+    }
+
+    res.json({
+      success: true,
+      dryRun,
+      newMonthlyFee: monthlyClubFeeCents,
+      creditAmount: monthlyCreditCents,
+      count: candidates.length,
+      candidates,
+      message: dryRun
+        ? `Found ${candidates.length} Stripe subscriptions above $25/mo. No changes were made.`
+        : `Updated ${candidates.filter((item) => item.updated).length} subscriptions to $25/mo and applied ${candidates.filter((item) => item.credited).length} credits.`,
+    })
+  } catch (error: unknown) {
+    console.error('Monthly billing migration error:', error)
     sendPaymentError(res, error)
   }
 })

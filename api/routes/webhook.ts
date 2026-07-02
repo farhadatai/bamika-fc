@@ -27,11 +27,16 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
   try {
     const stripe = getStripeClient();
 
-    if (endpointSecret) {
-      event = stripe.webhooks.constructEvent(req.body, sig as string, endpointSecret);
-    } else {
-      event = req.body;
+    if (!endpointSecret) {
+      console.error('Stripe webhook received but STRIPE_WEBHOOK_SECRET is not configured.');
+      return res.status(503).send('Stripe webhook secret is not configured.');
     }
+
+    if (!sig) {
+      return res.status(400).send('Missing Stripe signature.');
+    }
+
+    event = stripe.webhooks.constructEvent(req.body, sig as string, endpointSecret);
   } catch (err: unknown) {
     const message = getErrorMessage(err);
     console.error(`Webhook Error: ${message}`);
@@ -42,12 +47,53 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
+      const checkoutType = session.metadata?.checkout_type;
+      const uniformOrderId = session.metadata?.uniform_order_id;
       const playerId = session.metadata?.player_id || session.client_reference_id;
       const registrationId = session.metadata?.registration_id;
       const subscriptionId = session.subscription as string;
       const customerId = session.customer as string;
       const uniformPurchased = session.metadata?.uniform_purchased === 'true';
       const uniformConfirmationCode = session.metadata?.uniform_confirmation_code || null;
+
+      if (checkoutType === 'uniform_order' && uniformOrderId) {
+        const confirmationCode = session.metadata?.confirmation_code || null;
+        const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id || null;
+
+        const { error: orderError } = await supabase
+          .from('uniform_orders')
+          .update({
+            status: 'paid',
+            payment_status: 'paid',
+            stripe_checkout_session_id: session.id,
+            stripe_payment_intent_id: paymentIntentId,
+            stripe_customer_id: customerId,
+            confirmation_code: confirmationCode,
+            paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', uniformOrderId);
+
+        if (orderError) {
+          console.error(`Error updating uniform order ${uniformOrderId}:`, orderError);
+        }
+
+        if (playerId) {
+          const { error: playerUniformError } = await supabase
+            .from('players')
+            .update({
+              uniform_purchased: true,
+              uniform_confirmation_code: confirmationCode,
+            })
+            .eq('id', playerId);
+
+          if (playerUniformError) {
+            console.error(`Error updating player ${playerId} uniform status:`, playerUniformError);
+          }
+        }
+
+        break;
+      }
 
       if (!playerId) {
         console.error('Webhook Error: No player_id in checkout.session.completed client_reference_id');
@@ -126,7 +172,8 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
     }
 
     case 'customer.subscription.created':
-    case 'customer.subscription.updated': {
+    case 'customer.subscription.updated':
+    case 'customer.subscription.deleted': {
       const subscription = event.data.object as Stripe.Subscription;
       const subPlayerId = subscription.metadata.player_id;
 
@@ -134,31 +181,45 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
         console.error('Webhook Error: No player_id in subscription.metadata');
         break; 
       }
-      
-      if (subscription.status === 'trialing' || subscription.status === 'active') {
-        try {
-          const { error: playerError } = await supabase
-            .from('players')
-            .update({
-              status: 'active',
-              payment_status: 'paid',
-              stripe_subscription_id: subscription.id,
-              stripe_customer_id: typeof subscription.customer === 'string' ? subscription.customer : null,
-            })
-            .eq('id', subPlayerId);
 
-          if (playerError) {
-            console.error(`Error updating player ${subPlayerId} from subscription ${subscription.id}:`, playerError);
-            await supabase
-              .from('players')
-              .update({ status: 'active', payment_status: 'paid' })
-              .eq('id', subPlayerId);
-          } else {
-            console.log(`Player ${subPlayerId} activated via subscription ${subscription.id}.`);
-          }
-        } catch (error: unknown) {
-          console.error('Error processing subscription event:', getErrorMessage(error));
+      const isActive = subscription.status === 'trialing' || subscription.status === 'active';
+      const isInactive = subscription.status === 'canceled' || event.type === 'customer.subscription.deleted';
+      const playerStatus = isActive ? 'active' : isInactive ? 'inactive' : 'pending_payment';
+      const paymentStatus = isActive ? 'paid' : isInactive ? 'cancelled' : subscription.status;
+
+      try {
+        const updatePayload = {
+          status: playerStatus,
+          payment_status: paymentStatus,
+          stripe_subscription_id: subscription.id,
+          stripe_customer_id: typeof subscription.customer === 'string' ? subscription.customer : null,
+        };
+
+        const { error: playerError } = await supabase
+          .from('players')
+          .update(updatePayload)
+          .eq('id', subPlayerId);
+
+        if (playerError) {
+          console.error(`Error updating player ${subPlayerId} from subscription ${subscription.id}:`, playerError);
+          await supabase
+            .from('players')
+            .update({ status: playerStatus, payment_status: paymentStatus })
+            .eq('id', subPlayerId);
         }
+
+        await supabase
+          .from('registrations')
+          .update({
+            status: playerStatus,
+            payment_status: paymentStatus,
+            stripe_subscription_id: subscription.id,
+          })
+          .or(`player_id.eq.${subPlayerId},checkout_player_id.eq.${subPlayerId}`);
+
+        console.log(`Player ${subPlayerId} payment status updated from Stripe subscription ${subscription.id}.`);
+      } catch (error: unknown) {
+        console.error('Error processing subscription event:', getErrorMessage(error));
       }
       break;
     }

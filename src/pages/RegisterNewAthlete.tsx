@@ -34,6 +34,31 @@ const isMissingPlayerSchemaError = (message: string) => (
   || message.includes('permission denied')
 );
 
+const normalizeBirthDate = (value: string) => {
+  const trimmed = value.trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+
+  if (!match) {
+    throw new Error('Please choose a valid date of birth before continuing.');
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+
+  if (
+    Number.isNaN(parsed.getTime())
+    || parsed.getUTCFullYear() !== year
+    || parsed.getUTCMonth() !== month - 1
+    || parsed.getUTCDate() !== day
+  ) {
+    throw new Error('Please choose a valid date of birth before continuing.');
+  }
+
+  return parsed.toISOString();
+};
+
 export default function RegisterNewAthlete() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -150,7 +175,7 @@ export default function RegisterNewAthlete() {
         return;
       }
 
-      const safeDob = formData.dob ? new Date(`${formData.dob}T12:00:00`).toISOString() : null;
+      const safeDob = normalizeBirthDate(formData.dob);
 
       const { data: newPlayer, error: playerError } = await supabase
         .from('players')
@@ -248,9 +273,6 @@ export default function RegisterNewAthlete() {
                 <div className="rounded-xl border border-gray-800 bg-neutral-950 p-4">
                   <div className="text-sm font-bold text-gray-300">Monthly club fee</div>
                   <div className="mt-1 text-3xl font-black text-[#EF4444]">$25/mo</div>
-                </div>
-                <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-sm font-black uppercase tracking-widest text-green-300">
-                  Registration fee waived
                 </div>
               </div>
             </div>
@@ -502,10 +524,6 @@ export default function RegisterNewAthlete() {
                   <h3 className="mb-4 font-black uppercase italic">Today at Checkout</h3>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between border-b border-gray-800 pb-3">
-                      <span className="text-sm font-bold text-gray-500">Registration Fee</span>
-                      <span className="font-black text-green-300">Waived</span>
-                    </div>
-                    <div className="flex items-center justify-between border-b border-gray-800 pb-3">
                       <span className="text-sm font-bold text-gray-500">Monthly Fee</span>
                       <span className="font-black">$25/mo</span>
                     </div>
@@ -514,7 +532,7 @@ export default function RegisterNewAthlete() {
                       <span className="text-2xl font-black text-[#EF4444]">$25/mo</span>
                     </div>
                     <div className="rounded-xl border border-gray-800 bg-neutral-950 p-3 text-xs leading-5 text-gray-500">
-                      Uniform orders are handled after registration in the parent dashboard so families can choose the correct player, size, and jersey number.
+                      Stripe checkout contains only the $25 monthly membership. Uniforms can be ordered separately later from the parent dashboard.
                     </div>
                   </div>
                 </div>

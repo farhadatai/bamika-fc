@@ -67,6 +67,28 @@ interface SponsorSpotlight {
   link_url?: string | null;
 }
 
+interface UniformOrder {
+  id: string;
+  player_id?: string | null;
+  player_name: string;
+  jersey_size?: string | null;
+  jersey_number?: string | null;
+  team_assigned?: string | null;
+  amount_cents?: number | null;
+  payment_status?: string | null;
+  status?: string | null;
+  confirmation_code?: string | null;
+  created_at?: string | null;
+  paid_at?: string | null;
+}
+
+interface ProfileSummary {
+  first_name?: string | null;
+  last_name?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+}
+
 const getInitials = (firstName = '', lastName = '') => {
   const first = firstName.trim()[0] || '';
   const last = lastName.trim()[0] || '';
@@ -116,13 +138,37 @@ const parseCoachMessage = (body = '') => {
   };
 };
 
+const getProfileFirstName = (profile?: ProfileSummary | null, email?: string | null, metadata?: Record<string, unknown>) => {
+  const firstName = profile?.first_name?.trim();
+  if (firstName) return firstName;
+
+  const fullName = profile?.full_name?.trim();
+  if (fullName) return fullName.split(/\s+/)[0];
+
+  const emailName = profile?.email?.split('@')[0] || email?.split('@')[0];
+  if (emailName) return emailName;
+
+  const metadataFirstName = typeof metadata?.first_name === 'string' ? metadata.first_name.trim() : '';
+  if (metadataFirstName) return metadataFirstName;
+
+  const metadataFullName = typeof metadata?.full_name === 'string' ? metadata.full_name.trim() : '';
+  if (metadataFullName) return metadataFullName.split(/\s+/)[0];
+
+  return 'Bamika Family';
+};
+
 export default function Dashboard() {
   const { user, userRole } = useAuthStore();
+  const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [teamMessages, setTeamMessages] = useState<Announcement[]>([]);
   const [players, setPlayers] = useState<PlayerSummary[]>([]);
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [sponsors, setSponsors] = useState<SponsorSpotlight[]>([]);
+  const [uniformOrders, setUniformOrders] = useState<UniformOrder[]>([]);
+  const [selectedUniformPlayerId, setSelectedUniformPlayerId] = useState('');
+  const [uniformOrderLoading, setUniformOrderLoading] = useState<string | null>(null);
+  const [uniformOrderError, setUniformOrderError] = useState('');
   const [loading, setLoading] = useState(true);
   const [payLoadingId, setPayLoadingId] = useState<string | null>(null);
   const [payError, setPayError] = useState('');
@@ -163,7 +209,7 @@ export default function Dashboard() {
     }
   };
 
-  const firstName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'Bamika Family';
+  const firstName = getProfileFirstName(profile, user?.email, user?.user_metadata);
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
   const isAdmin = userRole === 'admin';
   const isCoach = userRole === 'coach';
@@ -181,12 +227,18 @@ export default function Dashboard() {
           : ['parents', 'everyone', 'public'];
 
       const [
+        profileResponse,
         announcementsResponse,
         playersResponse,
         practicesResponse,
         matchesResponse,
         sponsorsResponse,
       ] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('first_name, last_name, full_name, email')
+          .eq('id', user.id)
+          .maybeSingle(),
         supabase
           .from('announcements')
           .select('*')
@@ -222,10 +274,30 @@ export default function Dashboard() {
           .limit(2),
       ]);
 
+      if (profileResponse.error) {
+        console.warn('Profile unavailable for dashboard greeting:', profileResponse.error);
+        setProfile(null);
+      } else {
+        setProfile(profileResponse.data || null);
+      }
+
       let teamAnnouncements: Announcement[] = [];
+      let parentUniformOrders: UniformOrder[] = [];
       const basePlayers = isParent ? playersResponse.data || [] : [];
 
       if (isParent) {
+        const { data: uniformData, error: uniformError } = await supabase
+          .from('uniform_orders')
+          .select('*')
+          .eq('parent_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (uniformError) {
+          console.warn('Uniform orders unavailable:', uniformError);
+        } else {
+          parentUniformOrders = uniformData || [];
+        }
+
         const teams = [...new Set(basePlayers.map((player) => player.team_assigned).filter((team) => team && team !== 'Unassigned'))];
         const playerIds = basePlayers.map((player) => player.id).filter(Boolean);
 
@@ -289,6 +361,7 @@ export default function Dashboard() {
       setAnnouncements(mergedAnnouncements);
       setTeamMessages(teamAnnouncements);
       setPlayers(basePlayers);
+      setUniformOrders(parentUniformOrders);
       setSponsors(sponsorsResponse.error ? [] : sponsorsResponse.data || []);
       setSchedule([...practiceItems, ...matchItems].sort((a, b) => `${a.date} ${a.time || ''}`.localeCompare(`${b.date} ${b.time || ''}`)).slice(0, 4));
       setLoading(false);
@@ -297,7 +370,22 @@ export default function Dashboard() {
     fetchHubData();
   }, [today, user, userRole, isParent]);
 
+  useEffect(() => {
+    if (!players.length) {
+      setSelectedUniformPlayerId('');
+      return;
+    }
+
+    if (!players.some((player) => player.id === selectedUniformPlayerId)) {
+      setSelectedUniformPlayerId(players[0].id);
+    }
+  }, [players, selectedUniformPlayerId]);
+
   const primaryPlayer = players[0];
+  const selectedUniformPlayer = players.find((player) => player.id === selectedUniformPlayerId) || players[0];
+  const selectedUniformPlayerOrders = selectedUniformPlayer
+    ? uniformOrders.filter((order) => order.player_id === selectedUniformPlayer.id)
+    : [];
   const getPlayerMessages = (player: PlayerSummary) => teamMessages
     .filter((message) => (
       (message.audience === 'player' && message.player_id === player.id)
@@ -325,6 +413,43 @@ export default function Dashboard() {
     : isCoach
       ? 'A focused coach overview. Use Coach Tools for roster updates, player details, and team messages.'
       : 'Track player status, upcoming practices, match days, announcements, and family resources in one place.';
+
+  const handleUniformOrder = async () => {
+    if (!selectedUniformPlayer) return;
+    setUniformOrderError('');
+    setUniformOrderLoading(selectedUniformPlayer.id);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        throw new Error('Please log in again before ordering a uniform.');
+      }
+
+      const response = await fetch('/api/uniform-orders/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ playerId: selectedUniformPlayer.id }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Unable to start uniform checkout.');
+
+      if (result.url) {
+        window.location.href = result.url;
+        return;
+      }
+
+      throw new Error('Stripe did not return a checkout link.');
+    } catch (error) {
+      setUniformOrderError(error instanceof Error ? error.message : 'Unable to start uniform checkout.');
+      setUniformOrderLoading(null);
+    }
+  };
 
   return (
     <div className="w-full py-6 text-white sm:py-8">
@@ -490,96 +615,173 @@ export default function Dashboard() {
                 <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500">Once your athlete is registered, their team, number, payment, and coach details will appear here.</p>
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {players.map((player) => (
-                  <article key={player.id} className="rounded-xl border border-gray-800 bg-black p-4">
-                    <div className="flex items-center gap-3">
-                      {player.photo_url ? (
-                        <img src={player.photo_url} alt={getPlayerName(player)} className="h-14 w-14 rounded-xl border border-gray-800 object-cover" />
-                      ) : (
-                        <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-gray-800 bg-neutral-900 font-black text-[#EF4444]">
-                          {getPlayerInitials(player)}
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {players.map((player) => (
+                    <article key={player.id} className="rounded-xl border border-gray-800 bg-black p-4">
+                      <div className="flex items-center gap-3">
+                        {player.photo_url ? (
+                          <img src={player.photo_url} alt={getPlayerName(player)} className="h-14 w-14 rounded-xl border border-gray-800 object-cover" />
+                        ) : (
+                          <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-gray-800 bg-neutral-900 font-black text-[#EF4444]">
+                            {getPlayerInitials(player)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <h3 className="truncate font-black uppercase italic">{getPlayerName(player)}</h3>
+                          <p className="mt-1 text-xs font-bold uppercase tracking-widest text-gray-500">{player.team_assigned || 'Unassigned'}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                        <div className="rounded-lg border border-gray-800 bg-neutral-950 p-3">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</div>
+                          <div className="mt-1 font-bold text-gray-200">{player.position || 'TBD'}</div>
+                        </div>
+                        <div className="rounded-lg border border-gray-800 bg-neutral-950 p-3">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Jersey</div>
+                          <div className="mt-1 font-bold text-gray-200">{player.jersey_number || player.jersey_size || 'TBD'}</div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${statusClass(player.status)}`}>
+                          {player.status || 'Pending'}
+                        </span>
+                        <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${statusClass(player.payment_status)}`}>
+                          <CreditCard className="mr-1 inline" size={12} />
+                          {player.payment_status || 'Payment pending'}
+                        </span>
+                      </div>
+
+                      {!isPlayerPaid(player) && (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={() => handlePayNow(player)}
+                            disabled={payLoadingId === player.id}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-2.5 text-sm font-black uppercase tracking-widest text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <CreditCard size={15} />
+                            {payLoadingId === player.id ? 'Starting payment…' : 'Set up monthly payment'}
+                          </button>
+                          <p className="mt-1.5 text-center text-[11px] font-bold text-gray-500">
+                            Finish setting up {player.first_name || 'your player'}&apos;s membership payment.
+                          </p>
+                          {payError && payLoadingId === null && (
+                            <p className="mt-1 text-center text-[11px] font-bold text-[#FCA5A5]">{payError}</p>
+                          )}
                         </div>
                       )}
-                      <div className="min-w-0">
-                        <h3 className="truncate font-black uppercase italic">{getPlayerName(player)}</h3>
-                        <p className="mt-1 text-xs font-bold uppercase tracking-widest text-gray-500">{player.team_assigned || 'Unassigned'}</p>
-                      </div>
-                    </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                      <div className="rounded-lg border border-gray-800 bg-neutral-950 p-3">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</div>
-                        <div className="mt-1 font-bold text-gray-200">{player.position || 'TBD'}</div>
-                      </div>
-                      <div className="rounded-lg border border-gray-800 bg-neutral-950 p-3">
-                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Jersey</div>
-                        <div className="mt-1 font-bold text-gray-200">{player.jersey_number || player.jersey_size || 'TBD'}</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${statusClass(player.status)}`}>
-                        {player.status || 'Pending'}
-                      </span>
-                      <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${statusClass(player.payment_status)}`}>
-                        <CreditCard className="mr-1 inline" size={12} />
-                        {player.payment_status || 'Payment pending'}
-                      </span>
-                    </div>
-
-                    {!isPlayerPaid(player) && (
-                      <div className="mt-3">
-                        <button
-                          type="button"
-                          onClick={() => handlePayNow(player)}
-                          disabled={payLoadingId === player.id}
-                          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-2.5 text-sm font-black uppercase tracking-widest text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <CreditCard size={15} />
-                          {payLoadingId === player.id ? 'Starting payment…' : 'Set up monthly payment'}
-                        </button>
-                        <p className="mt-1.5 text-center text-[11px] font-bold text-gray-500">
-                          Finish setting up {player.first_name || 'your player'}&apos;s membership payment.
-                        </p>
-                        {payError && payLoadingId === null && (
-                          <p className="mt-1 text-center text-[11px] font-bold text-[#FCA5A5]">{payError}</p>
-                        )}
-                      </div>
-                    )}
-
-                    {player.uniform_purchased && (
                       <div className="mt-3 rounded-lg border border-gray-800 bg-neutral-950 p-3">
                         <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Uniform</div>
-                        <div className="mt-1 text-xs font-black uppercase text-green-300">Purchased</div>
-                        <div className="mt-1 text-[11px] font-black uppercase tracking-widest text-[#D4AF37]">
-                          Code: {player.uniform_confirmation_code || 'Pending'}
-                        </div>
-                      </div>
-                    )}
-
-                    {getPlayerMessages(player).length > 0 && (
-                      <div className="mt-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-3">
-                        <div className="mb-2 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-[#FCA5A5]">
-                          <Megaphone size={13} />
-                          Coach messages
-                        </div>
-                        <div className="space-y-2">
-                          {getPlayerMessages(player).map((message) => (
-                            <div key={message.id} className="border-t border-[#EF4444]/20 pt-2 first:border-t-0 first:pt-0">
-                              <div className="text-xs font-black uppercase italic text-white">{message.title}</div>
-                              <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-[#FCA5A5]">
-                                From {parseCoachMessage(message.body).coachName}
-                              </div>
-                              <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs leading-5 text-gray-300">{parseCoachMessage(message.body).body}</p>
+                        {player.uniform_purchased ? (
+                          <>
+                            <div className="mt-1 text-xs font-black uppercase text-green-300">Purchased</div>
+                            <div className="mt-1 text-[11px] font-black uppercase tracking-widest text-[#D4AF37]">
+                              Code: {player.uniform_confirmation_code || 'Pending'}
                             </div>
-                          ))}
-                        </div>
+                          </>
+                        ) : (
+                          <div className="mt-1 text-xs font-bold text-gray-400">Available to order below</div>
+                        )}
                       </div>
-                    )}
-                  </article>
-                ))}
-              </div>
+
+                      {getPlayerMessages(player).length > 0 && (
+                        <div className="mt-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-3">
+                          <div className="mb-2 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-[#FCA5A5]">
+                            <Megaphone size={13} />
+                            Coach messages
+                          </div>
+                          <div className="space-y-2">
+                            {getPlayerMessages(player).map((message) => (
+                              <div key={message.id} className="border-t border-[#EF4444]/20 pt-2 first:border-t-0 first:pt-0">
+                                <div className="text-xs font-black uppercase italic text-white">{message.title}</div>
+                                <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-[#FCA5A5]">
+                                  From {parseCoachMessage(message.body).coachName}
+                                </div>
+                                <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs leading-5 text-gray-300">{parseCoachMessage(message.body).body}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </article>
+                  ))}
+                </div>
+
+                <div className="mt-5 rounded-xl border border-[#D4AF37]/30 bg-black p-4">
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
+                    <Shirt size={15} />
+                    Uniform order
+                  </div>
+                  <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+                    <select
+                      value={selectedUniformPlayer?.id || ''}
+                      onChange={(event) => setSelectedUniformPlayerId(event.target.value)}
+                      className="w-full rounded-lg border border-gray-800 bg-neutral-950 px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]"
+                    >
+                      {players.map((player) => (
+                        <option key={player.id} value={player.id}>
+                          {getPlayerName(player)}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleUniformOrder}
+                      disabled={!selectedUniformPlayer || uniformOrderLoading === selectedUniformPlayer?.id}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#D4AF37] px-4 py-3 text-xs font-black uppercase text-black hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {uniformOrderLoading === selectedUniformPlayer?.id ? 'Starting...' : 'Order Uniform $100'}
+                      <ArrowRight size={15} />
+                    </button>
+                  </div>
+                  {selectedUniformPlayer && (
+                    <div className="mt-3 grid gap-2 text-xs text-gray-400 sm:grid-cols-3">
+                      <div className="rounded-lg border border-gray-800 bg-neutral-950 p-3">
+                        <span className="block text-[9px] font-black uppercase tracking-widest text-gray-600">Player</span>
+                        <span className="mt-1 block font-black text-white">{getPlayerName(selectedUniformPlayer)}</span>
+                      </div>
+                      <div className="rounded-lg border border-gray-800 bg-neutral-950 p-3">
+                        <span className="block text-[9px] font-black uppercase tracking-widest text-gray-600">Size</span>
+                        <span className="mt-1 block font-black text-white">{selectedUniformPlayer.jersey_size || 'TBD'}</span>
+                      </div>
+                      <div className="rounded-lg border border-gray-800 bg-neutral-950 p-3">
+                        <span className="block text-[9px] font-black uppercase tracking-widest text-gray-600">Number</span>
+                        <span className="mt-1 block font-black text-white">{selectedUniformPlayer.jersey_number || 'TBD'}</span>
+                      </div>
+                    </div>
+                  )}
+                  {uniformOrderError && (
+                    <div className="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs font-bold text-red-200">
+                      {uniformOrderError}
+                    </div>
+                  )}
+                  {selectedUniformPlayerOrders.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Recent uniform orders</div>
+                      {selectedUniformPlayerOrders.slice(0, 2).map((order) => (
+                        <div key={order.id} className="flex flex-col gap-2 rounded-lg border border-gray-800 bg-neutral-950 p-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <div className="font-black uppercase text-white">{order.player_name}</div>
+                            <div className="mt-1 text-gray-500">Size {order.jersey_size || 'TBD'} - #{order.jersey_number || 'TBD'}</div>
+                          </div>
+                          <div className="text-left sm:text-right">
+                            <span className={`inline-flex rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-widest ${statusClass(order.payment_status)}`}>
+                              {order.payment_status || 'Pending'}
+                            </span>
+                            {order.confirmation_code && (
+                              <div className="mt-1 font-black uppercase tracking-widest text-[#D4AF37]">{order.confirmation_code}</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </section>
           )}

@@ -79,6 +79,30 @@ create table if not exists public.recognition_items (
   created_at timestamptz default now()
 );
 
+create table if not exists public.uniform_orders (
+  id uuid primary key default gen_random_uuid(),
+  parent_id uuid references public.profiles(id) on delete set null,
+  player_id uuid references public.players(id) on delete set null,
+  player_name text not null,
+  parent_name text,
+  parent_email text,
+  parent_phone text,
+  jersey_size text,
+  jersey_number text,
+  team_assigned text,
+  amount_cents integer not null default 10000,
+  currency text not null default 'usd',
+  status text not null default 'pending_payment',
+  payment_status text not null default 'pending',
+  stripe_checkout_session_id text,
+  stripe_payment_intent_id text,
+  stripe_customer_id text,
+  confirmation_code text,
+  created_at timestamptz not null default now(),
+  paid_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
 alter table public.drills add column if not exists youtube_url text;
 alter table public.drills add column if not exists video_url text;
 update public.drills
@@ -164,6 +188,15 @@ create index if not exists idx_registrations_parent_player
 create index if not exists idx_registrations_payment_status
   on public.registrations(payment_status, status);
 
+create index if not exists idx_uniform_orders_parent_id
+  on public.uniform_orders(parent_id);
+
+create index if not exists idx_uniform_orders_player_id
+  on public.uniform_orders(player_id);
+
+create index if not exists idx_uniform_orders_payment_status
+  on public.uniform_orders(payment_status, status);
+
 alter table public.recognition_items add column if not exists type text not null default 'player';
 alter table public.recognition_items add column if not exists title text;
 alter table public.recognition_items add column if not exists subtitle text;
@@ -172,6 +205,27 @@ alter table public.recognition_items add column if not exists image_url text;
 alter table public.recognition_items add column if not exists link_url text;
 alter table public.recognition_items add column if not exists is_published boolean not null default true;
 alter table public.recognition_items add column if not exists created_at timestamptz default now();
+
+alter table public.uniform_orders add column if not exists parent_id uuid references public.profiles(id) on delete set null;
+alter table public.uniform_orders add column if not exists player_id uuid references public.players(id) on delete set null;
+alter table public.uniform_orders add column if not exists player_name text;
+alter table public.uniform_orders add column if not exists parent_name text;
+alter table public.uniform_orders add column if not exists parent_email text;
+alter table public.uniform_orders add column if not exists parent_phone text;
+alter table public.uniform_orders add column if not exists jersey_size text;
+alter table public.uniform_orders add column if not exists jersey_number text;
+alter table public.uniform_orders add column if not exists team_assigned text;
+alter table public.uniform_orders add column if not exists amount_cents integer not null default 10000;
+alter table public.uniform_orders add column if not exists currency text not null default 'usd';
+alter table public.uniform_orders add column if not exists status text not null default 'pending_payment';
+alter table public.uniform_orders add column if not exists payment_status text not null default 'pending';
+alter table public.uniform_orders add column if not exists stripe_checkout_session_id text;
+alter table public.uniform_orders add column if not exists stripe_payment_intent_id text;
+alter table public.uniform_orders add column if not exists stripe_customer_id text;
+alter table public.uniform_orders add column if not exists confirmation_code text;
+alter table public.uniform_orders add column if not exists created_at timestamptz not null default now();
+alter table public.uniform_orders add column if not exists paid_at timestamptz;
+alter table public.uniform_orders add column if not exists updated_at timestamptz not null default now();
 
 update public.profiles
 set
@@ -209,6 +263,7 @@ alter table public.coaches enable row level security;
 alter table public.announcements enable row level security;
 alter table public.drills enable row level security;
 alter table public.recognition_items enable row level security;
+alter table public.uniform_orders enable row level security;
 
 drop policy if exists "Users can insert own profile" on public.profiles;
 drop policy if exists "Users can view own profile" on public.profiles;
@@ -440,6 +495,33 @@ create policy "Admins can manage recognition items" on public.recognition_items
     )
   );
 
+drop policy if exists "Parents can view own uniform orders" on public.uniform_orders;
+drop policy if exists "Parents can insert own uniform orders" on public.uniform_orders;
+drop policy if exists "Admins can manage uniform orders" on public.uniform_orders;
+
+create policy "Parents can view own uniform orders" on public.uniform_orders
+  for select to authenticated
+  using (parent_id = auth.uid());
+
+create policy "Parents can insert own uniform orders" on public.uniform_orders
+  for insert to authenticated
+  with check (parent_id = auth.uid());
+
+create policy "Admins can manage uniform orders" on public.uniform_orders
+  for all to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  );
+
 grant select, insert, update on public.profiles to authenticated;
 grant select, insert, update, delete on public.players to authenticated;
 grant select, update on public.coaches to authenticated;
@@ -449,6 +531,7 @@ grant select on public.drills to anon, authenticated;
 grant insert, update, delete on public.drills to authenticated;
 grant select on public.recognition_items to anon, authenticated;
 grant insert, update, delete on public.recognition_items to authenticated;
+grant select, insert, update, delete on public.uniform_orders to authenticated;
 
 insert into storage.buckets (id, name, public)
 values ('photos', 'photos', true)

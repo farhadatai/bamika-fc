@@ -5,3 +5,7 @@ dist
 .trae
 .log
 .figma
+public/slideshow/*.DNG
+public/slideshow/*.dng
+public/slideshow/*.HEIC
+public/slideshow/*.heic
