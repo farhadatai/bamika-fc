@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle, ArrowRight } from 'lucide-react';
 import Confetti from 'react-confetti';
-import { supabase } from '../../lib/supabase';
+import { useAuthStore } from '../../store/auth';
 
 export default function RegistrationSuccess() {
+  const { userRole } = useAuthStore();
   const [searchParams] = useSearchParams();
   const [playerName, setPlayerName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -50,10 +51,10 @@ export default function RegistrationSuccess() {
         </p>
 
         <Link 
-          to="/dashboard"
+          to={userRole === 'coach' ? '/coach' : '/dashboard'}
           className="inline-flex items-center gap-2 bg-primary text-white font-bold text-lg px-8 py-4 rounded-xl hover:bg-red-700 transition-transform transform hover:scale-105 shadow-lg"
         >
-          Go to Dashboard <ArrowRight size={22} />
+          Go to {userRole === 'coach' ? 'Coach Dashboard' : 'Dashboard'} <ArrowRight size={22} />
         </Link>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CreditCard,
   FileText,
+  MapPin,
   Shield,
   Upload,
   User,
@@ -20,6 +21,37 @@ const fieldClass = 'w-full rounded-xl border border-gray-800 bg-black px-4 py-3 
 const labelClass = 'mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-500';
 const jerseySizes = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'S', 'M', 'L', 'XL', '2XL'];
 const playerSchemaMessage = 'Player registration needs the latest Supabase database update. Run the newest players registration fields SQL migration, then try this step again.';
+
+interface FamilyAddress {
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
+const EMPTY_FAMILY_ADDRESS: FamilyAddress = {
+  address: '',
+  city: '',
+  state: '',
+  zip: '',
+};
+
+const normalizeFamilyAddress = (address: FamilyAddress): FamilyAddress => ({
+  address: address.address.trim(),
+  city: address.city.trim(),
+  state: address.state.trim().toUpperCase(),
+  zip: address.zip.trim(),
+});
+
+const isValidFamilyAddress = (address: FamilyAddress) => {
+  const normalized = normalizeFamilyAddress(address);
+  return Boolean(
+    normalized.address
+    && normalized.city
+    && /^[A-Z]{2}$/.test(normalized.state)
+    && /^\d{5}(?:-\d{4})?$/.test(normalized.zip)
+  );
+};
 
 const isMissingPlayerSchemaError = (message: string) => (
   (message.includes('players') && (
@@ -60,12 +92,14 @@ const normalizeBirthDate = (value: string) => {
 };
 
 export default function RegisterNewAthlete() {
-  const { user } = useAuthStore();
+  const { user, userRole } = useAuthStore();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState('');
+  const [familyAddress, setFamilyAddress] = useState<FamilyAddress>(EMPTY_FAMILY_ADDRESS);
+  const [addressLoading, setAddressLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -79,6 +113,31 @@ export default function RegisterNewAthlete() {
     photoUrl: '',
     waiverSignedAt: '',
   });
+
+  useEffect(() => {
+    let active = true;
+
+    const loadFamilyAddress = async () => {
+      if (!user) {
+        if (active) setAddressLoading(false);
+        return;
+      }
+
+      const { data, error: addressError } = await supabase
+        .from('family_addresses')
+        .select('address, city, state, zip')
+        .eq('parent_id', user.id)
+        .maybeSingle();
+
+      if (!active) return;
+      if (addressError) console.warn('Family address could not be loaded:', addressError);
+      setFamilyAddress(data || EMPTY_FAMILY_ADDRESS);
+      setAddressLoading(false);
+    };
+
+    loadFamilyAddress();
+    return () => { active = false; };
+  }, [user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -151,6 +210,22 @@ export default function RegisterNewAthlete() {
     setError(null);
 
     try {
+      const normalizedAddress = normalizeFamilyAddress(familyAddress);
+      if (!isValidFamilyAddress(normalizedAddress)) {
+        throw new Error('Enter a complete mailing address with a two-letter state and a valid ZIP code.');
+      }
+
+      const { error: addressError } = await supabase
+        .from('family_addresses')
+        .upsert({
+          parent_id: user.id,
+          ...normalizedAddress,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'parent_id' });
+
+      if (addressError) throw new Error(addressError.message || 'Unable to save the family mailing address.');
+      setFamilyAddress(normalizedAddress);
+
       const playerFullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
       const { data: existingPlayer, error: existingPlayerError } = await supabase
         .from('players')
@@ -219,12 +294,22 @@ export default function RegisterNewAthlete() {
         payment_status: 'pending',
       };
 
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Please log in again before starting payment.');
+
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ registrationData: payload, playerId: newPlayer.id, includeUniform: false }),
+        body: JSON.stringify({
+          registrationData: payload,
+          playerId: newPlayer.id,
+          includeUniform: false,
+          cancelUrl: `${window.location.origin}${userRole === 'coach' ? '/coach' : '/dashboard'}`,
+        }),
       });
 
       const data = await response.json();
@@ -243,7 +328,7 @@ export default function RegisterNewAthlete() {
   const nextStep = () => setStep((s) => Math.min(s + 1, 4));
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
 
-  const isStep1Valid = formData.firstName && formData.lastName && formData.dob;
+  const isStep1Valid = Boolean(formData.firstName && formData.lastName && formData.dob && isValidFamilyAddress(familyAddress) && !addressLoading);
   const isStep2Valid = formData.photoUrl;
   const isStep3Valid = formData.waiverSignedAt && signature.trim().length > 0;
 
@@ -263,7 +348,7 @@ export default function RegisterNewAthlete() {
                 New Athlete <span className="text-[#D4AF37]">Registration</span>
               </h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-gray-400 sm:text-base">
-                Add your player, upload a roster photo, sign the waiver, and complete Bamika FC monthly membership checkout.
+                Confirm one family mailing address, add your player, sign the waiver, and complete the $25 monthly membership checkout.
               </p>
             </div>
 
@@ -358,6 +443,42 @@ export default function RegisterNewAthlete() {
                   <label className={labelClass}>Medical Conditions</label>
                   <textarea name="medicalConditions" value={formData.medicalConditions} onChange={handleInputChange} rows={4} className={fieldClass} placeholder="Allergies, asthma, previous injuries, medications, or anything coaches should know." />
                 </div>
+              </div>
+
+              <div className="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-5">
+                <div className="mb-4 flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-blue-300">
+                    <MapPin size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-black uppercase italic text-white">Family Mailing Address</h3>
+                    <p className="mt-1 text-sm leading-6 text-gray-400">Enter this once. It is saved to your family profile and automatically linked to every player for GotSport reports.</p>
+                  </div>
+                </div>
+                {addressLoading ? (
+                  <div className="text-sm font-bold text-gray-500">Loading saved address...</div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="md:col-span-2">
+                      <span className={labelClass}>Street Address *</span>
+                      <input required autoComplete="street-address" value={familyAddress.address} onChange={(event) => setFamilyAddress((current) => ({ ...current, address: event.target.value }))} className={fieldClass} />
+                    </label>
+                    <label>
+                      <span className={labelClass}>City *</span>
+                      <input required autoComplete="address-level2" value={familyAddress.city} onChange={(event) => setFamilyAddress((current) => ({ ...current, city: event.target.value }))} className={fieldClass} />
+                    </label>
+                    <div className="grid grid-cols-[0.7fr_1.3fr] gap-3">
+                      <label>
+                        <span className={labelClass}>State *</span>
+                        <input required maxLength={2} autoComplete="address-level1" placeholder="CA" value={familyAddress.state} onChange={(event) => setFamilyAddress((current) => ({ ...current, state: event.target.value.toUpperCase() }))} className={`${fieldClass} uppercase`} />
+                      </label>
+                      <label>
+                        <span className={labelClass}>ZIP *</span>
+                        <input required autoComplete="postal-code" inputMode="numeric" placeholder="93722" value={familyAddress.zip} onChange={(event) => setFamilyAddress((current) => ({ ...current, zip: event.target.value }))} className={fieldClass} />
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end">
@@ -506,6 +627,7 @@ export default function RegisterNewAthlete() {
                       ['Player Name', `${formData.firstName} ${formData.lastName}`],
                       ['Position', formData.position],
                       ['Jersey Size', formData.jerseySize],
+                      ['Family Address', `${familyAddress.city}, ${familyAddress.state} ${familyAddress.zip}`],
                       ['Waiver', `Signed by ${signature}`],
                     ].map(([label, value]) => (
                       <div key={label} className="flex items-center justify-between gap-4 border-b border-gray-800 pb-3 text-sm">

@@ -92,6 +92,26 @@ const normalizeBirthDate = (value: string) => {
   return parsed.toISOString()
 }
 
+interface CoachDirectoryPlayerRecord {
+  id: string
+  first_name?: string | null
+  last_name?: string | null
+  full_name?: string | null
+  status?: string | null
+  payment_status?: string | null
+  team_assigned?: string | null
+  created_at?: string | null
+  profiles?: {
+    first_name?: string | null
+    last_name?: string | null
+    full_name?: string | null
+  } | Array<{
+    first_name?: string | null
+    last_name?: string | null
+    full_name?: string | null
+  }> | null
+}
+
 const requireAdmin = async (req: Request, res: Response) => {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
 
@@ -172,6 +192,52 @@ router.post('/login', async (): Promise<void> => {
  */
 router.post('/logout', async (): Promise<void> => {
   // TODO: Implement logout logic
+})
+
+router.get('/coach-player-directory', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const coachUser = await requireCoach(req, res)
+    if (!coachUser) return
+
+    if (!hasServiceRoleKey()) {
+      res.status(500).json({ error: 'The limited coach directory requires the server service role key.' })
+      return
+    }
+
+    const { data: players, error } = await supabase
+      .from('players')
+      .select('id, first_name, last_name, full_name, status, payment_status, team_assigned, created_at, profiles:parent_id(first_name, last_name, full_name)')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      res.status(500).json({ error: error.message || 'Unable to load the club player directory.' })
+      return
+    }
+
+    const directory = ((players || []) as CoachDirectoryPlayerRecord[]).map((player) => {
+      const parent = Array.isArray(player.profiles) ? player.profiles[0] : player.profiles
+      const parentName = `${parent?.first_name || ''} ${parent?.last_name || ''}`.trim()
+        || parent?.full_name
+        || 'Parent not listed'
+
+      return {
+        id: player.id,
+        first_name: player.first_name || '',
+        last_name: player.last_name || '',
+        full_name: player.full_name || '',
+        status: player.status || 'pending',
+        payment_status: player.payment_status || 'pending',
+        team_assigned: player.team_assigned || 'Unassigned',
+        created_at: player.created_at || null,
+        parent_name: parentName,
+      }
+    })
+
+    res.status(200).json({ players: directory })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to load the club player directory.'
+    res.status(500).json({ error: message })
+  }
 })
 
 router.post('/invite-coach', async (req: Request, res: Response): Promise<void> => {

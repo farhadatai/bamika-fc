@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth';
 import { uploadPhoto } from '../lib/upload';
 import { useNavigate } from 'react-router-dom';
-import { Loader, Phone, FileText, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2, X, CreditCard, Target, Plus } from 'lucide-react';
+import { Loader, Phone, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2, X, CreditCard, Target, Plus } from 'lucide-react';
 
 interface Player {
   id: string;
@@ -31,6 +31,18 @@ interface Player {
 interface PlayerRow extends Omit<Player, 'dob' | 'profiles'> {
   date_of_birth?: string;
   profiles?: Player['profiles'];
+}
+
+interface ClubPlayerSummary {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  status: string;
+  payment_status: string;
+  team_assigned: string;
+  created_at?: string | null;
+  parent_name: string;
 }
 
 const getPlayerName = (player: Pick<Player, 'first_name' | 'last_name' | 'full_name'>) => (
@@ -109,10 +121,22 @@ const emptyCoachPlayerInvite = {
   parent_phone: '',
 };
 
+const getClubRegistrationStatus = (player: ClubPlayerSummary): 'active' | 'inactive' | 'pending' => {
+  const status = String(player.status || '').toLowerCase();
+  const paymentStatus = String(player.payment_status || '').toLowerCase();
+  if (['inactive', 'cancelled', 'canceled', 'paused'].includes(status)) return 'inactive';
+  if (status === 'active' || ['paid', 'active', 'waived'].includes(paymentStatus)) return 'active';
+  return 'pending';
+};
+
 export default function CoachDashboard() {
   const { user, userRole } = useAuthStore();
   const navigate = useNavigate();
   const [players, setPlayers] = useState<Player[]>([]);
+  const [clubPlayers, setClubPlayers] = useState<ClubPlayerSummary[]>([]);
+  const [clubSearch, setClubSearch] = useState('');
+  const [clubStatusFilter, setClubStatusFilter] = useState('all');
+  const [directoryError, setDirectoryError] = useState('');
   const [games, setGames] = useState<Game[]>([]);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [teamAnnouncements, setTeamAnnouncements] = useState<Announcement[]>([]);
@@ -189,6 +213,27 @@ export default function CoachDashboard() {
     setError(null);
     try {
       if (!user) return;
+
+      setDirectoryError('');
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        setClubPlayers([]);
+        setDirectoryError('Please log in again to view club registrations.');
+      } else {
+        const directoryResponse = await fetch('/api/auth/coach-player-directory', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const directoryResult = await directoryResponse.json().catch(() => ({}));
+
+        if (directoryResponse.ok) {
+          setClubPlayers(Array.isArray(directoryResult.players) ? directoryResult.players : []);
+        } else {
+          setClubPlayers([]);
+          setDirectoryError(directoryResult.error || 'Club registrations could not be loaded.');
+        }
+      }
 
       // 1. Get the coach's team_id
       const { data: coachData, error: coachError } = await supabase
@@ -394,6 +439,23 @@ export default function CoachDashboard() {
   const selectedPlayerMessages = selectedPlayer
     ? teamAnnouncements.filter((announcement) => announcement.audience === 'player' && announcement.player_id === selectedPlayer.id)
     : [];
+  const clubRegistrationStats = clubPlayers.reduce((stats, player) => {
+    stats.total += 1;
+    stats[getClubRegistrationStatus(player)] += 1;
+    return stats;
+  }, { total: 0, active: 0, inactive: 0, pending: 0 });
+  const filteredClubPlayers = clubPlayers.filter((player) => {
+    const status = getClubRegistrationStatus(player);
+    const searchTarget = [
+      getPlayerName(player),
+      player.parent_name,
+      player.team_assigned,
+      status,
+      player.payment_status,
+    ].filter(Boolean).join(' ').toLowerCase();
+    return (clubStatusFilter === 'all' || status === clubStatusFilter)
+      && (!clubSearch.trim() || searchTarget.includes(clubSearch.trim().toLowerCase()));
+  });
 
   if (loading) {
     return (
@@ -426,15 +488,24 @@ export default function CoachDashboard() {
             {teamId ? teamId : 'No team assigned yet'}
           </p>
         </div>
-        {profile && (
-          <button 
-            onClick={() => setShowEditProfile(!showEditProfile)}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-700 bg-black px-4 py-3 text-sm font-bold text-gray-300 shadow-sm hover:bg-gray-900 sm:w-auto sm:py-2"
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <button
+            type="button"
+            onClick={() => navigate('/register-new-athlete')}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-3 text-sm font-black uppercase text-white hover:bg-red-700 sm:py-2"
           >
-            <User size={18} />
-            My Profile
+            <Plus size={17} /> Register My Child
           </button>
-        )}
+          {profile && (
+            <button
+              onClick={() => setShowEditProfile(!showEditProfile)}
+              className="flex items-center justify-center gap-2 rounded-lg border border-gray-700 bg-black px-4 py-3 text-sm font-bold text-gray-300 shadow-sm hover:bg-gray-900 sm:py-2"
+            >
+              <User size={18} />
+              My Profile
+            </button>
+          )}
+        </div>
       </div>
 
       {/* MY PROFILE SECTION */}
@@ -496,6 +567,101 @@ export default function CoachDashboard() {
           </div>
         </div>
       )}
+
+      <section className="rounded-2xl border border-blue-500/30 bg-neutral-950 p-5 sm:p-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-widest text-blue-300">Limited coach access</div>
+            <h2 className="mt-2 text-xl font-black uppercase italic text-white">Club Registration Overview</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
+              View every registered player, their parent name, team, and active status. Addresses, medical details, documents, and other private information stay hidden.
+            </p>
+          </div>
+          <button type="button" onClick={() => navigate('/register-new-athlete')} className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-400/50 px-4 py-3 text-xs font-black uppercase text-blue-100 hover:bg-blue-500/10">
+            <Plus size={15} /> Register My Child
+          </button>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            { label: 'Registered', value: clubRegistrationStats.total, color: 'text-white' },
+            { label: 'Active', value: clubRegistrationStats.active, color: 'text-green-300' },
+            { label: 'Pending', value: clubRegistrationStats.pending, color: 'text-yellow-200' },
+            { label: 'Inactive', value: clubRegistrationStats.inactive, color: 'text-gray-300' },
+          ].map((stat) => (
+            <div key={stat.label} className="rounded-xl border border-gray-800 bg-black p-4">
+              <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">{stat.label}</div>
+              <div className={`mt-2 text-2xl font-black ${stat.color}`}>{stat.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]">
+          <input aria-label="Search club registrations" value={clubSearch} onChange={(event) => setClubSearch(event.target.value)} placeholder="Search player, parent, or team" className="input-primary" />
+          <select aria-label="Filter club registrations by status" value={clubStatusFilter} onChange={(event) => setClubStatusFilter(event.target.value)} className="input-primary">
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+
+        {directoryError ? (
+          <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-bold text-red-200">{directoryError}</div>
+        ) : filteredClubPlayers.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-dashed border-gray-800 bg-black p-6 text-center text-sm text-gray-500">No registrations match this filter.</div>
+        ) : (
+          <>
+            <div className="mt-4 space-y-3 lg:hidden">
+              {filteredClubPlayers.map((player) => {
+                const status = getClubRegistrationStatus(player);
+                return (
+                  <article key={player.id} className="rounded-xl border border-gray-800 bg-black p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-black uppercase italic text-white">{getPlayerName(player)}</h3>
+                        <p className="mt-1 text-xs text-gray-500">Parent: {player.parent_name}</p>
+                      </div>
+                      <span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-widest ${getRosterStatusClass(status)}`}>{status}</span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs font-bold text-gray-500">
+                      <span>{player.team_assigned}</span>
+                      <span>{player.created_at ? new Date(player.created_at).toLocaleDateString() : 'Date unavailable'}</span>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            <div className="mt-4 hidden overflow-x-auto rounded-xl border border-gray-800 bg-black lg:block">
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <thead className="border-b border-gray-800 bg-neutral-950 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3">Player</th>
+                    <th className="px-4 py-3">Parent</th>
+                    <th className="px-4 py-3">Team</th>
+                    <th className="px-4 py-3">Registered</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-900">
+                  {filteredClubPlayers.map((player) => {
+                    const status = getClubRegistrationStatus(player);
+                    return (
+                      <tr key={player.id}>
+                        <td className="px-4 py-3 font-black uppercase italic text-white">{getPlayerName(player)}</td>
+                        <td className="px-4 py-3 font-bold text-gray-300">{player.parent_name}</td>
+                        <td className="px-4 py-3 text-gray-400">{player.team_assigned}</td>
+                        <td className="px-4 py-3 text-gray-400">{player.created_at ? new Date(player.created_at).toLocaleDateString() : 'Unavailable'}</td>
+                        <td className="px-4 py-3"><span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-widest ${getRosterStatusClass(status)}`}>{status}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </section>
 
       {!teamId && (
         <div className="rounded-2xl border border-dashed border-gray-800 bg-black p-8 text-center">

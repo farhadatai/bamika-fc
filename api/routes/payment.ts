@@ -117,6 +117,7 @@ const buildReturnUrl = (req: express.Request, requestedUrl: unknown, fallbackPat
 
 type RegistrationRecord = {
   id: string
+  parent_id?: string | null
   player_id?: string | null
   checkout_player_id?: string | null
   first_name: string
@@ -165,6 +166,7 @@ const getPlayerNameParts = (player: Record<string, any>) => {
 const findOrCreateRegistrationForPlayer = async (
   playerId: string,
   registrationData: Record<string, any> = {},
+  parentId: string,
 ) => {
   const { data: player, error: playerError } = await supabase
     .from('players')
@@ -174,6 +176,12 @@ const findOrCreateRegistrationForPlayer = async (
 
   if (playerError || !player) {
     throw new Error(playerError?.message || 'Player not found.')
+  }
+
+  if (player.parent_id !== parentId) {
+    const error = new Error('This player is not linked to your family account.')
+    error.name = 'CheckoutAuthorizationError'
+    throw error
   }
 
   const { firstName, lastName } = getPlayerNameParts(player)
@@ -346,15 +354,31 @@ const findPlayerSubscription = async (playerId: string, storedSubscriptionId?: s
 
 router.post('/create-checkout-session', async (req, res) => {
   try {
-    const { registrationData, registrationId, successUrl, playerId: requestPlayerId } = req.body
+    const checkoutUser = await requireUser(req, res)
+    if (!checkoutUser) return
+
+    const { registrationData, registrationId, successUrl, cancelUrl, playerId: requestPlayerId } = req.body
     const stripe = getStripeClient()
     const includeUniform = false
     const uniformConfirmationCode = ''
 
+    const { data: familyAddress, error: familyAddressError } = await supabase
+      .from('family_addresses')
+      .select('parent_id')
+      .eq('parent_id', checkoutUser.id)
+      .maybeSingle()
+
+    if (familyAddressError || !familyAddress) {
+      return res.status(400).json({
+        error: 'Add a complete mailing address to your family profile before registering or paying for a player.',
+        code: 'FAMILY_ADDRESS_REQUIRED',
+      })
+    }
+
     let registration: RegistrationRecord;
 
     if (requestPlayerId && !registrationId) {
-      registration = await findOrCreateRegistrationForPlayer(String(requestPlayerId), registrationData || {})
+      registration = await findOrCreateRegistrationForPlayer(String(requestPlayerId), registrationData || {}, checkoutUser.id)
     } else if (registrationId) {
       // Fetch existing registration
       const { data, error } = await supabase
@@ -366,6 +390,9 @@ router.post('/create-checkout-session', async (req, res) => {
       if (error || !data) {
         return res.status(404).json({ error: 'Registration not found' })
       }
+      if (data.parent_id !== checkoutUser.id) {
+        return res.status(403).json({ error: 'This registration is not linked to your family account.' })
+      }
       registration = data as RegistrationRecord
     } else {
       // 1. Create a pending registration in Supabase
@@ -375,6 +402,7 @@ router.post('/create-checkout-session', async (req, res) => {
         .insert([
           {
             ...safeRegistrationData,
+            parent_id: checkoutUser.id,
             status: 'pending',
             created_at: new Date().toISOString(),
           },
@@ -391,8 +419,6 @@ router.post('/create-checkout-session', async (req, res) => {
     }
 
     const playerId = requestPlayerId || registration.player_id || registration.checkout_player_id || registration.id;
-
-    const baseUrl = getSiteBaseUrl(req);
 
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
       {
@@ -416,7 +442,7 @@ router.post('/create-checkout-session', async (req, res) => {
       line_items: lineItems,
       mode: 'subscription',
       success_url: buildReturnUrl(req, successUrl, '/registration/success?session_id={CHECKOUT_SESSION_ID}'),
-      cancel_url: `${baseUrl}/dashboard`,
+      cancel_url: buildReturnUrl(req, cancelUrl, '/dashboard'),
       client_reference_id: playerId,
       metadata: {
         registration_id: registration.id,
@@ -440,6 +466,10 @@ router.post('/create-checkout-session', async (req, res) => {
     res.json({ url: session.url })
   } catch (error: unknown) {
     console.error('Stripe Error:', error)
+    if (error instanceof Error && error.name === 'CheckoutAuthorizationError') {
+      res.status(403).json({ error: error.message })
+      return
+    }
     sendPaymentError(res, error)
   }
 })

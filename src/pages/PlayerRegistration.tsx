@@ -78,6 +78,10 @@ export default function PlayerRegistration() {
     setError(null);
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Please log in again before registering a player.');
+
       const payload = {
         parent_id: user.id,
         first_name: formData.firstName,
@@ -95,6 +99,7 @@ export default function PlayerRegistration() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ registrationData: payload }),
       });
