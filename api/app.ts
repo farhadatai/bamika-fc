@@ -26,6 +26,11 @@ const __dirname = path.dirname(__filename)
 
 const app: express.Application = express()
 
+// Vercel places one trusted reverse proxy in front of this Express app.
+// This lets the rate limiter use the visitor IP from X-Forwarded-For instead
+// of treating the entire deployment as one shared client.
+app.set('trust proxy', 1)
+
 // Restrict cross-origin API access to the club's own sites. Server-to-server
 // callers (Stripe webhooks, curl) send no Origin header and are unaffected.
 const allowedOrigins = [
@@ -57,6 +62,9 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests, please try again later.' },
+  // Vercel also sends the standardized Forwarded header. Express currently
+  // resolves client IPs from X-Forwarded-For, so that is the intentional source.
+  validate: { forwardedHeader: false },
 })
 app.use('/api', apiLimiter)
 
