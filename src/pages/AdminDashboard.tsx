@@ -2086,85 +2086,13 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {stats.map((stat) => (
             <div key={stat.label} className="rounded-xl border border-gray-800 bg-neutral-900 p-4">
               <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">{stat.label}</div>
               <div className="mt-2 text-3xl font-black text-white">{stat.value}</div>
             </div>
           ))}
-        </div>
-
-        <div className="rounded-2xl border border-gray-800 bg-neutral-950 p-4">
-          <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-sm font-black uppercase italic text-white">Reports</h2>
-              <p className="text-xs text-gray-500">Download clean records for Excel or print/save as PDF.</p>
-            </div>
-          </div>
-          <div className="grid gap-2 md:grid-cols-3">
-            {[
-              ['players', 'Players'],
-              ['parents', 'Parents'],
-              ['coaches', 'Coaches'],
-            ].map(([type, label]) => (
-              <div key={type} className="flex flex-col gap-3 rounded-xl border border-gray-800 bg-black p-3 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-xs font-black uppercase tracking-widest text-gray-300">{label}</span>
-                <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex">
-                  <button onClick={() => exportReport(type, 'csv')} className="inline-flex items-center gap-1 rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">
-                    <Download size={13} /> Excel
-                  </button>
-                  <button onClick={() => exportReport(type, 'pdf')} className="inline-flex items-center gap-1 rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-[#EF4444]">
-                    <FileText size={13} /> PDF
-                  </button>
-                </div>
-              </div>
-            ))}
-            <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 md:col-span-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-black uppercase tracking-widest text-white">GotSport Players</span>
-                    <span className="rounded-full border border-blue-400/30 bg-blue-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-blue-200">USCLUB - Competitive</span>
-                  </div>
-                  <p className="mt-2 max-w-3xl text-xs leading-5 text-gray-400">
-                    Parent profile addresses are linked automatically. Enter a fallback only for families that have not completed their address yet.
-                  </p>
-                </div>
-                <button onClick={() => exportReport('godsport', 'csv')} className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-blue-400/50 px-4 py-3 text-[10px] font-black uppercase text-blue-100 hover:bg-blue-500/10">
-                  <Download size={13} /> Download CSV
-                </button>
-              </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                <input value={gotSportFallback.address} onChange={(event) => setGotSportFallback((current) => ({ ...current, address: event.target.value }))} placeholder="Fallback street address" className="rounded-lg border border-gray-800 bg-black px-3 py-2 text-xs font-bold text-white outline-none focus:border-blue-400" />
-                <input value={gotSportFallback.city} onChange={(event) => setGotSportFallback((current) => ({ ...current, city: event.target.value }))} placeholder="City" className="rounded-lg border border-gray-800 bg-black px-3 py-2 text-xs font-bold text-white outline-none focus:border-blue-400" />
-                <input value={gotSportFallback.state} onChange={(event) => setGotSportFallback((current) => ({ ...current, state: event.target.value }))} placeholder="State (example: CA)" className="rounded-lg border border-gray-800 bg-black px-3 py-2 text-xs font-bold uppercase text-white outline-none focus:border-blue-400" />
-                <input value={gotSportFallback.zip} onChange={(event) => setGotSportFallback((current) => ({ ...current, zip: event.target.value }))} placeholder="ZIP code" inputMode="numeric" className="rounded-lg border border-gray-800 bg-black px-3 py-2 text-xs font-bold text-white outline-none focus:border-blue-400" />
-              </div>
-              <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                In GotSport, check "First row contains column headings" and choose "Comma" as the delimiter.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-green-500/30 bg-green-500/10 p-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-sm font-black uppercase italic text-white">Monthly Fee Update</h2>
-              <p className="mt-1 text-xs leading-5 text-green-100/80">
-                New checkouts contain only the $25 monthly membership. Use this to update existing $50 Stripe subscriptions and apply a $25 credit.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <button onClick={() => handleMoveBillingTo25(true)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-green-400/50 px-4 py-3 text-[10px] font-black uppercase text-green-200 hover:bg-green-500/10">
-                Preview Stripe Updates
-              </button>
-              <button onClick={() => handleMoveBillingTo25(false)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-500 px-4 py-3 text-[10px] font-black uppercase text-black hover:bg-white">
-                Apply $25 + Credits
-              </button>
-            </div>
-          </div>
         </div>
 
         {databaseNotice && (
@@ -2179,7 +2107,7 @@ export default function AdminDashboard() {
         {/* 2. TAB NAVIGATION */}
         <div className="overflow-x-auto rounded-2xl border border-gray-800 bg-neutral-900 p-1"> 
           <div className="flex min-w-max gap-2">
-            {['parents', 'coaches', 'roster', 'uniforms', 'schedule', 'drills', 'announcements', 'sponsor requests', 'spotlights'].map((tab) => (
+            {['parents', 'coaches', 'roster', 'uniforms', 'schedule', 'drills', 'announcements', 'sponsor requests', 'spotlights', 'reports & tools'].map((tab) => (
               <button 
                 key={tab} 
                 onClick={() => setActiveTab(tab)} 
@@ -2195,6 +2123,81 @@ export default function AdminDashboard() {
 
         {/* 3. MAIN CONTENT AREA */}
         <div className="min-h-[400px]"> 
+          {activeTab === 'reports & tools' && (
+            <div className="flex flex-col gap-6">
+              <div className="rounded-2xl border border-gray-800 bg-neutral-950 p-4">
+                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h2 className="text-sm font-black uppercase italic text-white">Reports</h2>
+                    <p className="text-xs text-gray-500">Download clean records for Excel or print/save as PDF.</p>
+                  </div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  {[
+                    ['players', 'Players'],
+                    ['parents', 'Parents'],
+                    ['coaches', 'Coaches'],
+                  ].map(([type, label]) => (
+                    <div key={type} className="flex flex-col gap-3 rounded-xl border border-gray-800 bg-black p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-xs font-black uppercase tracking-widest text-gray-300">{label}</span>
+                      <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex">
+                        <button onClick={() => exportReport(type, 'csv')} className="inline-flex items-center gap-1 rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">
+                          <Download size={13} /> Excel
+                        </button>
+                        <button onClick={() => exportReport(type, 'pdf')} className="inline-flex items-center gap-1 rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-[#EF4444]">
+                          <FileText size={13} /> PDF
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 md:col-span-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-black uppercase tracking-widest text-white">GotSport Players</span>
+                          <span className="rounded-full border border-blue-400/30 bg-blue-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-blue-200">USCLUB - Competitive</span>
+                        </div>
+                        <p className="mt-2 max-w-3xl text-xs leading-5 text-gray-400">
+                          Parent profile addresses are linked automatically. Enter a fallback only for families that have not completed their address yet.
+                        </p>
+                      </div>
+                      <button onClick={() => exportReport('godsport', 'csv')} className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-blue-400/50 px-4 py-3 text-[10px] font-black uppercase text-blue-100 hover:bg-blue-500/10">
+                        <Download size={13} /> Download CSV
+                      </button>
+                    </div>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      <input value={gotSportFallback.address} onChange={(event) => setGotSportFallback((current) => ({ ...current, address: event.target.value }))} placeholder="Fallback street address" className="rounded-lg border border-gray-800 bg-black px-3 py-2 text-xs font-bold text-white outline-none focus:border-blue-400" />
+                      <input value={gotSportFallback.city} onChange={(event) => setGotSportFallback((current) => ({ ...current, city: event.target.value }))} placeholder="City" className="rounded-lg border border-gray-800 bg-black px-3 py-2 text-xs font-bold text-white outline-none focus:border-blue-400" />
+                      <input value={gotSportFallback.state} onChange={(event) => setGotSportFallback((current) => ({ ...current, state: event.target.value }))} placeholder="State (example: CA)" className="rounded-lg border border-gray-800 bg-black px-3 py-2 text-xs font-bold uppercase text-white outline-none focus:border-blue-400" />
+                      <input value={gotSportFallback.zip} onChange={(event) => setGotSportFallback((current) => ({ ...current, zip: event.target.value }))} placeholder="ZIP code" inputMode="numeric" className="rounded-lg border border-gray-800 bg-black px-3 py-2 text-xs font-bold text-white outline-none focus:border-blue-400" />
+                    </div>
+                    <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                      In GotSport, check "First row contains column headings" and choose "Comma" as the delimiter.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-green-500/30 bg-green-500/10 p-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h2 className="text-sm font-black uppercase italic text-white">Monthly Fee Update</h2>
+                    <p className="mt-1 text-xs leading-5 text-green-100/80">
+                      New checkouts contain only the $25 monthly membership. Use this to update existing $50 Stripe subscriptions and apply a $25 credit.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button onClick={() => handleMoveBillingTo25(true)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-green-400/50 px-4 py-3 text-[10px] font-black uppercase text-green-200 hover:bg-green-500/10">
+                      Preview Stripe Updates
+                    </button>
+                    <button onClick={() => handleMoveBillingTo25(false)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-500 px-4 py-3 text-[10px] font-black uppercase text-black hover:bg-white">
+                      Apply $25 + Credits
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {activeTab === 'parents' && (
             <div className="overflow-hidden rounded-2xl border border-gray-800 bg-neutral-900">
               <div className="flex flex-col gap-2 border-b border-gray-800 bg-neutral-950 p-5 sm:flex-row sm:items-center sm:justify-between">

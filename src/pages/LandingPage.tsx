@@ -404,7 +404,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ANNOUNCEMENTS */}
+      {/* ANNOUNCEMENTS (hidden until there are announcements to show) */}
+      {announcements.length > 0 && (
       <section id="announcements" className="bg-neutral-950 py-16 w-full border-y border-gray-900">
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto">
@@ -454,6 +455,7 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* SPONSORS & PLAYER OF THE MONTH */}
       <section id="sponsors" className="bg-black py-20 w-full border-b border-gray-900">
@@ -464,14 +466,14 @@ export default function LandingPage() {
               Recognition
             </div>
             <h2 className="text-4xl md:text-5xl font-black italic uppercase tracking-tight text-white">
-              Sponsors <span className="text-[#D4AF37]">&</span> Player of the Month
+              Sponsors{playerSpotlights.length > 0 && (<> <span className="text-[#D4AF37]">&</span> Player of the Month</>)}
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-500">
-              Sponsors and player recognition stay separate, but families can see both in one organized section.
+              Community partners who support Bamika FC families and players.
             </p>
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-2">
+          <div className={`grid gap-8 ${playerSpotlights.length > 0 ? 'lg:grid-cols-2' : ''}`}>
             <div className="space-y-6">
               <div className="rounded-2xl border border-[#D4AF37]/35 bg-neutral-950 p-5 md:p-6">
                 <div className="mb-5 flex items-center justify-between gap-4">
@@ -546,6 +548,7 @@ export default function LandingPage() {
               </form>
             </div>
 
+            {playerSpotlights.length > 0 && (
             <div id="spotlights" className="rounded-2xl border border-[#EF4444]/35 bg-neutral-950 p-5 md:p-6">
               <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
@@ -595,6 +598,7 @@ export default function LandingPage() {
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       </section>
@@ -739,7 +743,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* SCHEDULE */}
+      {/* SCHEDULE (hidden until practices or matches are scheduled) */}
+      {(events.length > 0 || games.length > 0) && (
       <section id="schedule" className="py-24 bg-neutral-950 w-full">
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -862,7 +867,8 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-      
+      )}
+
       {/* COACHES */}
       <section id="coaches" className="hidden">
         <div className="w-full px-4 sm:px-6 lg:px-8">

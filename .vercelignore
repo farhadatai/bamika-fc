@@ -9,3 +9,9 @@ public/slideshow/*.DNG
 public/slideshow/*.dng
 public/slideshow/*.HEIC
 public/slideshow/*.heic
+public/slideshow/web/*.DNG
+public/slideshow/web/*.HEIC
+public/slideshow/web/IMG_*.JPG
+public/slideshow/web/IMG_*.PNG
+public/background.png
+asset-originals

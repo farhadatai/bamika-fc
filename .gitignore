@@ -10,3 +10,6 @@ dist
 # Logs and editor cruft
 *.log
 .DS_Store
+
+# Local backups of original (pre-compression) images
+asset-originals/
