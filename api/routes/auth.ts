@@ -206,7 +206,7 @@ router.get('/coach-player-directory', async (req: Request, res: Response): Promi
 
     const { data: players, error } = await supabase
       .from('players')
-      .select('id, first_name, last_name, full_name, status, payment_status, team_assigned, created_at, profiles:parent_id(first_name, last_name, full_name)')
+      .select('id, full_name, status, payment_status, team_assigned, created_at, profiles:parent_id(first_name, last_name, full_name)')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -220,10 +220,13 @@ router.get('/coach-player-directory', async (req: Request, res: Response): Promi
         || parent?.full_name
         || 'Parent not listed'
 
+      // players has no first_name/last_name columns; derive them from full_name
+      const playerNameParts = (player.full_name || '').trim().split(/\s+/).filter(Boolean)
+
       return {
         id: player.id,
-        first_name: player.first_name || '',
-        last_name: player.last_name || '',
+        first_name: playerNameParts[0] || '',
+        last_name: playerNameParts.slice(1).join(' '),
         full_name: player.full_name || '',
         status: player.status || 'pending',
         payment_status: player.payment_status || 'pending',
