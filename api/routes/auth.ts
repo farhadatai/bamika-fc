@@ -243,6 +243,128 @@ router.get('/coach-player-directory', async (req: Request, res: Response): Promi
   }
 })
 
+const requireUser = async (req: Request, res: Response) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+
+  if (!token) {
+    res.status(401).json({ error: 'Please log in again.' })
+    return null
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getUser(token)
+
+  if (authError || !authData.user) {
+    res.status(401).json({ error: 'Your session expired. Please log in again.' })
+    return null
+  }
+
+  return authData.user
+}
+
+// Lets a parent attach a birth certificate to a player they own after
+// registration. Finds the matching registrations row (or creates one for
+// legacy players that never got one) and stores the uploaded file path.
+router.post('/parent/birth-certificate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const user = await requireUser(req, res)
+    if (!user) return
+
+    if (!hasServiceRoleKey()) {
+      res.status(500).json({ error: 'Document uploads require the server service role key.' })
+      return
+    }
+
+    const playerId = String(req.body.player_id || '').trim()
+    const filePath = String(req.body.file_path || '').trim()
+
+    if (!playerId || !filePath) {
+      res.status(400).json({ error: 'Missing player or uploaded file.' })
+      return
+    }
+
+    // Uploads land in birth_certificates/<user id>/... — only accept paths in
+    // the caller's own folder so one parent can't reference another's file.
+    if (!filePath.startsWith(`${user.id}/`) || filePath.includes('..')) {
+      res.status(400).json({ error: 'Invalid document path.' })
+      return
+    }
+
+    const { data: player, error: playerError } = await supabase
+      .from('players')
+      .select('id, parent_id, full_name, status, payment_status')
+      .eq('id', playerId)
+      .single()
+
+    if (playerError || !player) {
+      res.status(404).json({ error: 'Player not found.' })
+      return
+    }
+
+    if (String(player.parent_id) !== String(user.id)) {
+      res.status(403).json({ error: 'You can only upload documents for your own players.' })
+      return
+    }
+
+    const nameParts = String(player.full_name || '').trim().split(/\s+/).filter(Boolean)
+    const playerFirst = (nameParts[0] || '').toLowerCase()
+    const playerLast = nameParts.slice(1).join(' ').toLowerCase()
+
+    const { data: registrations, error: registrationsError } = await supabase
+      .from('registrations')
+      .select('id, player_id, checkout_player_id, first_name, last_name, created_at')
+      .eq('parent_id', user.id)
+      .order('created_at', { ascending: false })
+
+    if (registrationsError) {
+      res.status(500).json({ error: registrationsError.message || 'Unable to load registrations.' })
+      return
+    }
+
+    const registration = (registrations || []).find((row) => (
+      String(row.player_id || '') === String(player.id)
+      || String(row.checkout_player_id || '') === String(player.id)
+      || (
+        (row.first_name || '').trim().toLowerCase() === playerFirst
+        && (row.last_name || '').trim().toLowerCase() === playerLast
+      )
+    ))
+
+    if (registration) {
+      const { error: updateError } = await supabase
+        .from('registrations')
+        .update({ birth_cert_path: filePath })
+        .eq('id', registration.id)
+
+      if (updateError) {
+        res.status(500).json({ error: updateError.message || 'Unable to save the document.' })
+        return
+      }
+    } else {
+      const { error: insertError } = await supabase
+        .from('registrations')
+        .insert({
+          parent_id: user.id,
+          player_id: player.id,
+          first_name: nameParts[0] || 'Player',
+          last_name: nameParts.slice(1).join(' '),
+          birth_cert_path: filePath,
+          status: player.status || 'active',
+          payment_status: player.payment_status || 'pending',
+        })
+
+      if (insertError) {
+        res.status(500).json({ error: insertError.message || 'Unable to save the document.' })
+        return
+      }
+    }
+
+    res.status(200).json({ message: 'Birth certificate saved.' })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to save the document.'
+    res.status(500).json({ error: message })
+  }
+})
+
 router.post('/invite-coach', async (req: Request, res: Response): Promise<void> => {
   try {
     if (!hasServiceRoleKey()) {

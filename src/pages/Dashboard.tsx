@@ -50,6 +50,15 @@ interface PlayerSummary {
   uniform_confirmation_code?: string | null;
 }
 
+interface ParentRegistration {
+  id: string;
+  player_id?: string | null;
+  checkout_player_id?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  birth_cert_path?: string | null;
+}
+
 interface ScheduleItem {
   id: string;
   title: string;
@@ -153,6 +162,21 @@ const parseCoachMessage = (body = '') => {
   };
 };
 
+const findRegistrationForPlayer = (registrations: ParentRegistration[], player: PlayerSummary) => {
+  const nameParts = getPlayerName(player).trim().split(/\s+/).filter(Boolean);
+  const first = (player.first_name || nameParts[0] || '').trim().toLowerCase();
+  const last = (player.last_name || nameParts.slice(1).join(' ')).trim().toLowerCase();
+
+  return registrations.find((registration) => (
+    registration.player_id === player.id
+    || registration.checkout_player_id === player.id
+    || (
+      (registration.first_name || '').trim().toLowerCase() === first
+      && (registration.last_name || '').trim().toLowerCase() === last
+    )
+  ));
+};
+
 const getProfileFirstName = (profile?: ProfileSummary | null, email?: string | null, metadata?: Record<string, unknown>) => {
   const firstName = profile?.first_name?.trim();
   if (firstName) return firstName;
@@ -191,6 +215,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [payLoadingId, setPayLoadingId] = useState<string | null>(null);
   const [payError, setPayError] = useState('');
+  const [registrations, setRegistrations] = useState<ParentRegistration[]>([]);
+  const [certUploadingId, setCertUploadingId] = useState<string | null>(null);
+  const [certNotices, setCertNotices] = useState<Record<string, { ok: boolean; text: string }>>({});
 
   // Lets a parent start the monthly membership payment for a player who
   // registered but never finished the Stripe checkout. Reuses the same
@@ -232,6 +259,69 @@ export default function Dashboard() {
     } catch (err: unknown) {
       setPayError(err instanceof Error ? err.message : 'Could not start payment.');
       setPayLoadingId(null);
+    }
+  };
+
+  const playerHasBirthCert = (player: PlayerSummary) => {
+    const registration = findRegistrationForPlayer(registrations, player);
+    return !!registration?.birth_cert_path && registration.birth_cert_path !== 'not_provided';
+  };
+
+  const handleBirthCertUpload = async (player: PlayerSummary, file: File) => {
+    if (!user) return;
+    setCertNotices((current) => {
+      const next = { ...current };
+      delete next[player.id];
+      return next;
+    });
+    setCertUploadingId(player.id);
+
+    try {
+      const fileExt = file.name.split('.').pop() || 'pdf';
+      const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('birth_certificates')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw new Error('Could not upload the file. Please try again.');
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Please log in again.');
+
+      const response = await fetch('/api/auth/parent/birth-certificate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ player_id: player.id, file_path: filePath }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Could not save the document.');
+
+      setRegistrations((current) => {
+        const registration = findRegistrationForPlayer(current, player);
+        if (registration) {
+          return current.map((row) => (row.id === registration.id ? { ...row, birth_cert_path: filePath } : row));
+        }
+        return [...current, {
+          id: `local-${player.id}`,
+          player_id: player.id,
+          first_name: player.first_name,
+          last_name: player.last_name,
+          birth_cert_path: filePath,
+        }];
+      });
+      setCertNotices((current) => ({ ...current, [player.id]: { ok: true, text: 'Birth certificate uploaded. Thank you!' } }));
+    } catch (err: unknown) {
+      const text = err instanceof Error ? err.message : 'Could not save the document.';
+      setCertNotices((current) => ({ ...current, [player.id]: { ok: false, text } }));
+    } finally {
+      setCertUploadingId(null);
     }
   };
 
@@ -335,6 +425,19 @@ export default function Dashboard() {
           console.warn('Uniform orders unavailable:', uniformError);
         } else {
           parentUniformOrders = uniformData || [];
+        }
+
+        const { data: registrationData, error: registrationError } = await supabase
+          .from('registrations')
+          .select('id, player_id, checkout_player_id, first_name, last_name, birth_cert_path')
+          .eq('parent_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (registrationError) {
+          console.warn('Registrations unavailable for document status:', registrationError);
+          setRegistrations([]);
+        } else {
+          setRegistrations(registrationData || []);
         }
 
         const teams = [...new Set(basePlayers.map((player) => player.team_assigned).filter((team) => team && team !== 'Unassigned'))];
@@ -799,6 +902,36 @@ export default function Dashboard() {
                           )}
                         </div>
                       )}
+
+                      <div className="mt-3 rounded-lg border border-gray-800 bg-neutral-950 p-3">
+                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Birth Certificate</div>
+                        {playerHasBirthCert(player) ? (
+                          <div className="mt-1 text-xs font-black uppercase text-green-300">On file</div>
+                        ) : (
+                          <>
+                            <div className="mt-1 text-xs font-bold text-yellow-200">Not uploaded yet — needed for league rosters.</div>
+                            <label className={`mt-2 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-700 px-3 py-2 text-[10px] font-black uppercase text-gray-300 transition hover:border-[#D4AF37] hover:text-white ${certUploadingId === player.id ? 'pointer-events-none opacity-60' : ''}`}>
+                              {certUploadingId === player.id ? 'Uploading...' : 'Upload birth certificate'}
+                              <input
+                                type="file"
+                                accept="image/*,.pdf"
+                                className="hidden"
+                                disabled={certUploadingId === player.id}
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0];
+                                  if (file) handleBirthCertUpload(player, file);
+                                  event.target.value = '';
+                                }}
+                              />
+                            </label>
+                          </>
+                        )}
+                        {certNotices[player.id] && (
+                          <p className={`mt-2 text-[11px] font-bold ${certNotices[player.id].ok ? 'text-green-300' : 'text-red-300'}`}>
+                            {certNotices[player.id].text}
+                          </p>
+                        )}
+                      </div>
 
                       <div className="mt-3 rounded-lg border border-gray-800 bg-neutral-950 p-3">
                         <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Uniform</div>

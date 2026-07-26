@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express'
 import Stripe from 'stripe'
 import { supabase } from '../lib/supabase.js'
+import { runPaymentReminders } from '../lib/reminders.js'
 
 const router = Router()
 
@@ -42,6 +43,20 @@ const requireAdmin = async (req: Request, res: Response) => {
 
   return authData.user
 }
+
+// Lets an admin preview or send the pending-dues reminder emails on demand
+// (the weekly Vercel cron hits the same logic via /api/cron/payment-reminders).
+router.post('/payment-reminders', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+
+    const summary = await runPaymentReminders({ dryRun: Boolean(req.body?.dryRun) })
+    res.status(200).json(summary)
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
 
 const storagePathFromPublicUrl = (url?: string | null) => {
   if (!url) return null

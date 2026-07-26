@@ -832,12 +832,45 @@ router.post('/admin/billing/move-to-25', async (req, res): Promise<void> => {
 
 router.post('/create-portal-session', async (req, res) => {
   try {
+    // Requires a login, and the requested Stripe customer must belong to the
+    // caller. Without this an attacker who guessed a cus_... id could open
+    // another family's billing portal (invoices, card details, cancellation).
+    const portalUser = await requireUser(req, res)
+    if (!portalUser) return
+
     const { customerId } = req.body;
     const stripe = getStripeClient()
 
     if (!customerId) {
       res.status(400).json({ error: 'Missing Stripe customer id.' })
       return
+    }
+
+    const { data: callerProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', portalUser.id)
+      .single()
+
+    if (callerProfile?.role !== 'admin') {
+      const { data: ownedPlayers } = await supabase
+        .from('players')
+        .select('id')
+        .eq('parent_id', portalUser.id)
+        .eq('stripe_customer_id', customerId)
+        .limit(1)
+
+      const { data: ownedRegistrations } = await supabase
+        .from('registrations')
+        .select('id')
+        .eq('parent_id', portalUser.id)
+        .eq('stripe_customer_id', customerId)
+        .limit(1)
+
+      if (!ownedPlayers?.length && !ownedRegistrations?.length) {
+        res.status(403).json({ error: 'This billing account is not linked to your family.' })
+        return
+      }
     }
 
     const baseUrl = getSiteBaseUrl(req);

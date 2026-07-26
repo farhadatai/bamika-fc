@@ -21,6 +21,7 @@ import LiveStream from './pages/LiveStream'
 import ParentDetailView from './pages/ParentDetailView'
 import CoachSetupPassword from './pages/CoachSetupPassword'
 import ParentSetupPassword from './pages/ParentSetupPassword'
+import ResetPassword from './pages/ResetPassword'
 
 const isMissingProfileColumnError = (message?: string) => (
   !!message
@@ -51,10 +52,20 @@ function App() {
 
       if ((role === 'coach' || metadataRole === 'coach') && isInviteReturn && window.location.pathname !== '/coach/setup-password') {
         navigate('/coach/setup-password', { replace: true })
+        return
       }
 
       if (invitedByCoach && isInviteReturn && window.location.pathname !== '/parent/setup-password') {
         navigate('/parent/setup-password', { replace: true })
+        return
+      }
+
+      // Regular parents arriving from a "forgot password" recovery email:
+      // send them to the reset form instead of dropping them on the homepage.
+      const isRecoveryReturn = authReturn.includes('type=recovery')
+      const onPasswordPage = ['/reset-password', '/coach/setup-password', '/parent/setup-password'].includes(window.location.pathname)
+      if (isRecoveryReturn && !onPasswordPage) {
+        navigate('/reset-password', { replace: true })
       }
     }
 
@@ -129,8 +140,12 @@ function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
+
+      if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/reset-password') {
+        navigate('/reset-password', { replace: true })
+      }
 
       if (session?.user) {
         fetchRole(session.user)
@@ -183,6 +198,7 @@ function App() {
         <Route path="/live" element={<LiveStream />} />
         <Route path="/coach/setup-password" element={<CoachSetupPassword />} />
         <Route path="/parent/setup-password" element={<ParentSetupPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>

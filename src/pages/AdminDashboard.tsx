@@ -1385,6 +1385,29 @@ export default function AdminDashboard() {
     return result;
   };
 
+  const handleSendPaymentReminders = async (dryRun = true) => {
+    if (!dryRun && !window.confirm('Email every family that still has a pending membership payment? Run Preview first to see who will receive it.')) return;
+
+    try {
+      const result = await adminApiRequest('/api/admin/payment-reminders', {
+        method: 'POST',
+        body: JSON.stringify({ dryRun }),
+      });
+
+      const lines = (result.results || []).slice(0, 15).map((item) => (
+        `${item.email} - ${(item.players || []).join(', ')}${item.sent ? ' (sent)' : item.detail ? ` (${item.detail})` : ''}`
+      ));
+
+      const header = result.dryRun
+        ? (result.emailConfigured ? 'Preview only - no emails sent.' : 'Preview only - add RESEND_API_KEY in Vercel to actually send.')
+        : `Sent ${result.emailsSent} of ${result.families} reminder emails.`;
+
+      alert(`${header}\n\nPending players: ${result.pendingPlayers} across ${result.families} families${result.familiesMissingEmail ? ` (${result.familiesMissingEmail} without an email on file)` : ''}.${lines.length ? `\n\n${lines.join('\n')}` : ''}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to run payment reminders.');
+    }
+  };
+
   const handleMoveBillingTo25 = async (dryRun = true) => {
     if (!dryRun && !window.confirm('Update active Stripe subscriptions above $25/mo to $25/mo and apply a $25 customer credit when needed? Run Preview first if you have not already checked the list.')) return;
 
@@ -2174,6 +2197,25 @@ export default function AdminDashboard() {
                     <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-gray-500">
                       In GotSport, check "First row contains column headings" and choose "Comma" as the delimiter.
                     </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#D4AF37]/30 bg-[#D4AF37]/5 p-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h2 className="text-sm font-black uppercase italic text-white">Payment Reminders</h2>
+                    <p className="mt-1 text-xs leading-5 text-gray-400">
+                      Emails every family with a pending membership payment a link to finish setup. Also runs automatically every Saturday morning.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button onClick={() => handleSendPaymentReminders(true)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#D4AF37]/50 px-4 py-3 text-[10px] font-black uppercase text-[#D4AF37] hover:bg-[#D4AF37]/10">
+                      Preview Recipients
+                    </button>
+                    <button onClick={() => handleSendPaymentReminders(false)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#D4AF37] px-4 py-3 text-[10px] font-black uppercase text-black hover:bg-white">
+                      Send Reminders Now
+                    </button>
                   </div>
                 </div>
               </div>
