@@ -16,6 +16,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin': 'Admin | Bamika FC',
   '/coach': 'Coach Dashboard | Bamika FC',
   '/reset-password': 'Reset Password | Bamika FC',
+  '/team-builder': 'Teams & Lineups | Bamika FC',
   '/payment': 'Payment | Bamika FC',
 };
 

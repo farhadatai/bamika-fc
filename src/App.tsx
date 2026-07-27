@@ -22,6 +22,7 @@ import ParentDetailView from './pages/ParentDetailView'
 import CoachSetupPassword from './pages/CoachSetupPassword'
 import ParentSetupPassword from './pages/ParentSetupPassword'
 import ResetPassword from './pages/ResetPassword'
+import TeamBuilder from './pages/TeamBuilder'
 
 const isMissingProfileColumnError = (message?: string) => (
   !!message
@@ -207,6 +208,7 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/parent/:id" element={<ParentDetailView />} />
           <Route path="/coach" element={<CoachDashboard />} />
+          <Route path="/team-builder" element={<TeamBuilder />} />
           <Route path="/payment" element={<Payment />} />
         </Route>
       </Route>

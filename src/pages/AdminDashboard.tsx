@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone, Star, HandHeart, FileText, RefreshCw, Download, Search, Shirt } from 'lucide-react';
+import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone, Star, HandHeart, FileText, RefreshCw, Download, Search, Shirt, Grid3x3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { TEAM_OPTIONS, getYoutubeId, getYoutubeThumbnail } from '../lib/utils';
@@ -2103,10 +2103,16 @@ export default function AdminDashboard() {
               Manage families, coaches, rosters, matches, and training content from one place.
             </p>
           </div>
-          <button onClick={() => setIsOnboardModalOpen(true)} className="btn-primary inline-flex items-center justify-center gap-2 md:w-auto">
-            <Plus size={18} />
-            Onboard Coach
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button onClick={() => navigate('/team-builder')} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D4AF37]/50 px-4 py-3 text-xs font-black uppercase tracking-widest text-[#D4AF37] transition hover:bg-[#D4AF37]/10">
+              <Grid3x3 size={16} />
+              Teams & Lineups
+            </button>
+            <button onClick={() => setIsOnboardModalOpen(true)} className="btn-primary inline-flex items-center justify-center gap-2 md:w-auto">
+              <Plus size={18} />
+              Onboard Coach
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">

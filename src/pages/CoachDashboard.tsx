@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth';
 import { uploadPhoto } from '../lib/upload';
 import { useNavigate } from 'react-router-dom';
-import { Loader, Phone, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2, X, CreditCard, Target, Plus } from 'lucide-react';
+import { Loader, Phone, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2, X, CreditCard, Target, Plus, Grid3x3 } from 'lucide-react';
 
 interface Player {
   id: string;
@@ -489,6 +489,13 @@ export default function CoachDashboard() {
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <button
+            type="button"
+            onClick={() => navigate('/team-builder')}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#D4AF37]/50 px-4 py-3 text-sm font-black uppercase text-[#D4AF37] hover:bg-[#D4AF37]/10 sm:py-2"
+          >
+            <Grid3x3 size={17} /> Teams & Lineups
+          </button>
           <button
             type="button"
             onClick={() => navigate('/register-new-athlete')}
