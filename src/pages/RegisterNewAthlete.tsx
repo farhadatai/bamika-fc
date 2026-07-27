@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth';
+import { buildTeamPickContext, pickTeamForPlayer } from '../lib/teamAssignment';
 
 const steps = ['Athlete', 'Photo', 'Waiver', 'Payment'];
 const fieldClass = 'w-full rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-[#EF4444] focus:ring-2 focus:ring-[#EF4444]/20';
@@ -252,6 +253,21 @@ export default function RegisterNewAthlete() {
 
       const safeDob = normalizeBirthDate(formData.dob);
 
+      // Place the player straight onto the coached team for their age bracket
+      // so they are not left sitting in "Unassigned". An admin can move them
+      // afterwards from the roster.
+      let autoTeam = 'Unassigned';
+      try {
+        const [{ data: coachRows }, { data: rosterRows }] = await Promise.all([
+          supabase.from('coaches').select('team_id'),
+          supabase.from('players').select('team_assigned'),
+        ]);
+        const context = buildTeamPickContext(coachRows || [], rosterRows || []);
+        autoTeam = pickTeamForPlayer({ date_of_birth: safeDob }, context) || 'Unassigned';
+      } catch {
+        // Placement is a convenience; never block registration on it.
+      }
+
       const { data: newPlayer, error: playerError } = await supabase
         .from('players')
         .insert({
@@ -263,7 +279,7 @@ export default function RegisterNewAthlete() {
           jersey_size: formData.jerseySize,
           medical_conditions: formData.medicalConditions,
           photo_url: formData.photoUrl,
-          team_assigned: 'Unassigned',
+          team_assigned: autoTeam,
           jersey_number: '-',
           status: 'pending_payment',
           payment_status: 'pending',

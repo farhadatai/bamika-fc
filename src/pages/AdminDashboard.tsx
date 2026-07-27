@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone, Star, HandHeart, FileText, RefreshCw, Download, Search, Shirt, Grid3x3 } from 'lucide-react';
+import { Shield, X, Trash2, Plus, Mail, Upload, Play, ExternalLink, Megaphone, Star, HandHeart, FileText, RefreshCw, Download, Search, Shirt, Grid3x3, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { TEAM_OPTIONS, getYoutubeId, getYoutubeThumbnail } from '../lib/utils';
+import { PLAYER_POSITION_OPTIONS } from '../lib/formations';
+import { ROSTER_SORT_OPTIONS, sortRoster, type RosterSortKey } from '../lib/roster';
+import { buildTeamPickContext, pickTeamForPlayer } from '../lib/teamAssignment';
 import { uploadPhoto } from '../lib/upload';
 
 // --- ROW TYPES (Supabase query results) ---
@@ -258,7 +261,15 @@ const isMissingDrillSchemaError = (error) => {
   );
 };
 
-const POSITION_OPTIONS = ['TBD', 'Forward', 'Midfielder', 'Defender', 'Goalkeeper'];
+const PositionOptions = () => (
+  <>
+    {PLAYER_POSITION_OPTIONS.map((entry) => (
+      <optgroup key={entry.group} label={entry.group}>
+        {entry.options.map((position) => <option key={position} value={position}>{position}</option>)}
+      </optgroup>
+    ))}
+  </>
+);
 const JERSEY_SIZE_OPTIONS = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'S', 'M', 'L', 'XL', '2XL'];
 const getDrillVideoUrl = (drill) => drill?.video_url || drill?.youtube_url || '';
 
@@ -879,6 +890,7 @@ export default function AdminDashboard() {
   const [newSpotlight, setNewSpotlight] = useState(emptySpotlight);
   const [databaseNotice, setDatabaseNotice] = useState('');
   const [rosterSearch, setRosterSearch] = useState('');
+  const [rosterSort, setRosterSort] = useState<RosterSortKey>('name_asc');
   const [rosterPaymentFilter, setRosterPaymentFilter] = useState('all');
   const [rosterTeamFilter, setRosterTeamFilter] = useState('all');
   const [rosterDocFilter, setRosterDocFilter] = useState('all');
@@ -1257,6 +1269,56 @@ export default function AdminDashboard() {
       }
       alert(error.message);
     }
+  };
+
+  // Places every unassigned player onto the coached team for their age
+  // bracket. Ages come from date of birth, so players missing one are skipped
+  // and reported back to the admin.
+  const handleAutoAssignTeams = async () => {
+    const context = buildTeamPickContext(data.coaches || [], data.roster || []);
+    const unassigned = (data.roster || []).filter((player) => {
+      const team = String(player.team_assigned || '').trim();
+      return !team || team === 'Unassigned';
+    });
+
+    if (unassigned.length === 0) {
+      alert('Every player already has a team.');
+      return;
+    }
+
+    const planned = [];
+    const skipped = [];
+
+    unassigned.forEach((player) => {
+      const team = pickTeamForPlayer(player, context);
+      if (team) {
+        planned.push({ player, team });
+        // Keep counts current so squads fill evenly across this run.
+        context.teamCounts[team] = (context.teamCounts[team] ?? 0) + 1;
+      } else {
+        skipped.push(getPlayerDisplayName(player));
+      }
+    });
+
+    if (planned.length === 0) {
+      alert(`No players could be placed automatically. ${skipped.length} player(s) have no date of birth on file.`);
+      return;
+    }
+
+    const preview = planned.slice(0, 12).map((entry) => `${getPlayerDisplayName(entry.player)} -> ${entry.team}`).join('\n');
+    const confirmMessage = `Assign ${planned.length} player(s) to a team by age?\n\n${preview}${planned.length > 12 ? `\n...and ${planned.length - 12} more` : ''}${skipped.length ? `\n\nSkipped (no date of birth): ${skipped.length}` : ''}`;
+    if (!window.confirm(confirmMessage)) return;
+
+    let assigned = 0;
+    let failed = 0;
+    for (const entry of planned) {
+      const { error } = await supabase.from('players').update({ team_assigned: entry.team }).eq('id', entry.player.id);
+      if (error) failed += 1;
+      else assigned += 1;
+    }
+
+    alert(`Assigned ${assigned} player(s).${failed ? ` ${failed} could not be updated.` : ''}${skipped.length ? ` ${skipped.length} skipped for missing date of birth.` : ''}`);
+    fetchData();
   };
 
   const handleAssignPlayerTeam = async (playerId, teamId) => {
@@ -2021,7 +2083,12 @@ export default function AdminDashboard() {
     { label: 'Sponsor Requests', value: data.sponsorRequests.length },
     { label: 'Uniform Orders', value: data.uniformOrders.length },
   ];
-  const sortedRoster = [...data.roster].sort((a, b) => getPlayerDisplayName(a).localeCompare(getPlayerDisplayName(b)));
+  const sortedRoster = sortRoster(data.roster, rosterSort, (player) => ({
+    name: getPlayerDisplayName(player),
+    dateOfBirth: player.date_of_birth,
+    team: player.team_assigned,
+    position: player.position,
+  }));
   const paymentSummary = data.roster.reduce((summary, player) => {
     const registration = getRegistrationForPlayer(player, data.registrations);
     const status = String(player.payment_status || registration?.payment_status || 'pending').toLowerCase();
@@ -2397,9 +2464,18 @@ export default function AdminDashboard() {
                   <h2 className="text-xl font-black uppercase italic text-white">Player Roster</h2>
                   <p className="text-sm text-gray-500">Track athletes, Stripe payment status, documents, teams, and parent contact.</p>
                 </div>
-                <span className="rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                  {filteredRoster.length} of {data.roster.length} players
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAutoAssignTeams}
+                    className="inline-flex items-center gap-2 rounded-lg border border-[#D4AF37]/50 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                  >
+                    <Users size={13} /> Auto-assign teams by age
+                  </button>
+                  <span className="rounded-full border border-gray-800 bg-black px-3 py-1 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                    {filteredRoster.length} of {data.roster.length} players
+                  </span>
+                </div>
               </div>
               <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {[
@@ -2416,7 +2492,7 @@ export default function AdminDashboard() {
                 ))}
               </div>
               <div className="mb-5 rounded-xl border border-gray-800 bg-black p-4">
-                <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr_auto]">
+                <div className="grid gap-3 lg:grid-cols-[1.3fr_0.8fr_0.8fr_0.8fr_0.9fr_auto]">
                   <label className="relative block">
                     <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
                     <input
@@ -2447,6 +2523,16 @@ export default function AdminDashboard() {
                     <option value="missing_waiver">Missing waiver</option>
                     <option value="complete_docs">Docs complete</option>
                   </select>
+                  <select
+                    value={rosterSort}
+                    onChange={(event) => setRosterSort(event.target.value as RosterSortKey)}
+                    aria-label="Sort roster"
+                    className="rounded-lg border border-gray-800 bg-neutral-950 px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]"
+                  >
+                    {ROSTER_SORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>Sort: {option.label}</option>
+                    ))}
+                  </select>
                   <button
                     type="button"
                     onClick={() => {
@@ -2454,6 +2540,7 @@ export default function AdminDashboard() {
                       setRosterPaymentFilter('all');
                       setRosterTeamFilter('all');
                       setRosterDocFilter('all');
+                      setRosterSort('name_asc');
                     }}
                     className="rounded-lg border border-gray-800 px-4 py-3 text-xs font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]"
                   >
@@ -2491,7 +2578,6 @@ export default function AdminDashboard() {
                 const linkedParent =
                   getLinkedParent(p);
                 const playerName = getPlayerDisplayName(p);
-                const isInactive = ['inactive', 'cancelled', 'canceled'].includes((p.status || '').toLowerCase());
                 const registration = getRegistrationForPlayer(p, data.registrations);
                 const paymentStatus = p.payment_status || registration?.payment_status || 'Pending';
                 const rosterStatus = p.status || registration?.status || 'pending';
@@ -3183,7 +3269,7 @@ export default function AdminDashboard() {
                         <label className="block">
                           <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</span>
                           <select value={p.position || 'TBD'} onChange={(e) => handleUpdatePlayer(p.id, { position: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-[#EF4444]">
-                            {POSITION_OPTIONS.map((position) => <option key={position} value={position}>{position}</option>)}
+                            <PositionOptions />
                           </select>
                         </label>
                         <label className="block">

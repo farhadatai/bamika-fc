@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth';
 import { uploadPhoto } from '../lib/upload';
 import { useNavigate } from 'react-router-dom';
 import { Loader, Phone, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2, X, CreditCard, Target, Plus, Grid3x3 } from 'lucide-react';
+import { PLAYER_POSITION_OPTIONS } from '../lib/formations';
+import { ROSTER_SORT_OPTIONS, sortRoster, type RosterSortKey } from '../lib/roster';
 
 interface Player {
   id: string;
@@ -33,23 +35,19 @@ interface PlayerRow extends Omit<Player, 'dob' | 'profiles'> {
   profiles?: Player['profiles'];
 }
 
-interface ClubPlayerSummary {
-  id: string;
-  first_name?: string;
-  last_name?: string;
-  full_name?: string;
-  status: string;
-  payment_status: string;
-  team_assigned: string;
-  created_at?: string | null;
-  parent_name: string;
-}
-
 const getPlayerName = (player: Pick<Player, 'first_name' | 'last_name' | 'full_name'>) => (
   `${player.first_name || ''} ${player.last_name || ''}`.trim() || player.full_name || 'Bamika Player'
 );
 
-const POSITION_OPTIONS = ['TBD', 'Forward', 'Midfielder', 'Defender', 'Goalkeeper'];
+const PositionOptions = () => (
+  <>
+    {PLAYER_POSITION_OPTIONS.map((entry) => (
+      <optgroup key={entry.group} label={entry.group}>
+        {entry.options.map((position) => <option key={position} value={position}>{position}</option>)}
+      </optgroup>
+    ))}
+  </>
+);
 const JERSEY_SIZE_OPTIONS = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'S', 'M', 'L', 'XL', '2XL'];
 const COACH_MESSAGE_PREFIX = '__BAMIKA_COACH__:';
 
@@ -121,22 +119,11 @@ const emptyCoachPlayerInvite = {
   parent_phone: '',
 };
 
-const getClubRegistrationStatus = (player: ClubPlayerSummary): 'active' | 'inactive' | 'pending' => {
-  const status = String(player.status || '').toLowerCase();
-  const paymentStatus = String(player.payment_status || '').toLowerCase();
-  if (['inactive', 'cancelled', 'canceled', 'paused'].includes(status)) return 'inactive';
-  if (status === 'active' || ['paid', 'active', 'waived'].includes(paymentStatus)) return 'active';
-  return 'pending';
-};
-
 export default function CoachDashboard() {
   const { user, userRole } = useAuthStore();
   const navigate = useNavigate();
   const [players, setPlayers] = useState<Player[]>([]);
-  const [clubPlayers, setClubPlayers] = useState<ClubPlayerSummary[]>([]);
-  const [clubSearch, setClubSearch] = useState('');
-  const [clubStatusFilter, setClubStatusFilter] = useState('all');
-  const [directoryError, setDirectoryError] = useState('');
+  const [teamSort, setTeamSort] = useState<RosterSortKey>('name_asc');
   const [games, setGames] = useState<Game[]>([]);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [teamAnnouncements, setTeamAnnouncements] = useState<Announcement[]>([]);
@@ -213,27 +200,6 @@ export default function CoachDashboard() {
     setError(null);
     try {
       if (!user) return;
-
-      setDirectoryError('');
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-
-      if (!token) {
-        setClubPlayers([]);
-        setDirectoryError('Please log in again to view club registrations.');
-      } else {
-        const directoryResponse = await fetch('/api/auth/coach-player-directory', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const directoryResult = await directoryResponse.json().catch(() => ({}));
-
-        if (directoryResponse.ok) {
-          setClubPlayers(Array.isArray(directoryResult.players) ? directoryResult.players : []);
-        } else {
-          setClubPlayers([]);
-          setDirectoryError(directoryResult.error || 'Club registrations could not be loaded.');
-        }
-      }
 
       // 1. Get the coach's team_id
       const { data: coachData, error: coachError } = await supabase
@@ -439,23 +405,12 @@ export default function CoachDashboard() {
   const selectedPlayerMessages = selectedPlayer
     ? teamAnnouncements.filter((announcement) => announcement.audience === 'player' && announcement.player_id === selectedPlayer.id)
     : [];
-  const clubRegistrationStats = clubPlayers.reduce((stats, player) => {
-    stats.total += 1;
-    stats[getClubRegistrationStatus(player)] += 1;
-    return stats;
-  }, { total: 0, active: 0, inactive: 0, pending: 0 });
-  const filteredClubPlayers = clubPlayers.filter((player) => {
-    const status = getClubRegistrationStatus(player);
-    const searchTarget = [
-      getPlayerName(player),
-      player.parent_name,
-      player.team_assigned,
-      status,
-      player.payment_status,
-    ].filter(Boolean).join(' ').toLowerCase();
-    return (clubStatusFilter === 'all' || status === clubStatusFilter)
-      && (!clubSearch.trim() || searchTarget.includes(clubSearch.trim().toLowerCase()));
-  });
+  const sortedTeamPlayers = sortRoster(players, teamSort, (player) => ({
+    name: getPlayerName(player),
+    dateOfBirth: player.dob,
+    team: player.team_assigned,
+    position: player.position,
+  }));
 
   if (loading) {
     return (
@@ -575,99 +530,19 @@ export default function CoachDashboard() {
         </div>
       )}
 
-      <section className="rounded-2xl border border-blue-500/30 bg-neutral-950 p-5 sm:p-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      {/* The club-wide roster now lives on the shared dashboard so this tab
+          stays focused on the coach's own team. */}
+      <section className="rounded-2xl border border-blue-500/30 bg-neutral-950 p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-blue-300">Limited coach access</div>
-            <h2 className="mt-2 text-xl font-black uppercase italic text-white">Club Registration Overview</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
-              View every registered player, their parent name, team, and active status. Addresses, medical details, documents, and other private information stay hidden.
-            </p>
+            <div className="text-[10px] font-black uppercase tracking-widest text-blue-300">Club overview</div>
+            <h2 className="mt-1 text-lg font-black uppercase italic text-white">Looking for every registered player?</h2>
+            <p className="mt-1 text-sm text-gray-400">The full club roster, with search and sorting, is on your dashboard.</p>
           </div>
-          <button type="button" onClick={() => navigate('/register-new-athlete')} className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-400/50 px-4 py-3 text-xs font-black uppercase text-blue-100 hover:bg-blue-500/10">
-            <Plus size={15} /> Register My Child
+          <button type="button" onClick={() => navigate('/dashboard')} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-400/50 px-4 py-3 text-xs font-black uppercase text-blue-100 hover:bg-blue-500/10">
+            Open Club Roster
           </button>
         </div>
-
-        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {[
-            { label: 'Registered', value: clubRegistrationStats.total, color: 'text-white' },
-            { label: 'Active', value: clubRegistrationStats.active, color: 'text-green-300' },
-            { label: 'Pending', value: clubRegistrationStats.pending, color: 'text-yellow-200' },
-            { label: 'Inactive', value: clubRegistrationStats.inactive, color: 'text-gray-300' },
-          ].map((stat) => (
-            <div key={stat.label} className="rounded-xl border border-gray-800 bg-black p-4">
-              <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">{stat.label}</div>
-              <div className={`mt-2 text-2xl font-black ${stat.color}`}>{stat.value}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]">
-          <input aria-label="Search club registrations" value={clubSearch} onChange={(event) => setClubSearch(event.target.value)} placeholder="Search player, parent, or team" className="input-primary" />
-          <select aria-label="Filter club registrations by status" value={clubStatusFilter} onChange={(event) => setClubStatusFilter(event.target.value)} className="input-primary">
-            <option value="all">All statuses</option>
-            <option value="active">Active</option>
-            <option value="pending">Pending</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
-
-        {directoryError ? (
-          <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-bold text-red-200">{directoryError}</div>
-        ) : filteredClubPlayers.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-dashed border-gray-800 bg-black p-6 text-center text-sm text-gray-500">No registrations match this filter.</div>
-        ) : (
-          <>
-            <div className="mt-4 space-y-3 lg:hidden">
-              {filteredClubPlayers.map((player) => {
-                const status = getClubRegistrationStatus(player);
-                return (
-                  <article key={player.id} className="rounded-xl border border-gray-800 bg-black p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-black uppercase italic text-white">{getPlayerName(player)}</h3>
-                        <p className="mt-1 text-xs text-gray-500">Parent: {player.parent_name}</p>
-                      </div>
-                      <span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-widest ${getRosterStatusClass(status)}`}>{status}</span>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between text-xs font-bold text-gray-500">
-                      <span>{player.team_assigned}</span>
-                      <span>{player.created_at ? new Date(player.created_at).toLocaleDateString() : 'Date unavailable'}</span>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-            <div className="mt-4 hidden overflow-x-auto rounded-xl border border-gray-800 bg-black lg:block">
-              <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="border-b border-gray-800 bg-neutral-950 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                  <tr>
-                    <th className="px-4 py-3">Player</th>
-                    <th className="px-4 py-3">Parent</th>
-                    <th className="px-4 py-3">Team</th>
-                    <th className="px-4 py-3">Registered</th>
-                    <th className="px-4 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-900">
-                  {filteredClubPlayers.map((player) => {
-                    const status = getClubRegistrationStatus(player);
-                    return (
-                      <tr key={player.id}>
-                        <td className="px-4 py-3 font-black uppercase italic text-white">{getPlayerName(player)}</td>
-                        <td className="px-4 py-3 font-bold text-gray-300">{player.parent_name}</td>
-                        <td className="px-4 py-3 text-gray-400">{player.team_assigned}</td>
-                        <td className="px-4 py-3 text-gray-400">{player.created_at ? new Date(player.created_at).toLocaleDateString() : 'Unavailable'}</td>
-                        <td className="px-4 py-3"><span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-widest ${getRosterStatusClass(status)}`}>{status}</span></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
       </section>
 
       {!teamId && (
@@ -807,14 +682,26 @@ export default function CoachDashboard() {
             </div>
             <div className="flex flex-col gap-2 sm:items-end">
               <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">{players.length} players</div>
-              <button
-                type="button"
-                onClick={() => setShowAddPlayer(true)}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700 sm:py-2"
-              >
-                <Plus size={15} />
-                Add Player
-              </button>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <select
+                  value={teamSort}
+                  onChange={(event) => setTeamSort(event.target.value as RosterSortKey)}
+                  aria-label="Sort team roster"
+                  className="rounded-lg border border-gray-800 bg-neutral-950 px-3 py-3 text-xs font-bold text-white outline-none focus:border-[#D4AF37] sm:py-2"
+                >
+                  {ROSTER_SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>Sort: {option.label}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowAddPlayer(true)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700 sm:py-2"
+                >
+                  <Plus size={15} />
+                  Add Player
+                </button>
+              </div>
             </div>
           </div>
 
@@ -825,7 +712,7 @@ export default function CoachDashboard() {
           ) : (
             <>
             <div className="space-y-3 lg:hidden">
-              {players.map((player) => (
+              {sortedTeamPlayers.map((player) => (
                 <article key={player.id} className="rounded-xl border border-gray-800 bg-black p-4">
                   <button type="button" onClick={() => setSelectedPlayer(player)} className="flex w-full items-center gap-3 text-left">
                     {player.photo_url ? (
@@ -850,7 +737,7 @@ export default function CoachDashboard() {
                     <label className="block">
                       <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</span>
                       <select value={player.position || 'TBD'} onChange={(e) => handleUpdatePlayer(player.id, { position: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
-                        {POSITION_OPTIONS.map((position) => <option key={position} value={position}>{position}</option>)}
+                        <PositionOptions />
                       </select>
                     </label>
                     <label className="block">
@@ -904,7 +791,7 @@ export default function CoachDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-900">
-                  {players.map((player) => (
+                  {sortedTeamPlayers.map((player) => (
                     <tr key={player.id} className="align-middle hover:bg-neutral-950/80">
                       <td className="px-4 py-3">
                         <button type="button" onClick={() => setSelectedPlayer(player)} className="flex items-center gap-3 text-left">
@@ -930,7 +817,7 @@ export default function CoachDashboard() {
                       </td>
                       <td className="px-4 py-3">
                         <select value={player.position || 'TBD'} onChange={(e) => handleUpdatePlayer(player.id, { position: e.target.value })} className="w-32 rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
-                          {POSITION_OPTIONS.map((position) => <option key={position} value={position}>{position}</option>)}
+                          <PositionOptions />
                         </select>
                       </td>
                       <td className="px-4 py-3">
@@ -991,7 +878,7 @@ export default function CoachDashboard() {
                   <input required value={newPlayerInvite.player_last_name} placeholder="Player last name" className="input-primary" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, player_last_name: e.target.value })} />
                   <input required type="date" value={newPlayerInvite.date_of_birth} className="input-primary" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, date_of_birth: e.target.value })} />
                   <select value={newPlayerInvite.position} className="input-primary" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, position: e.target.value })}>
-                    {POSITION_OPTIONS.map((position) => <option key={position} value={position}>{position}</option>)}
+                    <PositionOptions />
                   </select>
                   <select value={newPlayerInvite.jersey_size} className="input-primary sm:col-span-2" onChange={(e) => setNewPlayerInvite({ ...newPlayerInvite, jersey_size: e.target.value })}>
                     {JERSEY_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}

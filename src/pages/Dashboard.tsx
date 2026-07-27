@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
+import ClubRegistrationOverview from '../components/ClubRegistrationOverview';
 
 interface Announcement {
   id: string;
@@ -819,6 +820,10 @@ export default function Dashboard() {
             {addressMessage && <p className="mt-3 text-sm font-bold text-green-300">{addressMessage}</p>}
           </section>
         )}
+
+        {/* Staff see the club-wide roster here; the coach tab stays focused on
+            their own team. */}
+        {(isCoach || isAdmin) && <ClubRegistrationOverview />}
 
         <div className={`grid gap-6 ${isParent ? 'lg:grid-cols-[1.1fr_0.9fr]' : 'lg:grid-cols-1'}`}>
           {isParent && (

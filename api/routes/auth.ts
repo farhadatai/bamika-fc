@@ -97,6 +97,8 @@ interface CoachDirectoryPlayerRecord {
   first_name?: string | null
   last_name?: string | null
   full_name?: string | null
+  date_of_birth?: string | null
+  position?: string | null
   status?: string | null
   payment_status?: string | null
   team_assigned?: string | null
@@ -206,7 +208,7 @@ router.get('/coach-player-directory', async (req: Request, res: Response): Promi
 
     const { data: players, error } = await supabase
       .from('players')
-      .select('id, full_name, status, payment_status, team_assigned, created_at, profiles:parent_id(first_name, last_name, full_name)')
+      .select('id, full_name, date_of_birth, position, status, payment_status, team_assigned, created_at, profiles:parent_id(first_name, last_name, full_name)')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -228,6 +230,10 @@ router.get('/coach-player-directory', async (req: Request, res: Response): Promi
         first_name: playerNameParts[0] || '',
         last_name: playerNameParts.slice(1).join(' '),
         full_name: player.full_name || '',
+        // Coaches need age to sort and group squads; other private details
+        // (address, medical notes, documents) stay excluded.
+        date_of_birth: player.date_of_birth || null,
+        position: player.position || 'TBD',
         status: player.status || 'pending',
         payment_status: player.payment_status || 'pending',
         team_assigned: player.team_assigned || 'Unassigned',

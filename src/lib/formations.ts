@@ -449,6 +449,41 @@ export const FORMATIONS: Formation[] = [
   },
 ];
 
+// Position choices for the roster dropdowns. The first five values are the
+// originals, kept verbatim so existing player records stay valid; the rest add
+// the specific roles used by the formation board.
+export const PLAYER_POSITION_OPTIONS: Array<{ group: string; options: string[] }> = [
+  { group: 'General', options: ['TBD', 'Goalkeeper', 'Defender', 'Midfielder', 'Forward'] },
+  { group: 'Defense', options: ['Center Back', 'Left Back', 'Right Back', 'Wing Back', 'Sweeper'] },
+  { group: 'Midfield', options: ['Defensive Midfielder', 'Center Midfielder', 'Attacking Midfielder', 'Left Midfielder', 'Right Midfielder'] },
+  { group: 'Attack', options: ['Left Winger', 'Right Winger', 'Striker', 'Center Forward'] },
+];
+
+export const ALL_PLAYER_POSITIONS = PLAYER_POSITION_OPTIONS.flatMap((entry) => entry.options);
+
+// Maps a roster position label to the formation slot codes it can fill, so the
+// lineup builder can suggest players who already play that role.
+export const POSITION_LABEL_TO_CODES: Record<string, string[]> = {
+  Goalkeeper: ['GK'],
+  Defender: ['CB', 'LB', 'RB', 'LWB', 'RWB', 'SW', 'D'],
+  'Center Back': ['CB', 'D'],
+  'Left Back': ['LB', 'LWB', 'D'],
+  'Right Back': ['RB', 'RWB', 'D'],
+  'Wing Back': ['LWB', 'RWB', 'LB', 'RB'],
+  Sweeper: ['SW', 'CB'],
+  Midfielder: ['CM', 'CDM', 'CAM', 'LM', 'RM', 'M'],
+  'Defensive Midfielder': ['CDM', 'CM', 'M'],
+  'Center Midfielder': ['CM', 'CDM', 'CAM', 'M'],
+  'Attacking Midfielder': ['CAM', 'CM', 'M'],
+  'Left Midfielder': ['LM', 'LW', 'M'],
+  'Right Midfielder': ['RM', 'RW', 'M'],
+  Forward: ['ST', 'CF', 'LW', 'RW', 'F'],
+  'Left Winger': ['LW', 'LM', 'F'],
+  'Right Winger': ['RW', 'RM', 'F'],
+  Striker: ['ST', 'CF', 'F'],
+  'Center Forward': ['CF', 'ST', 'F'],
+};
+
 export const TEAM_COLORS = [
   { id: 'red', label: 'Red', hex: '#EF4444', text: '#FFFFFF' },
   { id: 'gold', label: 'Gold', hex: '#D4AF37', text: '#000000' },

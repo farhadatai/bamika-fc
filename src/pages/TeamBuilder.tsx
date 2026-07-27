@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Grid3x3, Plus, Printer, Save, Trash2, Users, X } from 'lucide-react';
+import { ClipboardCopy, ExternalLink, Grid3x3, Plus, Printer, Save, Trash2, Users, X } from 'lucide-react';
 import { useAuthStore } from '../store/auth';
 import { supabase } from '../lib/supabase';
 import SoccerField, { type FieldPlayer } from '../components/SoccerField';
+// Bundled straight from the migration file so the button always copies the
+// exact SQL that ships in the repo.
+import tournamentMigrationSql from '../../supabase/APPLY_TOURNAMENT_TEAMS.sql?raw';
 import {
   FORMATIONS,
   GAME_FORMATS,
@@ -89,6 +92,7 @@ export default function TeamBuilder() {
   const [view, setView] = useState<'lineups' | 'rosters'>('lineups');
   const [printMode, setPrintMode] = useState<'lineup' | 'roster' | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   // Roster print filters
   const [rosterAgeGroups, setRosterAgeGroups] = useState<string[]>([]);
@@ -428,8 +432,37 @@ export default function TeamBuilder() {
 
         {notice && (
           <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-100">
-            <div className="font-black uppercase tracking-widest text-yellow-300">Database update needed</div>
-            <p className="mt-1">{notice}</p>
+            <div className="font-black uppercase tracking-widest text-yellow-300">One-time database update needed</div>
+            <p className="mt-1">
+              Tournament teams need one database update before lineups can be saved. Copy the SQL below,
+              paste it into your Supabase SQL Editor, press Run, then refresh this page.
+              Printing rosters already works without it.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(tournamentMigrationSql);
+                    setCopiedSql(true);
+                    window.setTimeout(() => setCopiedSql(false), 2500);
+                  } catch {
+                    setError('Could not copy automatically. Open supabase/APPLY_TOURNAMENT_TEAMS.sql in the project and copy it manually.');
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-yellow-400 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-black hover:bg-white"
+              >
+                <ClipboardCopy size={14} /> {copiedSql ? 'Copied to clipboard' : 'Copy the SQL'}
+              </button>
+              <a
+                href="https://supabase.com/dashboard/project/cuopewflwcbzwpiezqkf/sql/new"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg border border-yellow-400/50 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-yellow-200 hover:bg-yellow-400/10"
+              >
+                Open Supabase SQL Editor <ExternalLink size={13} />
+              </a>
+            </div>
           </div>
         )}
         {error && (
@@ -814,7 +847,7 @@ export default function TeamBuilder() {
                   ))}
                 </tbody>
               </table>
-              <p className="print-foot">Coach signature: ____________________________　Date: ______________</p>
+              <p className="print-foot">Coach signature: ____________________________ Date: ______________</p>
             </section>
           ))}
         </div>
