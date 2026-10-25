@@ -1,5 +1,8 @@
 -- Bamika FC tournament hosting: public club registration (no account needed),
 -- admin approval, and per-team entries. Phase 1 = request + approve.
+-- Note: `tournament_teams` already belongs to the internal Teams & Lineups
+-- planner (APPLY_TOURNAMENT_TEAMS.sql), so visiting clubs' entries live in
+-- `tournament_club_teams`.
 -- Payments, rosters, schedule and live scores build on these same tables.
 
 create table if not exists public.tournaments (
@@ -36,7 +39,7 @@ create table if not exists public.tournament_clubs (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.tournament_teams (
+create table if not exists public.tournament_club_teams (
   id uuid primary key default gen_random_uuid(),
   club_id uuid not null references public.tournament_clubs(id) on delete cascade,
   division text not null,
@@ -49,11 +52,11 @@ create table if not exists public.tournament_teams (
 );
 
 create index if not exists tournament_clubs_tournament_idx on public.tournament_clubs(tournament_id, status);
-create index if not exists tournament_teams_club_idx on public.tournament_teams(club_id);
+create index if not exists tournament_club_teams_club_idx on public.tournament_club_teams(club_id);
 
 alter table public.tournaments enable row level security;
 alter table public.tournament_clubs enable row level security;
-alter table public.tournament_teams enable row level security;
+alter table public.tournament_club_teams enable row level security;
 
 -- Public (even logged-out) visitors may read tournament info for the /tournament page.
 grant select on public.tournaments to anon, authenticated;
@@ -64,14 +67,14 @@ create policy "tournaments_public_read" on public.tournaments
 -- Club requests and teams: written only through the API (service role). Admins
 -- manage them from the dashboard. Nobody else can read contact details.
 grant select, update, delete on public.tournament_clubs to authenticated;
-grant select, update, delete on public.tournament_teams to authenticated;
+grant select, update, delete on public.tournament_club_teams to authenticated;
 
 drop policy if exists "tournament_clubs_admin" on public.tournament_clubs;
 create policy "tournament_clubs_admin" on public.tournament_clubs
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
-drop policy if exists "tournament_teams_admin" on public.tournament_teams;
-create policy "tournament_teams_admin" on public.tournament_teams
+drop policy if exists "tournament_club_teams_admin" on public.tournament_club_teams;
+create policy "tournament_club_teams_admin" on public.tournament_club_teams
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
 drop policy if exists "tournaments_admin_write" on public.tournaments;

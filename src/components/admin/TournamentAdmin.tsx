@@ -35,7 +35,7 @@ interface ClubRow {
   notes: string | null
   status: 'pending' | 'approved' | 'declined'
   created_at: string
-  tournament_teams: TeamRow[]
+  tournament_club_teams: TeamRow[]
 }
 
 const formatMoney = (cents: number) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 0 })}`
@@ -78,7 +78,7 @@ export default function TournamentAdmin() {
 
     const { data: clubData, error: clubError } = await supabase
       .from('tournament_clubs')
-      .select('id, reference_code, club_name, contact_name, email, phone, city, notes, status, created_at, tournament_teams(id, division, team_name, group_label, payment_status)')
+      .select('id, reference_code, club_name, contact_name, email, phone, city, notes, status, created_at, tournament_club_teams(id, division, team_name, group_label, payment_status)')
       .order('created_at', { ascending: false })
 
     if (clubError) setLoadError(clubError.message)
@@ -93,8 +93,8 @@ export default function TournamentAdmin() {
     for (const club of clubs) {
       counts[club.status] += 1
       if (club.status !== 'declined') {
-        counts.teams += club.tournament_teams.length
-        counts.paidTeams += club.tournament_teams.filter((team) => team.payment_status === 'paid').length
+        counts.teams += club.tournament_club_teams.length
+        counts.paidTeams += club.tournament_club_teams.filter((team) => team.payment_status === 'paid').length
       }
     }
     return counts
@@ -104,7 +104,7 @@ export default function TournamentAdmin() {
     const map: Record<string, number> = {}
     for (const club of clubs) {
       if (club.status === 'declined') continue
-      for (const team of club.tournament_teams) map[team.division] = (map[team.division] || 0) + 1
+      for (const team of club.tournament_club_teams) map[team.division] = (map[team.division] || 0) + 1
     }
     return map
   }, [clubs])
@@ -229,7 +229,7 @@ export default function TournamentAdmin() {
         ) : (
           <div className="divide-y divide-gray-800">
             {visibleClubs.map((club) => {
-              const teamTotal = club.tournament_teams.length * tournament.team_fee_cents
+              const teamTotal = club.tournament_club_teams.length * tournament.team_fee_cents
               const busy = busyClubId === club.id
               return (
                 <div key={club.id} className="flex flex-col gap-4 p-5 lg:flex-row lg:items-start lg:justify-between">
@@ -246,7 +246,7 @@ export default function TournamentAdmin() {
                       {' · '}<a className="inline-flex items-center gap-1 text-[#D4AF37] hover:underline" href={`tel:${club.phone}`}><Phone size={12} />{club.phone}</a>
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {club.tournament_teams.map((team) => (
+                      {club.tournament_club_teams.map((team) => (
                         <span key={team.id} className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${team.payment_status === 'paid' ? 'border-green-500/40 bg-green-500/10 text-green-200' : 'border-gray-700 bg-black text-gray-200'}`}>
                           <span className="text-[#D4AF37]">{team.division}</span> {team.team_name}{team.group_label ? ` · Group ${team.group_label}` : ''}{team.payment_status === 'paid' ? ' · paid' : ''}
                         </span>
@@ -254,7 +254,7 @@ export default function TournamentAdmin() {
                     </div>
                     {club.notes && <p className="mt-3 border-l-2 border-gray-700 pl-3 text-sm italic text-gray-400">{club.notes}</p>}
                     <p className="mt-3 text-xs text-gray-500">
-                      Requested {new Date(club.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {club.tournament_teams.length} team{club.tournament_teams.length === 1 ? '' : 's'} · {formatMoney(teamTotal)} expected
+                      Requested {new Date(club.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {club.tournament_club_teams.length} team{club.tournament_club_teams.length === 1 ? '' : 's'} · {formatMoney(teamTotal)} expected
                     </p>
                   </div>
 

@@ -163,7 +163,7 @@ router.post('/register', registerLimiter, async (req: Request, res: Response): P
     if (!club) throw new Error('Could not generate a reference code. Please try again.')
 
     const { error: teamsError } = await supabase
-      .from('tournament_teams')
+      .from('tournament_club_teams')
       .insert(input.teams.map((team) => ({ club_id: club!.id, division: team.division, team_name: team.teamName })))
     if (teamsError) throw new Error(teamsError.message)
 
@@ -235,7 +235,7 @@ router.post('/admin/clubs/:id/status', async (req: Request, res: Response): Prom
 
     if (status !== 'pending') {
       const tournament = await getTournament()
-      const { data: teams } = await supabase.from('tournament_teams').select('division, team_name').eq('club_id', club.id)
+      const { data: teams } = await supabase.from('tournament_club_teams').select('division, team_name').eq('club_id', club.id)
       const teamCount = teams?.length || 0
       const fee = tournament?.team_fee_cents || 0
 
