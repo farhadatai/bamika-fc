@@ -32,6 +32,7 @@ export default function Navbar() {
               <Link to="/" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Home</Link>
               <Link to="/training-lab" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Training</Link>
               <Link to="/live" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Live</Link>
+              <Link to="/tournament" className="text-[#D4AF37] hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Tournament</Link>
               <Link to="/club" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">About Us</Link>
               {user ? (
                 <>
@@ -74,6 +75,7 @@ export default function Navbar() {
             <Link onClick={closeMobileMenu} to="/" className="rounded-md px-3 py-3 text-sm font-medium text-gray-200 hover:bg-gray-800">Home</Link>
             <Link onClick={closeMobileMenu} to="/training-lab" className="rounded-md px-3 py-3 text-sm font-medium text-gray-200 hover:bg-gray-800">Training</Link>
             <Link onClick={closeMobileMenu} to="/live" className="rounded-md px-3 py-3 text-sm font-medium text-gray-200 hover:bg-gray-800">Live</Link>
+            <Link onClick={closeMobileMenu} to="/tournament" className="rounded-md px-3 py-3 text-sm font-medium text-[#D4AF37] hover:bg-gray-800">Tournament</Link>
             <Link onClick={closeMobileMenu} to="/club" className="rounded-md px-3 py-3 text-sm font-medium text-gray-200 hover:bg-gray-800">About Us</Link>
             {user ? (
               <>

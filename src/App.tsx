@@ -23,6 +23,7 @@ import CoachSetupPassword from './pages/CoachSetupPassword'
 import ParentSetupPassword from './pages/ParentSetupPassword'
 import ResetPassword from './pages/ResetPassword'
 import TeamBuilder from './pages/TeamBuilder'
+import Tournament from './pages/Tournament'
 
 const isMissingProfileColumnError = (message?: string) => (
   !!message
@@ -197,6 +198,7 @@ function App() {
         <Route path="/registration/success" element={<RegistrationSuccess />} />
         <Route path="/training-lab" element={<TrainingLab />} />
         <Route path="/live" element={<LiveStream />} />
+        <Route path="/tournament" element={<Tournament />} />
         <Route path="/coach/setup-password" element={<CoachSetupPassword />} />
         <Route path="/parent/setup-password" element={<ParentSetupPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />

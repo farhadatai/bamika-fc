@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/auth';
 import { TEAM_OPTIONS, getYoutubeId, getYoutubeThumbnail } from '../lib/utils';
 import { PLAYER_POSITION_OPTIONS } from '../lib/formations';
 import { ROSTER_SORT_OPTIONS, sortRoster, type RosterSortKey } from '../lib/roster';
+import TournamentAdmin from '../components/admin/TournamentAdmin';
 import { buildTeamPickContext, pickTeamForPlayer } from '../lib/teamAssignment';
 import { uploadPhoto } from '../lib/upload';
 
@@ -2203,7 +2204,7 @@ export default function AdminDashboard() {
         {/* 2. TAB NAVIGATION */}
         <div className="overflow-x-auto rounded-2xl border border-gray-800 bg-neutral-900 p-1"> 
           <div className="flex min-w-max gap-2">
-            {['parents', 'coaches', 'roster', 'uniforms', 'schedule', 'drills', 'announcements', 'sponsor requests', 'spotlights', 'reports & tools'].map((tab) => (
+            {['parents', 'coaches', 'roster', 'uniforms', 'tournament', 'schedule', 'drills', 'announcements', 'sponsor requests', 'spotlights', 'reports & tools'].map((tab) => (
               <button 
                 key={tab} 
                 onClick={() => setActiveTab(tab)} 
@@ -2671,6 +2672,8 @@ export default function AdminDashboard() {
               )}
             </div>
           )}
+
+          {activeTab === 'tournament' && <TournamentAdmin />}
 
           {activeTab === 'uniforms' && (
             <div className="rounded-2xl border border-gray-800 bg-neutral-900">
