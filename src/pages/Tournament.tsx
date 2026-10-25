@@ -21,7 +21,7 @@ interface TeamEntry {
 }
 
 const FALLBACK_INFO: TournamentInfo = {
-  name: 'Bamika FC Thanksgiving Cup 2026',
+  name: 'Bamika FC Tournament Cup',
   starts_on: '2026-11-28',
   ends_on: '2026-11-29',
   venue_name: null,
