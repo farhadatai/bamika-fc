@@ -59,7 +59,7 @@ export default function TournamentAdmin() {
   const [busyKey, setBusyKey] = useState('')
   const [confirmKey, setConfirmKey] = useState('')
   const [notice, setNotice] = useState('')
-  const [venueDraft, setVenueDraft] = useState({ venue_name: '', venue_address: '' })
+  const [venueDraft, setVenueDraft] = useState({ venue_name: '', venue_address: '', starts_on: '', ends_on: '' })
   const [savingVenue, setSavingVenue] = useState(false)
 
   const load = useCallback(async () => {
@@ -80,7 +80,12 @@ export default function TournamentAdmin() {
     }
 
     setTournament(tournamentData)
-    setVenueDraft({ venue_name: tournamentData?.venue_name || '', venue_address: tournamentData?.venue_address || '' })
+    setVenueDraft({
+      venue_name: tournamentData?.venue_name || '',
+      venue_address: tournamentData?.venue_address || '',
+      starts_on: tournamentData?.starts_on || '',
+      ends_on: tournamentData?.ends_on || '',
+    })
 
     const { data: clubData, error: clubError } = await supabase
       .from('tournament_clubs')
@@ -271,11 +276,30 @@ export default function TournamentAdmin() {
 
       {/* Venue */}
       <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#D4AF37]">Venue (shown on the public page)</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#D4AF37]">Dates &amp; venue (shown on the public page and in emails)</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-gray-500">First day</span>
+            <input type="date" className="w-full rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]" value={venueDraft.starts_on} onChange={(e) => setVenueDraft({ ...venueDraft, starts_on: e.target.value })} />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-gray-500">Last day</span>
+            <input type="date" className="w-full rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]" value={venueDraft.ends_on} onChange={(e) => setVenueDraft({ ...venueDraft, ends_on: e.target.value })} />
+          </label>
+        </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
-          <input className="rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]" placeholder="Venue name (e.g. Cordova Sports Complex)" value={venueDraft.venue_name} onChange={(e) => setVenueDraft({ ...venueDraft, venue_name: e.target.value })} />
+          <input className="rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]" placeholder="Venue name (e.g. Luther Burbank High School)" value={venueDraft.venue_name} onChange={(e) => setVenueDraft({ ...venueDraft, venue_name: e.target.value })} />
           <input className="rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]" placeholder="Street address, city, state" value={venueDraft.venue_address} onChange={(e) => setVenueDraft({ ...venueDraft, venue_address: e.target.value })} />
-          <button disabled={savingVenue} onClick={() => saveTournament({ venue_name: venueDraft.venue_name.trim() || null, venue_address: venueDraft.venue_address.trim() || null })} className={`${smallButton} bg-[#EF4444] text-white`}>
+          <button
+            disabled={savingVenue || !venueDraft.starts_on || !venueDraft.ends_on || venueDraft.ends_on < venueDraft.starts_on}
+            onClick={() => saveTournament({
+              starts_on: venueDraft.starts_on,
+              ends_on: venueDraft.ends_on,
+              venue_name: venueDraft.venue_name.trim() || null,
+              venue_address: venueDraft.venue_address.trim() || null,
+            }).then(() => setNotice('Dates and venue saved — the public page and emails now use them.'))}
+            className={`${smallButton} bg-[#EF4444] text-white`}
+          >
             <Save size={14} /> Save
           </button>
         </div>
