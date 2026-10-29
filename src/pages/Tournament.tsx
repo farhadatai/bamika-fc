@@ -22,8 +22,8 @@ interface TeamEntry {
 
 const FALLBACK_INFO: TournamentInfo = {
   name: 'Bamika FC Tournament Cup',
-  starts_on: '2026-11-28',
-  ends_on: '2026-11-29',
+  starts_on: '2026-11-21',
+  ends_on: '2026-11-22',
   venue_name: null,
   venue_address: null,
   team_fee_cents: 25000,

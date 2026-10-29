@@ -84,5 +84,5 @@ grant insert, update on public.tournaments to authenticated;
 
 -- The Nov 28-29 tournament. Venue is filled in later from the admin tab.
 insert into public.tournaments (slug, name, starts_on, ends_on, team_fee_cents)
-values ('bamika-cup-2026', 'Bamika FC Tournament Cup', '2026-11-28', '2026-11-29', 25000)
-on conflict (slug) do update set name = excluded.name;
+values ('bamika-cup-2026', 'Bamika FC Tournament Cup', '2026-11-21', '2026-11-22', 25000)
+on conflict (slug) do update set name = excluded.name, starts_on = excluded.starts_on, ends_on = excluded.ends_on;
