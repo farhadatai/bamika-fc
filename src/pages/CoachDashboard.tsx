@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader, Phone, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2, X, CreditCard, Target, Plus, Grid3x3 } from 'lucide-react';
 import { PLAYER_POSITION_OPTIONS } from '../lib/formations';
 import { ROSTER_SORT_OPTIONS, sortRoster, type RosterSortKey } from '../lib/roster';
+import CoachPlayerPicker from '../components/CoachPlayerPicker';
 
 interface Player {
   id: string;
@@ -195,8 +196,8 @@ export default function CoachDashboard() {
     }
   }, []);
 
-  const fetchTeamData = useCallback(async () => {
-    setLoading(true);
+  const fetchTeamData = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setLoading(true);
     setError(null);
     try {
       if (!user) return;
@@ -530,20 +531,8 @@ export default function CoachDashboard() {
         </div>
       )}
 
-      {/* The club-wide roster now lives on the shared dashboard so this tab
-          stays focused on the coach's own team. */}
-      <section className="rounded-2xl border border-blue-500/30 bg-neutral-950 p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-blue-300">Club overview</div>
-            <h2 className="mt-1 text-lg font-black uppercase italic text-white">Looking for every registered player?</h2>
-            <p className="mt-1 text-sm text-gray-400">The full club roster, with search and sorting, is on your dashboard.</p>
-          </div>
-          <button type="button" onClick={() => navigate('/dashboard')} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-400/50 px-4 py-3 text-xs font-black uppercase text-blue-100 hover:bg-blue-500/10">
-            Open Club Roster
-          </button>
-        </div>
-      </section>
+      {/* Every club player, with claim / release for this coach's team. */}
+      <CoachPlayerPicker teamId={teamId} onChanged={() => fetchTeamData({ silent: true })} />
 
       {!teamId && (
         <div className="rounded-2xl border border-dashed border-gray-800 bg-black p-8 text-center">

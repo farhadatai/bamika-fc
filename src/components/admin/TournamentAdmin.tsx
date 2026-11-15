@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, Copy, Link2, Loader2, Mail, Phone, RefreshCw, RotateCcw, Save, Trash2, Trophy, X } from 'lucide-react'
+import { Check, Copy, ExternalLink, FileWarning, Link2, Loader2, Mail, Phone, RefreshCw, RotateCcw, Save, Trash2, Trophy, Users, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
 interface TournamentRow {
@@ -14,6 +14,25 @@ interface TournamentRow {
   roster_min: number
   roster_max: number
   registration_open: boolean
+  roster_deadline: string | null
+}
+
+interface RosterPlayer {
+  id: string
+  team_id: string
+  full_name: string
+  date_of_birth: string
+  jersey_number: string | null
+  has_birth_cert: boolean
+  birth_cert_url: string | null
+}
+
+const ageOn = (dateOfBirth: string, onDate: string) => {
+  const birth = new Date(`${dateOfBirth}T12:00:00`)
+  const on = new Date(`${onDate}T12:00:00`)
+  let age = on.getFullYear() - birth.getFullYear()
+  if (on.getMonth() < birth.getMonth() || (on.getMonth() === birth.getMonth() && on.getDate() < birth.getDate())) age -= 1
+  return age
 }
 
 interface TeamRow {
@@ -59,8 +78,13 @@ export default function TournamentAdmin() {
   const [busyKey, setBusyKey] = useState('')
   const [confirmKey, setConfirmKey] = useState('')
   const [notice, setNotice] = useState('')
-  const [venueDraft, setVenueDraft] = useState({ venue_name: '', venue_address: '', starts_on: '', ends_on: '' })
+  const [venueDraft, setVenueDraft] = useState({ venue_name: '', venue_address: '', starts_on: '', ends_on: '', roster_deadline: '' })
   const [savingVenue, setSavingVenue] = useState(false)
+  // Roster size per team (total players, players with a certificate) for the chips.
+  const [rosterCounts, setRosterCounts] = useState<Record<string, { total: number, certs: number }>>({})
+  const [openRosterTeamId, setOpenRosterTeamId] = useState('')
+  const [rosterPlayers, setRosterPlayers] = useState<RosterPlayer[]>([])
+  const [rosterLoading, setRosterLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -85,15 +109,28 @@ export default function TournamentAdmin() {
       venue_address: tournamentData?.venue_address || '',
       starts_on: tournamentData?.starts_on || '',
       ends_on: tournamentData?.ends_on || '',
+      roster_deadline: tournamentData?.roster_deadline || '',
     })
 
-    const { data: clubData, error: clubError } = await supabase
-      .from('tournament_clubs')
-      .select('id, reference_code, club_name, contact_name, email, phone, city, notes, status, access_token, created_at, tournament_club_teams(id, division, team_name, group_label, payment_status, paid_at)')
-      .order('created_at', { ascending: false })
+    const [{ data: clubData, error: clubError }, { data: rosterData }] = await Promise.all([
+      supabase
+        .from('tournament_clubs')
+        .select('id, reference_code, club_name, contact_name, email, phone, city, notes, status, access_token, created_at, tournament_club_teams(id, division, team_name, group_label, payment_status, paid_at)')
+        .order('created_at', { ascending: false }),
+      // Roster table may not exist until its migration runs; counts just stay empty then.
+      supabase.from('tournament_roster_players').select('team_id, birth_cert_path'),
+    ])
 
     if (clubError) setLoadError(clubError.message)
     setClubs((clubData as ClubRow[]) || [])
+    const counts: Record<string, { total: number, certs: number }> = {}
+    for (const row of (rosterData || []) as Array<{ team_id: string, birth_cert_path: string | null }>) {
+      const entry = counts[row.team_id] || { total: 0, certs: 0 }
+      entry.total += 1
+      if (row.birth_cert_path) entry.certs += 1
+      counts[row.team_id] = entry
+    }
+    setRosterCounts(counts)
     setLoading(false)
   }, [])
 
@@ -187,6 +224,26 @@ export default function TournamentAdmin() {
     if (payload.updated > 0) await load()
     setNotice(payload.updated > 0 ? `${payload.updated} payment${payload.updated === 1 ? '' : 's'} confirmed from Stripe.` : 'No new payments found in Stripe.')
   })
+
+  const toggleRoster = async (team: TeamRow) => {
+    if (openRosterTeamId === team.id) {
+      setOpenRosterTeamId('')
+      setRosterPlayers([])
+      return
+    }
+    setOpenRosterTeamId(team.id)
+    setRosterPlayers([])
+    setRosterLoading(true)
+    try {
+      const payload = await adminFetch(`/api/tournament/admin/teams/${team.id}/roster`)
+      setRosterPlayers((payload.players || []) as RosterPlayer[])
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Could not load the roster')
+      setOpenRosterTeamId('')
+    } finally {
+      setRosterLoading(false)
+    }
+  }
 
   const copyLink = async (club: ClubRow) => {
     try {
@@ -286,6 +343,10 @@ export default function TournamentAdmin() {
             <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-gray-500">Last day</span>
             <input type="date" className="w-full rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]" value={venueDraft.ends_on} onChange={(e) => setVenueDraft({ ...venueDraft, ends_on: e.target.value })} />
           </label>
+          <label className="block sm:col-span-2">
+            <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-gray-500">Roster deadline (clubs can edit rosters through this day; leave empty for no lock)</span>
+            <input type="date" className="w-full rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37] sm:w-64" value={venueDraft.roster_deadline} onChange={(e) => setVenueDraft({ ...venueDraft, roster_deadline: e.target.value })} />
+          </label>
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
           <input className="rounded-xl border border-gray-800 bg-black px-4 py-3 text-sm font-bold text-white outline-none focus:border-[#D4AF37]" placeholder="Venue name (e.g. Luther Burbank High School)" value={venueDraft.venue_name} onChange={(e) => setVenueDraft({ ...venueDraft, venue_name: e.target.value })} />
@@ -297,6 +358,7 @@ export default function TournamentAdmin() {
               ends_on: venueDraft.ends_on,
               venue_name: venueDraft.venue_name.trim() || null,
               venue_address: venueDraft.venue_address.trim() || null,
+              roster_deadline: venueDraft.roster_deadline || null,
             }).then(() => setNotice('Dates and venue saved — the public page and emails now use them.'))}
             className={`${smallButton} bg-[#EF4444] text-white`}
           >
@@ -349,9 +411,20 @@ export default function TournamentAdmin() {
                         {teams.map((team) => {
                           const paid = team.payment_status === 'paid'
                           const confirming = confirmKey === `team-${team.id}`
+                          const rosterCount = rosterCounts[team.id] || { total: 0, certs: 0 }
+                          const rosterOpen = openRosterTeamId === team.id
                           return (
                             <span key={team.id} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-bold ${paid ? 'border-green-500/40 bg-green-500/10 text-green-200' : 'border-gray-700 bg-black text-gray-200'}`}>
                               <span><span className="text-[#D4AF37]">{team.division}</span> {team.team_name}{team.group_label ? ` · Group ${team.group_label}` : ''}{paid ? ' · paid' : ' · unpaid'}</span>
+                              {paid && (
+                                <button
+                                  onClick={() => toggleRoster(team)}
+                                  title="View this team's roster and birth certificates"
+                                  className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-widest ${rosterOpen ? 'bg-[#D4AF37] text-black' : rosterCount.total >= tournament.roster_min ? 'border border-green-500/40 text-green-200 hover:bg-green-500/20' : 'border border-yellow-500/40 text-yellow-200 hover:bg-yellow-500/20'}`}
+                                >
+                                  <Users size={11} /> Roster {rosterCount.total}/{tournament.roster_max}{rosterCount.total > rosterCount.certs ? ` · ${rosterCount.total - rosterCount.certs} no cert` : ''}
+                                </button>
+                              )}
                               {!paid && (
                                 confirming ? (
                                   <span className="inline-flex items-center gap-1">
@@ -367,6 +440,45 @@ export default function TournamentAdmin() {
                         })}
                         {teams.length === 0 && <span className="text-xs text-gray-500">No teams left on this request.</span>}
                       </div>
+
+                      {teams.some((team) => team.id === openRosterTeamId) && (() => {
+                        const team = teams.find((row) => row.id === openRosterTeamId)!
+                        const missing = rosterPlayers.filter((player) => !player.has_birth_cert).length
+                        return (
+                          <div className="mt-3 rounded-xl border border-[#D4AF37]/30 bg-black">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-800 px-4 py-3">
+                              <p className="text-xs font-black uppercase tracking-widest text-white">
+                                <span className="text-[#D4AF37]">{team.division}</span> {team.team_name} roster · {rosterPlayers.length} player{rosterPlayers.length === 1 ? '' : 's'}
+                                {rosterPlayers.length > 0 && rosterPlayers.length < tournament.roster_min ? <span className="text-yellow-300"> · below minimum of {tournament.roster_min}</span> : null}
+                                {missing > 0 ? <span className="text-red-300"> · {missing} without certificate</span> : null}
+                              </p>
+                              <button onClick={() => toggleRoster(team)} className="text-gray-500 hover:text-white" aria-label="Close roster"><X size={14} /></button>
+                            </div>
+                            {rosterLoading ? (
+                              <div className="p-4 text-gray-500"><Loader2 size={16} className="animate-spin" /></div>
+                            ) : rosterPlayers.length === 0 ? (
+                              <p className="p-4 text-xs text-gray-500">No players entered yet. The club adds them from their club link.</p>
+                            ) : (
+                              <ol className="divide-y divide-gray-900">
+                                {rosterPlayers.map((player, index) => (
+                                  <li key={player.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
+                                    <span className="text-gray-200">
+                                      <span className="mr-2 inline-block w-7 text-center font-black text-[#D4AF37]">{player.jersey_number || index + 1}</span>
+                                      {player.full_name}
+                                      <span className="ml-2 text-xs text-gray-500">{new Date(`${player.date_of_birth}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · age {ageOn(player.date_of_birth, tournament.starts_on)}</span>
+                                    </span>
+                                    {player.birth_cert_url ? (
+                                      <a href={player.birth_cert_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded border border-green-500/40 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-green-300 hover:bg-green-500/10"><ExternalLink size={11} /> Birth certificate</a>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 rounded border border-red-500/40 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-red-300"><FileWarning size={11} /> No certificate</span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ol>
+                            )}
+                          </div>
+                        )
+                      })()}
 
                       {club.notes && <p className="mt-3 border-l-2 border-gray-700 pl-3 text-sm italic text-gray-400">{club.notes}</p>}
                       <p className="mt-3 text-xs text-gray-500">

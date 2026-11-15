@@ -119,6 +119,84 @@ const publicTeam = (team: { id: string, division: string, team_name: string, gro
   paid_at: team.paid_at,
 })
 
+// ---------------------------------------------------------------------------
+// Rosters
+// ---------------------------------------------------------------------------
+
+const ROSTER_BUCKET = 'tournament-docs'
+const MAX_CERT_BYTES = 6 * 1024 * 1024
+const CERT_TYPES: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+}
+
+interface RosterPlayerRow {
+  id: string
+  team_id: string
+  club_id: string
+  full_name: string
+  date_of_birth: string
+  jersey_number: string | null
+  birth_cert_path: string | null
+  created_at: string
+}
+
+const rosterPlayerSchema = z.object({
+  fullName: z.string().trim().min(2, 'Enter the player\'s full name.').max(80),
+  dateOfBirth: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter the date of birth.'),
+  jerseyNumber: z.string().trim().max(4).optional().default(''),
+  birthCert: z.object({
+    name: z.string().trim().max(200),
+    type: z.string().trim().max(100),
+    data: z.string().min(1),
+  }).optional(),
+})
+
+const isMissingRosterTable = (message: string) => /tournament_roster_players/.test(message) && /(schema cache|does not exist)/.test(message)
+
+const getClubRoster = async (clubId: string) => {
+  const { data, error } = await supabase
+    .from('tournament_roster_players')
+    .select('id, team_id, club_id, full_name, date_of_birth, jersey_number, birth_cert_path, created_at')
+    .eq('club_id', clubId)
+    .order('created_at', { ascending: true })
+  if (error) {
+    // Until the roster migration has run, the club page still loads (payments must never break).
+    if (isMissingRosterTable(error.message)) return []
+    throw new Error(error.message)
+  }
+  return (data || []) as RosterPlayerRow[]
+}
+
+// What a club (or the admin list) sees: never the storage path itself.
+const publicRosterPlayer = (player: RosterPlayerRow) => ({
+  id: player.id,
+  team_id: player.team_id,
+  full_name: player.full_name,
+  date_of_birth: player.date_of_birth,
+  jersey_number: player.jersey_number,
+  has_birth_cert: Boolean(player.birth_cert_path),
+  created_at: player.created_at,
+})
+
+const rostersLocked = (tournament: { roster_deadline: string | null } | null) => {
+  if (!tournament?.roster_deadline) return false
+  // Deadline is inclusive: rosters lock at the end of that day (Pacific time).
+  return Date.now() > new Date(`${tournament.roster_deadline}T23:59:59-08:00`).getTime()
+}
+
+const isReasonableBirthDate = (value: string) => {
+  const date = new Date(`${value}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return false
+  const year = date.getFullYear()
+  const thisYear = new Date().getFullYear()
+  return year >= thisYear - 25 && year <= thisYear
+}
+
 const markTeamPaid = async (teamId: string, sessionId: string) => {
   const { error } = await supabase
     .from('tournament_club_teams')
@@ -326,7 +404,7 @@ router.get('/club/:token', portalLimiter, async (req: Request, res: Response): P
       res.status(404).json({ error: 'This club link is not valid.' })
       return
     }
-    const [tournament, teams] = await Promise.all([getTournament(), getClubTeams(club.id)])
+    const [tournament, teams, roster] = await Promise.all([getTournament(), getClubTeams(club.id), getClubRoster(club.id)])
     res.json({
       tournament: tournament && {
         name: tournament.name,
@@ -338,6 +416,7 @@ router.get('/club/:token', portalLimiter, async (req: Request, res: Response): P
         roster_min: tournament.roster_min,
         roster_max: tournament.roster_max,
         roster_deadline: tournament.roster_deadline,
+        rosters_locked: rostersLocked(tournament),
       },
       club: {
         club_name: club.club_name,
@@ -347,6 +426,7 @@ router.get('/club/:token', portalLimiter, async (req: Request, res: Response): P
         reference_code: club.reference_code,
       },
       teams: teams.map(publicTeam),
+      roster: roster.map(publicRosterPlayer),
     })
   } catch (error) {
     res.status(500).json({ error: getErrorMessage(error) })
@@ -474,9 +554,235 @@ router.post('/club/:token/verify', portalLimiter, async (req: Request, res: Resp
   }
 })
 
+// Add a player to a PAID team's roster. The birth certificate arrives as base64
+// JSON (clubs have no account, so they cannot upload to storage directly) and
+// is written to the private tournament-docs bucket by the server.
+router.post('/club/:token/teams/:teamId/players', portalLimiter, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, teamId } = req.params
+    if (!isValidToken(token)) {
+      res.status(404).json({ error: 'This club link is not valid.' })
+      return
+    }
+    const club = await getClubByToken(token)
+    if (!club) {
+      res.status(404).json({ error: 'This club link is not valid.' })
+      return
+    }
+    if (club.status !== 'approved') {
+      res.status(400).json({ error: 'Rosters open once your club is approved.' })
+      return
+    }
+    const parsed = rosterPlayerSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message || 'Check the player details.' })
+      return
+    }
+    const input = parsed.data
+    if (!isReasonableBirthDate(input.dateOfBirth)) {
+      res.status(400).json({ error: 'That date of birth does not look right.' })
+      return
+    }
+
+    const tournament = await getTournament()
+    if (!tournament) throw new Error('Tournament not found')
+    if (rostersLocked(tournament)) {
+      res.status(400).json({ error: 'Rosters are locked. Contact Bamika FC for changes.' })
+      return
+    }
+
+    const teams = await getClubTeams(club.id)
+    const team = teams.find((row) => row.id === teamId)
+    if (!team) {
+      res.status(404).json({ error: 'Team not found.' })
+      return
+    }
+    if (team.payment_status !== 'paid') {
+      res.status(400).json({ error: 'Pay this team\'s entry fee first, then add its players.' })
+      return
+    }
+
+    const roster = await getClubRoster(club.id)
+    const teamRoster = roster.filter((player) => player.team_id === team.id)
+    if (teamRoster.length >= tournament.roster_max) {
+      res.status(400).json({ error: `This team already has the maximum of ${tournament.roster_max} players.` })
+      return
+    }
+    const duplicate = teamRoster.find((player) => player.full_name.trim().toLowerCase() === input.fullName.toLowerCase())
+    if (duplicate) {
+      res.status(400).json({ error: `${input.fullName} is already on this team's roster.` })
+      return
+    }
+
+    let birthCertPath: string | null = null
+    if (input.birthCert) {
+      const extension = CERT_TYPES[input.birthCert.type.toLowerCase()]
+      if (!extension) {
+        res.status(400).json({ error: 'Upload the birth certificate as a PDF or a photo (JPG, PNG, HEIC).' })
+        return
+      }
+      const buffer = Buffer.from(input.birthCert.data, 'base64')
+      if (buffer.length === 0 || buffer.length > MAX_CERT_BYTES) {
+        res.status(400).json({ error: 'The birth certificate file must be under 6 MB.' })
+        return
+      }
+      const safeName = input.fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'player'
+      birthCertPath = `${club.id}/${team.id}/${Date.now()}-${safeName}.${extension}`
+      const { error: uploadError } = await supabase.storage
+        .from(ROSTER_BUCKET)
+        .upload(birthCertPath, buffer, { contentType: input.birthCert.type.toLowerCase(), upsert: false })
+      if (uploadError) throw new Error(`Could not save the birth certificate: ${uploadError.message}`)
+    }
+
+    const { data: player, error: insertError } = await supabase
+      .from('tournament_roster_players')
+      .insert({
+        team_id: team.id,
+        club_id: club.id,
+        full_name: input.fullName,
+        date_of_birth: input.dateOfBirth,
+        jersey_number: input.jerseyNumber || null,
+        birth_cert_path: birthCertPath,
+      })
+      .select('id, team_id, club_id, full_name, date_of_birth, jersey_number, birth_cert_path, created_at')
+      .single()
+    if (insertError || !player) throw new Error(insertError?.message || 'Could not add the player')
+
+    res.status(201).json({ success: true, player: publicRosterPlayer(player as RosterPlayerRow) })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+// Replace (or add) the birth certificate for a player already on the roster.
+router.post('/club/:token/players/:playerId/birth-certificate', portalLimiter, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, playerId } = req.params
+    if (!isValidToken(token)) {
+      res.status(404).json({ error: 'This club link is not valid.' })
+      return
+    }
+    const club = await getClubByToken(token)
+    if (!club) {
+      res.status(404).json({ error: 'This club link is not valid.' })
+      return
+    }
+    const parsed = rosterPlayerSchema.shape.birthCert.unwrap().safeParse(req.body?.birthCert)
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Choose a file to upload.' })
+      return
+    }
+    const tournament = await getTournament()
+    if (rostersLocked(tournament)) {
+      res.status(400).json({ error: 'Rosters are locked. Contact Bamika FC for changes.' })
+      return
+    }
+    const roster = await getClubRoster(club.id)
+    const player = roster.find((row) => row.id === playerId)
+    if (!player) {
+      res.status(404).json({ error: 'Player not found.' })
+      return
+    }
+    const extension = CERT_TYPES[parsed.data.type.toLowerCase()]
+    if (!extension) {
+      res.status(400).json({ error: 'Upload the birth certificate as a PDF or a photo (JPG, PNG, HEIC).' })
+      return
+    }
+    const buffer = Buffer.from(parsed.data.data, 'base64')
+    if (buffer.length === 0 || buffer.length > MAX_CERT_BYTES) {
+      res.status(400).json({ error: 'The birth certificate file must be under 6 MB.' })
+      return
+    }
+    const safeName = player.full_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'player'
+    const path = `${club.id}/${player.team_id}/${Date.now()}-${safeName}.${extension}`
+    const { error: uploadError } = await supabase.storage
+      .from(ROSTER_BUCKET)
+      .upload(path, buffer, { contentType: parsed.data.type.toLowerCase(), upsert: false })
+    if (uploadError) throw new Error(`Could not save the birth certificate: ${uploadError.message}`)
+
+    const { error: updateError } = await supabase
+      .from('tournament_roster_players')
+      .update({ birth_cert_path: path })
+      .eq('id', player.id)
+    if (updateError) throw new Error(updateError.message)
+    if (player.birth_cert_path) void supabase.storage.from(ROSTER_BUCKET).remove([player.birth_cert_path])
+
+    res.json({ success: true, player: publicRosterPlayer({ ...player, birth_cert_path: path }) })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+// Remove a player from the roster (and their document).
+router.delete('/club/:token/players/:playerId', portalLimiter, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, playerId } = req.params
+    if (!isValidToken(token)) {
+      res.status(404).json({ error: 'This club link is not valid.' })
+      return
+    }
+    const club = await getClubByToken(token)
+    if (!club) {
+      res.status(404).json({ error: 'This club link is not valid.' })
+      return
+    }
+    const tournament = await getTournament()
+    if (rostersLocked(tournament)) {
+      res.status(400).json({ error: 'Rosters are locked. Contact Bamika FC for changes.' })
+      return
+    }
+    const roster = await getClubRoster(club.id)
+    const player = roster.find((row) => row.id === playerId)
+    if (!player) {
+      res.status(404).json({ error: 'Player not found.' })
+      return
+    }
+    const { error } = await supabase.from('tournament_roster_players').delete().eq('id', player.id)
+    if (error) throw new Error(error.message)
+    if (player.birth_cert_path) void supabase.storage.from(ROSTER_BUCKET).remove([player.birth_cert_path])
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
 // ---------------------------------------------------------------------------
 // Admin
 // ---------------------------------------------------------------------------
+
+// Full roster for one team, with short-lived download links for birth certificates.
+router.get('/admin/teams/:teamId/roster', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+
+    const { data: players, error } = await supabase
+      .from('tournament_roster_players')
+      .select('id, team_id, club_id, full_name, date_of_birth, jersey_number, birth_cert_path, created_at')
+      .eq('team_id', req.params.teamId)
+      .order('created_at', { ascending: true })
+    if (error) throw new Error(error.message)
+
+    const rows = (players || []) as RosterPlayerRow[]
+    const paths = rows.map((player) => player.birth_cert_path).filter((path): path is string => Boolean(path))
+    const signed: Record<string, string> = {}
+    if (paths.length > 0) {
+      const { data: urls } = await supabase.storage.from(ROSTER_BUCKET).createSignedUrls(paths, 60 * 15)
+      for (const entry of urls || []) {
+        if (entry.path && entry.signedUrl) signed[entry.path] = entry.signedUrl
+      }
+    }
+
+    res.json({
+      players: rows.map((player) => ({
+        ...publicRosterPlayer(player),
+        birth_cert_url: player.birth_cert_path ? signed[player.birth_cert_path] || null : null,
+      })),
+    })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
 
 // Approve / decline / reset a club request (emails the club; approval includes the portal link).
 router.post('/admin/clubs/:id/status', async (req: Request, res: Response): Promise<void> => {

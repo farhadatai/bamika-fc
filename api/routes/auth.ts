@@ -107,10 +107,12 @@ interface CoachDirectoryPlayerRecord {
     first_name?: string | null
     last_name?: string | null
     full_name?: string | null
+    phone?: string | null
   } | Array<{
     first_name?: string | null
     last_name?: string | null
     full_name?: string | null
+    phone?: string | null
   }> | null
 }
 
@@ -206,10 +208,28 @@ router.get('/coach-player-directory', async (req: Request, res: Response): Promi
       return
     }
 
-    const { data: players, error } = await supabase
-      .from('players')
-      .select('id, full_name, date_of_birth, position, status, payment_status, team_assigned, created_at, profiles:parent_id(first_name, last_name, full_name)')
-      .order('created_at', { ascending: false })
+    const [{ data: players, error }, { data: coachRows }] = await Promise.all([
+      supabase
+        .from('players')
+        .select('id, full_name, date_of_birth, position, status, payment_status, team_assigned, created_at, profiles:parent_id(first_name, last_name, full_name, phone)')
+        .order('created_at', { ascending: false }),
+      // Which teams have a coach, so the picker can show who currently holds a player.
+      supabase.from('coaches').select('id, team_id'),
+    ])
+
+    const coachByTeam: Record<string, string> = {}
+    const coachList = ((coachRows || []) as Array<{ id: string, team_id: string | null }>).filter((row) => row.team_id)
+    if (coachList.length > 0) {
+      const { data: coachProfiles } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, full_name')
+        .in('id', coachList.map((row) => row.id))
+      const nameById: Record<string, string> = {}
+      for (const profile of (coachProfiles || []) as Array<{ id: string, first_name?: string | null, last_name?: string | null, full_name?: string | null }>) {
+        nameById[profile.id] = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.full_name || 'Coach'
+      }
+      for (const row of coachList) coachByTeam[row.team_id as string] = nameById[row.id] || 'Coach'
+    }
 
     if (error) {
       res.status(500).json({ error: error.message || 'Unable to load the club player directory.' })
@@ -237,14 +257,100 @@ router.get('/coach-player-directory', async (req: Request, res: Response): Promi
         status: player.status || 'pending',
         payment_status: player.payment_status || 'pending',
         team_assigned: player.team_assigned || 'Unassigned',
+        team_coach: coachByTeam[player.team_assigned || ''] || null,
         created_at: player.created_at || null,
         parent_name: parentName,
+        parent_phone: parent?.phone || null,
       }
     })
 
     res.status(200).json({ players: directory })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to load the club player directory.'
+    res.status(500).json({ error: message })
+  }
+})
+
+/**
+ * Coach picks a player for their own team ("claim") or sends one of their
+ * players back to Unassigned ("release"). Replaces automatic placement.
+ * POST /api/auth/coach/assign-player  { player_id, action: 'claim' | 'release' }
+ */
+router.post('/coach/assign-player', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const coachUser = await requireCoach(req, res)
+    if (!coachUser) return
+
+    if (!hasServiceRoleKey()) {
+      res.status(500).json({ error: 'Team assignment requires the server service role key.' })
+      return
+    }
+
+    const playerId = String(req.body?.player_id || '').trim()
+    const action = req.body?.action === 'release' ? 'release' : 'claim'
+    if (!playerId) {
+      res.status(400).json({ error: 'Missing player.' })
+      return
+    }
+
+    const { data: coachRow } = await supabase
+      .from('coaches')
+      .select('team_id')
+      .eq('id', coachUser.id)
+      .maybeSingle()
+    const coachTeam = String(coachRow?.team_id || '').trim()
+    if (!coachTeam || coachTeam === 'Unassigned') {
+      res.status(400).json({ error: 'You need a team assigned by the admin before adding players to it.' })
+      return
+    }
+
+    const { data: player, error: playerError } = await supabase
+      .from('players')
+      .select('id, full_name, team_assigned, status, payment_status')
+      .eq('id', playerId)
+      .single()
+    if (playerError || !player) {
+      res.status(404).json({ error: 'Player not found.' })
+      return
+    }
+
+    const currentTeam = String(player.team_assigned || '').trim() || 'Unassigned'
+    const status = String(player.status || '').toLowerCase()
+    if (['inactive', 'cancelled', 'canceled', 'deleted'].includes(status)) {
+      res.status(400).json({ error: `${player.full_name} is not an active registration.` })
+      return
+    }
+
+    if (action === 'release') {
+      if (currentTeam !== coachTeam) {
+        res.status(403).json({ error: 'You can only remove players from your own team.' })
+        return
+      }
+    } else if (currentTeam === coachTeam) {
+      res.status(200).json({ success: true, team_assigned: coachTeam, message: `${player.full_name} is already on your team.` })
+      return
+    }
+
+    const nextTeam = action === 'release' ? 'Unassigned' : coachTeam
+    const { error: updateError } = await supabase
+      .from('players')
+      .update({ team_assigned: nextTeam })
+      .eq('id', player.id)
+    if (updateError) {
+      res.status(500).json({ error: updateError.message })
+      return
+    }
+
+    res.status(200).json({
+      success: true,
+      team_assigned: nextTeam,
+      previous_team: currentTeam,
+      message: action === 'release'
+        ? `${player.full_name} moved back to Unassigned.`
+        : `${player.full_name} added to ${coachTeam}${currentTeam !== 'Unassigned' ? ` (moved from ${currentTeam})` : ''}.`,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to update the player\'s team.'
     res.status(500).json({ error: message })
   }
 })
