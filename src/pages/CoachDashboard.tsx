@@ -137,6 +137,7 @@ export default function CoachDashboard() {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const [newPlayerInvite, setNewPlayerInvite] = useState(emptyCoachPlayerInvite);
   const [submittingInvite, setSubmittingInvite] = useState(false);
 
@@ -531,9 +532,6 @@ export default function CoachDashboard() {
         </div>
       )}
 
-      {/* Every club player, with claim / release for this coach's team. */}
-      <CoachPlayerPicker teamId={teamId} onChanged={() => fetchTeamData({ silent: true })} />
-
       {!teamId && (
         <div className="rounded-2xl border border-dashed border-gray-800 bg-black p-8 text-center">
           <h2 className="text-xl font-black uppercase italic text-white">Waiting for team assignment</h2>
@@ -684,11 +682,11 @@ export default function CoachDashboard() {
                 </select>
                 <button
                   type="button"
-                  onClick={() => setShowAddPlayer(true)}
+                  onClick={() => setShowPicker(true)}
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700 sm:py-2"
                 >
                   <Plus size={15} />
-                  Add Player
+                  Add Players
                 </button>
               </div>
             </div>
@@ -844,6 +842,16 @@ export default function CoachDashboard() {
             </>
           )}
         </section>
+      )}
+
+      {teamId && (
+        <CoachPlayerPicker
+          teamId={teamId}
+          open={showPicker}
+          onClose={() => setShowPicker(false)}
+          onChanged={() => fetchTeamData({ silent: true })}
+          onRegisterNew={() => setShowAddPlayer(true)}
+        />
       )}
 
       {showAddPlayer && (
