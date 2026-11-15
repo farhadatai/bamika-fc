@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth';
 import { uploadPhoto } from '../lib/upload';
 import { useNavigate } from 'react-router-dom';
-import { Loader, Phone, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2, X, CreditCard, Target, Plus, Grid3x3 } from 'lucide-react';
+import { Loader, Phone, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, Trash2, X, CreditCard, Target, Plus, Grid3x3, Printer } from 'lucide-react';
 import { PLAYER_POSITION_OPTIONS } from '../lib/formations';
 import { ROSTER_SORT_OPTIONS, sortRoster, type RosterSortKey } from '../lib/roster';
 import CoachPlayerPicker from '../components/CoachPlayerPicker';
@@ -138,6 +138,17 @@ export default function CoachDashboard() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  // Print after the print-only roster sheet has rendered, then restore the screen view.
+  useEffect(() => {
+    if (!printing) return;
+    const timer = window.setTimeout(() => {
+      window.print();
+      setPrinting(false);
+    }, 100);
+    return () => window.clearTimeout(timer);
+  }, [printing]);
   const [newPlayerInvite, setNewPlayerInvite] = useState(emptyCoachPlayerInvite);
   const [submittingInvite, setSubmittingInvite] = useState(false);
 
@@ -437,7 +448,54 @@ export default function CoachDashboard() {
   }
 
   return (
-    <div className="w-full space-y-6 pb-20">
+    <>
+    {/* ================= PRINT OUTPUT (roster sheet, only while printing) ================= */}
+    {printing && teamId && (
+      <div className="print-area">
+        <section className="print-page">
+          <header className="print-header">
+            <div>
+              <h1>Bamika FC — {teamId} Roster</h1>
+              <p>
+                Coach {getCoachDisplayName(profile, user?.email)}
+                {' · '}{players.length} players
+                {' · '}Printed {new Date().toLocaleDateString()}
+              </p>
+            </div>
+            <img src="/logo.png" alt="" className="print-logo" />
+          </header>
+          <table className="print-table">
+            <thead>
+              <tr>
+                <th style={{ width: '6%' }}>#</th>
+                <th style={{ width: '28%' }}>Player</th>
+                <th style={{ width: '12%' }}>Birth date</th>
+                <th style={{ width: '6%' }}>Age</th>
+                <th style={{ width: '14%' }}>Position</th>
+                <th style={{ width: '20%' }}>Parent</th>
+                <th style={{ width: '14%' }}>Phone</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortRoster(players, 'name_asc', (player) => ({ name: getPlayerName(player), dateOfBirth: player.dob, team: player.team_assigned, position: player.position })).map((player) => (
+                <tr key={player.id}>
+                  <td>{player.jersey_number && player.jersey_number !== '-' ? player.jersey_number : ''}</td>
+                  <td className="print-strong">{getPlayerName(player)}</td>
+                  <td>{player.dob ? new Date(`${player.dob.slice(0, 10)}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</td>
+                  <td>{player.dob ? calculateAge(player.dob) : ''}</td>
+                  <td>{player.position || 'TBD'}</td>
+                  <td>{getParentName(player.profiles) || ''}</td>
+                  <td>{player.profiles?.phone || ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="print-foot">Coach signature: ____________________________ Date: ______________</p>
+        </section>
+      </div>
+    )}
+
+    <div className="no-print w-full space-y-6 pb-20">
       <div className="flex flex-col gap-4 rounded-2xl border border-gray-800 bg-neutral-950 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black uppercase italic text-white sm:text-3xl">Coach Dashboard</h1>
@@ -680,6 +738,16 @@ export default function CoachDashboard() {
                     <option key={option.value} value={option.value}>Sort: {option.label}</option>
                   ))}
                 </select>
+                <button
+                  type="button"
+                  onClick={() => setPrinting(true)}
+                  disabled={players.length === 0}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-700 px-4 py-3 text-xs font-black uppercase text-gray-200 hover:border-[#D4AF37] hover:text-white disabled:opacity-50 sm:py-2"
+                  title="Print or save the roster as a PDF"
+                >
+                  <Printer size={15} />
+                  Print Roster
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowPicker(true)}
@@ -1045,5 +1113,6 @@ export default function CoachDashboard() {
         )}
       </div>
     </div>
+    </>
   );
 }

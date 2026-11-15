@@ -641,6 +641,25 @@ export default function Dashboard() {
   return (
     <div className="w-full py-6 text-white sm:py-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        {isCoach ? (
+        /* Coaches get a compact header: their real workspace is /coach. */
+        <section className="flex flex-col gap-4 rounded-2xl border border-gray-800 bg-neutral-950 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-black uppercase italic text-white sm:text-3xl">
+              Welcome, <span className="text-[#EF4444]">{firstName}</span>
+            </h1>
+            <p className="mt-1 text-sm text-gray-400">Your roster, player cards, messages, and printable roster live in Coach Tools.</p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link to="/coach" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-5 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-red-700">
+              <Users size={15} /> Open Coach Tools
+            </Link>
+            <Link to="/team-builder" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#D4AF37]/50 px-5 py-3 text-xs font-black uppercase tracking-widest text-[#D4AF37] hover:bg-[#D4AF37]/10">
+              Teams &amp; Lineups
+            </Link>
+          </div>
+        </section>
+        ) : (
         <section className="overflow-hidden rounded-2xl border border-gray-800 bg-neutral-950">
           <div className={`grid gap-0 ${isParent && primaryPlayer ? 'lg:grid-cols-[1.4fr_0.8fr]' : ''}`}>
             <div className="p-6 sm:p-8 lg:p-10">
@@ -741,8 +760,9 @@ export default function Dashboard() {
             </div>
           </div>
         </section>
+        )}
 
-        {sponsors.length > 0 && (
+        {sponsors.length > 0 && !isCoach && (
           <section className="overflow-hidden rounded-2xl border border-[#D4AF37]/30 bg-neutral-950 shadow-2xl shadow-black/30">
             <div className="border-b border-[#D4AF37]/20 bg-[#D4AF37]/10 px-5 py-3">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
@@ -823,7 +843,7 @@ export default function Dashboard() {
 
         {/* Staff see the club-wide roster here; the coach tab stays focused on
             their own team. */}
-        {(isCoach || isAdmin) && <ClubRegistrationOverview />}
+        {isAdmin && <ClubRegistrationOverview />}
 
         <div className={`grid gap-6 ${isParent ? 'lg:grid-cols-[1.1fr_0.9fr]' : 'lg:grid-cols-1'}`}>
           {isParent && (
