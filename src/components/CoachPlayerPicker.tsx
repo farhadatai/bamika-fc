@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Loader, Search, UserPlus, X } from 'lucide-react';
+import { ArrowRightLeft, Check, Loader, Search, UserMinus, UserPlus, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 // "Add from club roster" popup for coaches: every registered player, one tap
-// to put them on the coach's team. New signups start Unassigned (automatic
+// to put them on the coach's team, or "Move" to hand a player to any other
+// coach (or back to Unassigned). New signups start Unassigned (automatic
 // placement is off) and are flagged NEW for 3 days.
 
 interface DirectoryPlayer {
@@ -18,6 +19,12 @@ interface DirectoryPlayer {
   team_coach?: string | null;
   created_at?: string | null;
   parent_name: string;
+}
+
+interface CoachOption {
+  team_id: string;
+  coach_name: string;
+  is_me: boolean;
 }
 
 interface CoachPlayerPickerProps {
@@ -53,6 +60,9 @@ const isInactive = (player: DirectoryPlayer) =>
 
 export default function CoachPlayerPicker({ teamId, open, onClose, onChanged, onRegisterNew }: CoachPlayerPickerProps) {
   const [players, setPlayers] = useState<DirectoryPlayer[]>([]);
+  const [coaches, setCoaches] = useState<CoachOption[]>([]);
+  // Player whose "Move to…" sheet is open.
+  const [moving, setMoving] = useState<DirectoryPlayer | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
@@ -73,6 +83,7 @@ export default function CoachPlayerPicker({ teamId, open, onClose, onChanged, on
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Could not load the club roster.');
       setPlayers(((payload.players || []) as DirectoryPlayer[]).filter((player) => !isInactive(player)));
+      setCoaches((payload.coaches || []) as CoachOption[]);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Could not load the club roster.');
     } finally {
@@ -83,16 +94,20 @@ export default function CoachPlayerPicker({ teamId, open, onClose, onChanged, on
   useEffect(() => {
     if (open) {
       setQuery('');
+      setMoving(null);
       void load();
     }
   }, [open, load]);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (moving) setMoving(null); else onClose();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open, onClose, moving]);
 
   const newCount = useMemo(() => players.filter((player) => isNewPlayer(player) && player.team_assigned === 'Unassigned').length, [players]);
 
@@ -109,18 +124,22 @@ export default function CoachPlayerPicker({ teamId, open, onClose, onChanged, on
       .sort((a, b) => rank(a) - rank(b) || playerName(a).localeCompare(playerName(b)));
   }, [players, query, teamId]);
 
-  const move = async (player: DirectoryPlayer, action: 'claim' | 'release') => {
+  const coachFor = (team: string) => coaches.find((coach) => coach.team_id === team)?.coach_name || null;
+
+  // Send a player to any team: mine, another coach's, or 'Unassigned'.
+  const move = async (player: DirectoryPlayer, targetTeam: string) => {
     setBusyId(player.id);
     setError('');
     try {
       const response = await fetch('/api/auth/coach/assign-player', {
         method: 'POST',
         headers: await authHeaders(),
-        body: JSON.stringify({ player_id: player.id, action }),
+        body: JSON.stringify({ player_id: player.id, target_team: targetTeam }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Could not move the player.');
-      setPlayers((current) => current.map((row) => (row.id === player.id ? { ...row, team_assigned: payload.team_assigned, team_coach: null } : row)));
+      setPlayers((current) => current.map((row) => (row.id === player.id ? { ...row, team_assigned: payload.team_assigned, team_coach: coachFor(payload.team_assigned) } : row)));
+      setMoving(null);
       await onChanged();
     } catch (moveError) {
       setError(moveError instanceof Error ? moveError.message : 'Could not move the player.');
@@ -133,11 +152,11 @@ export default function CoachPlayerPicker({ teamId, open, onClose, onChanged, on
 
   return (
     <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/85 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-t-2xl border border-gray-800 bg-neutral-950 shadow-2xl sm:rounded-2xl" onClick={(event) => event.stopPropagation()}>
+      <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-gray-800 bg-neutral-950 shadow-2xl sm:rounded-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 border-b border-gray-800 p-5">
           <div>
             <h2 className="text-2xl font-black uppercase italic text-white">Add players to {teamId}</h2>
-            <p className="mt-1 text-sm text-gray-500">Tap <span className="font-bold text-white">Add</span> next to any registered player. {newCount > 0 ? <span className="font-bold text-[#D4AF37]">{newCount} new signup{newCount === 1 ? '' : 's'} this week still need a team.</span> : null}</p>
+            <p className="mt-1 text-sm text-gray-500">Tap <span className="font-bold text-white">Add</span> to put a player on your team, or <span className="font-bold text-white">Move</span> to hand one to another coach. {newCount > 0 ? <span className="font-bold text-[#D4AF37]">{newCount} new signup{newCount === 1 ? '' : 's'} this week still need a team.</span> : null}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg border border-gray-800 p-2 text-gray-500 hover:border-[#EF4444] hover:text-[#EF4444]" aria-label="Close"><X size={18} /></button>
         </div>
@@ -181,33 +200,98 @@ export default function CoachPlayerPicker({ teamId, open, onClose, onChanged, on
                         {' · '}{player.parent_name}
                       </p>
                     </div>
-                    {mine ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => move(player, 'release')}
-                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-green-300 hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-300"
-                        title="Remove from your team"
-                      >
-                        {busy ? <Loader size={12} className="animate-spin" /> : <Check size={12} />} Added
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => move(player, 'claim')}
-                        className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-60 ${unassigned ? 'bg-[#EF4444] hover:bg-red-700' : 'border border-gray-700 bg-black hover:border-[#D4AF37]'}`}
-                        title={unassigned ? 'Add to your team' : `Move from ${player.team_assigned} to your team`}
-                      >
-                        {busy ? <Loader size={12} className="animate-spin" /> : <UserPlus size={12} />} {unassigned ? 'Add' : 'Move'}
-                      </button>
-                    )}
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {mine ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setMoving(player)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-green-300 hover:border-[#D4AF37]"
+                          title="On your team — tap to move or remove"
+                        >
+                          {busy ? <Loader size={12} className="animate-spin" /> : <Check size={12} />} Added
+                        </button>
+                      ) : (
+                        <>
+                          {unassigned && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => move(player, teamId)}
+                              className="inline-flex items-center gap-1 rounded-lg bg-[#EF4444] px-3.5 py-2.5 text-[10px] font-black uppercase tracking-widest text-white hover:bg-red-700 disabled:opacity-60"
+                              title="Add to your team"
+                            >
+                              {busy ? <Loader size={12} className="animate-spin" /> : <UserPlus size={12} />} Add
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => setMoving(player)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-gray-700 bg-black px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-gray-200 hover:border-[#D4AF37] disabled:opacity-60"
+                            title="Choose which coach gets this player"
+                          >
+                            <ArrowRightLeft size={12} /> Move
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </li>
                 );
               })}
             </ul>
           )}
         </div>
+
+        {moving && (
+          <div className="absolute inset-0 z-10 flex items-end justify-center bg-black/70 sm:items-center sm:p-6" onClick={() => setMoving(null)}>
+            <div className="w-full max-w-md rounded-t-2xl border border-gray-700 bg-neutral-950 shadow-2xl sm:rounded-2xl" onClick={(event) => event.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 border-b border-gray-800 p-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Move player</p>
+                  <h3 className="truncate text-lg font-black uppercase italic text-white">{playerName(moving)}</h3>
+                  <p className="text-xs text-gray-500">Now: {moving.team_assigned === 'Unassigned' ? 'no team' : `${moving.team_assigned}${moving.team_coach ? ` · Coach ${moving.team_coach}` : ''}`}</p>
+                </div>
+                <button type="button" onClick={() => setMoving(null)} className="rounded-lg border border-gray-800 p-2 text-gray-500 hover:text-white" aria-label="Back"><X size={16} /></button>
+              </div>
+              <ul className="max-h-[55vh] overflow-y-auto divide-y divide-gray-900">
+                {coaches.filter((coach) => coach.team_id !== moving.team_assigned).map((coach) => (
+                  <li key={coach.team_id}>
+                    <button
+                      type="button"
+                      disabled={busyId === moving.id}
+                      onClick={() => move(moving, coach.team_id)}
+                      className={`flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-neutral-900 ${coach.is_me ? 'bg-[#EF4444]/10' : ''}`}
+                    >
+                      <span>
+                        <span className="block font-black uppercase italic text-white">{coach.team_id}{coach.is_me ? ' · my team' : ''}</span>
+                        <span className="block text-xs text-gray-500">Coach {coach.coach_name}</span>
+                      </span>
+                      {busyId === moving.id ? <Loader size={14} className="animate-spin text-gray-500" /> : <ArrowRightLeft size={14} className={coach.is_me ? 'text-[#EF4444]' : 'text-gray-500'} />}
+                    </button>
+                  </li>
+                ))}
+                {moving.team_assigned !== 'Unassigned' && (
+                  <li>
+                    <button
+                      type="button"
+                      disabled={busyId === moving.id}
+                      onClick={() => move(moving, 'Unassigned')}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-neutral-900"
+                    >
+                      <span>
+                        <span className="block font-black uppercase italic text-yellow-200">Remove from team</span>
+                        <span className="block text-xs text-gray-500">Back to the unassigned list for any coach to pick up</span>
+                      </span>
+                      <UserMinus size={14} className="text-yellow-200" />
+                    </button>
+                  </li>
+                )}
+                {coaches.length === 0 && <li className="px-4 py-4 text-sm text-gray-500">No coaches have teams yet.</li>}
+              </ul>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2 border-t border-gray-800 p-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-gray-500">Player not registered yet?</p>

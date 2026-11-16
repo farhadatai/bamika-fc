@@ -110,6 +110,9 @@ const getClubTeams = async (clubId: string) => {
   return data || []
 }
 
+// Paid visiting teams and Bamika's own (fee-waived) teams are both "in".
+const isEntered = (paymentStatus: string) => paymentStatus === 'paid' || paymentStatus === 'waived'
+
 const publicTeam = (team: { id: string, division: string, team_name: string, group_label: string | null, payment_status: string, paid_at: string | null }) => ({
   id: team.id,
   division: team.division,
@@ -143,6 +146,7 @@ interface RosterPlayerRow {
   jersey_number: string | null
   birth_cert_path: string | null
   created_at: string
+  source_player_id?: string | null
 }
 
 const rosterPlayerSchema = z.object({
@@ -161,7 +165,7 @@ const isMissingRosterTable = (message: string) => /tournament_roster_players/.te
 const getClubRoster = async (clubId: string) => {
   const { data, error } = await supabase
     .from('tournament_roster_players')
-    .select('id, team_id, club_id, full_name, date_of_birth, jersey_number, birth_cert_path, created_at')
+    .select('id, team_id, club_id, full_name, date_of_birth, jersey_number, birth_cert_path, created_at, source_player_id')
     .eq('club_id', clubId)
     .order('created_at', { ascending: true })
   if (error) {
@@ -597,7 +601,7 @@ router.post('/club/:token/teams/:teamId/players', portalLimiter, async (req: Req
       res.status(404).json({ error: 'Team not found.' })
       return
     }
-    if (team.payment_status !== 'paid') {
+    if (!isEntered(team.payment_status)) {
       res.status(400).json({ error: 'Pay this team\'s entry fee first, then add its players.' })
       return
     }
@@ -917,6 +921,345 @@ router.delete('/admin/clubs/:id', async (req: Request, res: Response): Promise<v
       return
     }
     const { error } = await supabase.from('tournament_clubs').delete().eq('id', req.params.id)
+    if (error) throw new Error(error.message)
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Bamika FC's own teams (coaches, no entry fee)
+// ---------------------------------------------------------------------------
+
+const HOME_CLUB_REFERENCE = 'BC26-HOME'
+const MAX_HOME_ENTRIES_PER_COACH_TEAM = 3
+
+// Coach or admin session, plus the coach's Bamika team label.
+const requireCoach = async (req: Request, res: Response) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+  if (!token) {
+    res.status(401).json({ error: 'Please log in again.' })
+    return null
+  }
+  const { data: authData, error: authError } = await supabase.auth.getUser(token)
+  if (authError || !authData.user) {
+    res.status(401).json({ error: 'Please log in again.' })
+    return null
+  }
+  const [{ data: profile }, { data: coachRow }] = await Promise.all([
+    supabase.from('profiles').select('role, first_name, last_name, full_name').eq('id', authData.user.id).single(),
+    supabase.from('coaches').select('team_id').eq('id', authData.user.id).maybeSingle(),
+  ])
+  if (profile?.role !== 'coach' && profile?.role !== 'admin') {
+    res.status(403).json({ error: 'Only Bamika coaches can enter club teams.' })
+    return null
+  }
+  const coachTeam = String(coachRow?.team_id || '').trim()
+  return {
+    user: authData.user,
+    isAdmin: profile?.role === 'admin',
+    coachTeam: coachTeam && coachTeam !== 'Unassigned' ? coachTeam : '',
+  }
+}
+
+type CoachSession = NonNullable<Awaited<ReturnType<typeof requireCoach>>>
+
+// The single "Bamika FC" club row that holds the home teams; created on first use.
+const getHomeClub = async (tournamentId: string) => {
+  const { data: existing, error } = await supabase
+    .from('tournament_clubs')
+    .select('id, tournament_id, club_name, status, is_home')
+    .eq('tournament_id', tournamentId)
+    .eq('is_home', true)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (existing) return existing
+  const { data: created, error: insertError } = await supabase
+    .from('tournament_clubs')
+    .insert({
+      tournament_id: tournamentId,
+      reference_code: HOME_CLUB_REFERENCE,
+      club_name: 'Bamika FC',
+      contact_name: 'Bamika FC',
+      email: adminNotifyEmail,
+      phone: '-',
+      city: 'Sacramento',
+      status: 'approved',
+      is_home: true,
+      reviewed_at: new Date().toISOString(),
+    })
+    .select('id, tournament_id, club_name, status, is_home')
+    .single()
+  if (insertError) throw new Error(insertError.message)
+  return created
+}
+
+interface HomeTeamRow {
+  id: string
+  club_id: string
+  division: string
+  team_name: string
+  group_label: string | null
+  payment_status: string
+  paid_at: string | null
+  coach_team: string | null
+  created_by: string | null
+}
+
+const getHomeTeams = async (clubId: string) => {
+  const { data, error } = await supabase
+    .from('tournament_club_teams')
+    .select('id, club_id, division, team_name, group_label, payment_status, paid_at, coach_team, created_by')
+    .eq('club_id', clubId)
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data || []) as HomeTeamRow[]
+}
+
+const coachNamesByTeam = async () => {
+  const { data: coachRows } = await supabase.from('coaches').select('id, team_id')
+  const rows = ((coachRows || []) as Array<{ id: string, team_id: string | null }>).filter((row) => row.team_id)
+  const byTeam: Record<string, string> = {}
+  if (rows.length === 0) return byTeam
+  const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name, full_name').in('id', rows.map((row) => row.id))
+  const nameById: Record<string, string> = {}
+  for (const profile of (profiles || []) as Array<{ id: string, first_name?: string | null, last_name?: string | null, full_name?: string | null }>) {
+    nameById[profile.id] = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.full_name || 'Coach'
+  }
+  for (const row of rows) byTeam[row.team_id as string] = nameById[row.id] || 'Coach'
+  return byTeam
+}
+
+// "U14 A" -> "U14" when that age group exists in the tournament.
+const divisionFromTeamLabel = (label: string, divisions: string[]) => {
+  const match = label.match(/^(U\d{1,2})/i)
+  const guess = match ? match[1].toUpperCase() : ''
+  return divisions.includes(guess) ? guess : ''
+}
+
+const ACTIVE_FILTER = (status: unknown) => !['inactive', 'cancelled', 'canceled', 'deleted'].includes(String(status || '').toLowerCase())
+
+// Everything the coach dashboard needs for its tournament card.
+router.get('/coach/entries', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const coach = await requireCoach(req, res)
+    if (!coach) return
+    const tournament = await getTournament()
+    if (!tournament) {
+      res.status(404).json({ error: 'Tournament not found.' })
+      return
+    }
+    const club = await getHomeClub(tournament.id)
+    const [teams, roster, coachNames] = await Promise.all([getHomeTeams(club.id), getClubRoster(club.id), coachNamesByTeam()])
+
+    // The coach's own Bamika players, ready to be picked.
+    let myPlayers: Array<{ id: string, full_name: string, date_of_birth: string | null, jersey_number: string | null }> = []
+    if (coach.coachTeam) {
+      const { data } = await supabase
+        .from('players')
+        .select('id, full_name, date_of_birth, jersey_number, status')
+        .eq('team_assigned', coach.coachTeam)
+        .order('full_name', { ascending: true })
+      myPlayers = ((data || []) as Array<{ id: string, full_name: string, date_of_birth: string | null, jersey_number: string | null, status: string | null }>)
+        .filter((player) => ACTIVE_FILTER(player.status))
+        .map(({ id, full_name, date_of_birth, jersey_number }) => ({ id, full_name, date_of_birth, jersey_number }))
+    }
+
+    res.json({
+      tournament: {
+        name: tournament.name,
+        starts_on: tournament.starts_on,
+        ends_on: tournament.ends_on,
+        venue_name: tournament.venue_name,
+        divisions: tournament.divisions,
+        roster_min: tournament.roster_min,
+        roster_max: tournament.roster_max,
+        roster_deadline: tournament.roster_deadline,
+        rosters_locked: rostersLocked(tournament),
+      },
+      coach_team: coach.coachTeam,
+      suggested_division: coach.coachTeam ? divisionFromTeamLabel(coach.coachTeam, tournament.divisions) : '',
+      max_entries: MAX_HOME_ENTRIES_PER_COACH_TEAM,
+      teams: teams.map((team) => ({
+        ...publicTeam(team),
+        coach_team: team.coach_team,
+        coach_name: team.coach_team ? coachNames[team.coach_team] || null : null,
+        mine: coach.isAdmin || (Boolean(coach.coachTeam) && team.coach_team === coach.coachTeam),
+        player_count: roster.filter((player) => player.team_id === team.id).length,
+      })),
+      roster: roster.map((player) => ({ ...publicRosterPlayer(player), source_player_id: player.source_player_id || null })),
+      my_players: myPlayers,
+    })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+const homeTeamSchema = z.object({
+  division: z.string().trim().min(2).max(10),
+  teamName: z.string().trim().min(2, 'Give the team a name.').max(80),
+})
+
+// Coach enters a Bamika team. No fee: payment_status = 'waived'.
+router.post('/coach/teams', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const coach = await requireCoach(req, res)
+    if (!coach) return
+    if (!coach.coachTeam) {
+      res.status(400).json({ error: 'You need a Bamika team assigned by the admin before entering the tournament.' })
+      return
+    }
+    const parsed = homeTeamSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message || 'Check the team details.' })
+      return
+    }
+    const tournament = await getTournament()
+    if (!tournament) throw new Error('Tournament not found')
+    if (!(tournament.divisions as string[]).includes(parsed.data.division)) {
+      res.status(400).json({ error: 'Pick one of the tournament age groups.' })
+      return
+    }
+    if (rostersLocked(tournament)) {
+      res.status(400).json({ error: 'Rosters are locked. Contact the admin for changes.' })
+      return
+    }
+    const club = await getHomeClub(tournament.id)
+    const teams = await getHomeTeams(club.id)
+    if (teams.filter((team) => team.coach_team === coach.coachTeam).length >= MAX_HOME_ENTRIES_PER_COACH_TEAM) {
+      res.status(400).json({ error: `Up to ${MAX_HOME_ENTRIES_PER_COACH_TEAM} tournament teams per Bamika team.` })
+      return
+    }
+    if (teams.some((team) => team.division === parsed.data.division && team.team_name.toLowerCase() === parsed.data.teamName.toLowerCase())) {
+      res.status(400).json({ error: 'A Bamika team with that name is already entered in this age group.' })
+      return
+    }
+    const { data: created, error } = await supabase
+      .from('tournament_club_teams')
+      .insert({
+        club_id: club.id,
+        division: parsed.data.division,
+        team_name: parsed.data.teamName,
+        payment_status: 'waived',
+        paid_at: new Date().toISOString(),
+        coach_team: coach.coachTeam,
+        created_by: coach.user.id,
+      })
+      .select('id, club_id, division, team_name, group_label, payment_status, paid_at, coach_team, created_by')
+      .single()
+    if (error) throw new Error(error.message)
+    res.status(201).json({ success: true, team: { ...publicTeam(created), coach_team: created.coach_team, mine: true, player_count: 0 } })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+// Shared guard: the team must be a Bamika entry this coach may manage.
+const getManagedHomeTeam = async (coach: CoachSession, teamId: string, res: Response) => {
+  const tournament = await getTournament()
+  if (!tournament) throw new Error('Tournament not found')
+  const club = await getHomeClub(tournament.id)
+  const teams = await getHomeTeams(club.id)
+  const team = teams.find((row) => row.id === teamId)
+  if (!team) {
+    res.status(404).json({ error: 'Team not found.' })
+    return null
+  }
+  if (!coach.isAdmin && (!coach.coachTeam || team.coach_team !== coach.coachTeam)) {
+    res.status(403).json({ error: `Only the ${team.coach_team || 'owning'} coach can change this team.` })
+    return null
+  }
+  if (rostersLocked(tournament)) {
+    res.status(400).json({ error: 'Rosters are locked. Contact the admin for changes.' })
+    return null
+  }
+  return { tournament, club, team }
+}
+
+// Put one of the club's registered players on a Bamika tournament team.
+router.post('/coach/teams/:teamId/players', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const coach = await requireCoach(req, res)
+    if (!coach) return
+    const managed = await getManagedHomeTeam(coach, req.params.teamId, res)
+    if (!managed) return
+    const { tournament, club, team } = managed
+    const playerId = String(req.body?.player_id || '').trim()
+    if (!playerId) {
+      res.status(400).json({ error: 'Missing player.' })
+      return
+    }
+    const { data: player, error: playerError } = await supabase
+      .from('players')
+      .select('id, full_name, date_of_birth, jersey_number, status')
+      .eq('id', playerId)
+      .maybeSingle()
+    if (playerError) throw new Error(playerError.message)
+    if (!player || !ACTIVE_FILTER(player.status)) {
+      res.status(404).json({ error: 'Player not found.' })
+      return
+    }
+    if (!player.date_of_birth) {
+      res.status(400).json({ error: `${player.full_name} has no birth date on file. Ask the admin to add it first.` })
+      return
+    }
+    const roster = await getClubRoster(club.id)
+    const onTeam = roster.filter((row) => row.team_id === team.id)
+    if (onTeam.length >= tournament.roster_max) {
+      res.status(400).json({ error: `This team already has the maximum of ${tournament.roster_max} players.` })
+      return
+    }
+    if (onTeam.some((row) => row.source_player_id === player.id)) {
+      res.status(400).json({ error: `${player.full_name} is already on this team.` })
+      return
+    }
+    const jersey = String(player.jersey_number || '').trim()
+    const { data: created, error } = await supabase
+      .from('tournament_roster_players')
+      .insert({
+        team_id: team.id,
+        club_id: club.id,
+        full_name: player.full_name,
+        date_of_birth: String(player.date_of_birth).slice(0, 10),
+        jersey_number: jersey && jersey !== '-' ? jersey.slice(0, 4) : null,
+        source_player_id: player.id,
+      })
+      .select('id, team_id, club_id, full_name, date_of_birth, jersey_number, birth_cert_path, created_at, source_player_id')
+      .single()
+    if (error) throw new Error(error.message)
+    res.status(201).json({ success: true, player: { ...publicRosterPlayer(created), source_player_id: created.source_player_id } })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+router.delete('/coach/teams/:teamId/players/:playerId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const coach = await requireCoach(req, res)
+    if (!coach) return
+    const managed = await getManagedHomeTeam(coach, req.params.teamId, res)
+    if (!managed) return
+    const { error } = await supabase
+      .from('tournament_roster_players')
+      .delete()
+      .eq('id', req.params.playerId)
+      .eq('team_id', managed.team.id)
+    if (error) throw new Error(error.message)
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+// Withdraw a Bamika team (its roster goes with it).
+router.delete('/coach/teams/:teamId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const coach = await requireCoach(req, res)
+    if (!coach) return
+    const managed = await getManagedHomeTeam(coach, req.params.teamId, res)
+    if (!managed) return
+    const { error } = await supabase.from('tournament_club_teams').delete().eq('id', managed.team.id)
     if (error) throw new Error(error.message)
     res.json({ success: true })
   } catch (error) {

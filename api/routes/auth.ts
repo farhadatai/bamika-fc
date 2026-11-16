@@ -218,7 +218,7 @@ router.get('/coach-player-directory', async (req: Request, res: Response): Promi
     ])
 
     const coachByTeam: Record<string, string> = {}
-    const coachList = ((coachRows || []) as Array<{ id: string, team_id: string | null }>).filter((row) => row.team_id)
+    const coachList = ((coachRows || []) as Array<{ id: string, team_id: string | null }>).filter((row) => row.team_id && row.team_id !== 'Unassigned')
     if (coachList.length > 0) {
       const { data: coachProfiles } = await supabase
         .from('profiles')
@@ -264,7 +264,12 @@ router.get('/coach-player-directory', async (req: Request, res: Response): Promi
       }
     })
 
-    res.status(200).json({ players: directory })
+    // Every coach with a team, so a player can be moved straight to any of them.
+    const coaches = coachList
+      .map((row) => ({ team_id: row.team_id as string, coach_name: coachByTeam[row.team_id as string] || 'Coach', is_me: row.id === coachUser.id }))
+      .sort((a, b) => a.team_id.localeCompare(b.team_id, undefined, { numeric: true }))
+
+    res.status(200).json({ players: directory, coaches })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to load the club player directory.'
     res.status(500).json({ error: message })
@@ -272,9 +277,13 @@ router.get('/coach-player-directory', async (req: Request, res: Response): Promi
 })
 
 /**
- * Coach picks a player for their own team ("claim") or sends one of their
- * players back to Unassigned ("release"). Replaces automatic placement.
- * POST /api/auth/coach/assign-player  { player_id, action: 'claim' | 'release' }
+ * Coach moves a player between teams. Replaces automatic placement.
+ * POST /api/auth/coach/assign-player
+ *   { player_id, target_team }            -> any coach's team, or 'Unassigned'
+ *   { player_id, action: 'claim' }        -> my team (legacy)
+ *   { player_id, action: 'release' }      -> Unassigned (legacy)
+ * Any coach may move any active player: the club is small and transfers between
+ * coaches should be one tap, not an admin ticket.
  */
 router.post('/coach/assign-player', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -288,20 +297,33 @@ router.post('/coach/assign-player', async (req: Request, res: Response): Promise
 
     const playerId = String(req.body?.player_id || '').trim()
     const action = req.body?.action === 'release' ? 'release' : 'claim'
+    const requestedTarget = String(req.body?.target_team || '').trim()
     if (!playerId) {
       res.status(400).json({ error: 'Missing player.' })
       return
     }
 
-    const { data: coachRow } = await supabase
-      .from('coaches')
-      .select('team_id')
-      .eq('id', coachUser.id)
-      .maybeSingle()
-    const coachTeam = String(coachRow?.team_id || '').trim()
-    if (!coachTeam || coachTeam === 'Unassigned') {
-      res.status(400).json({ error: 'You need a team assigned by the admin before adding players to it.' })
-      return
+    const { data: coachRows } = await supabase.from('coaches').select('id, team_id')
+    const allCoaches = (coachRows || []) as Array<{ id: string, team_id: string | null }>
+    const coachTeam = String(allCoaches.find((row) => row.id === coachUser.id)?.team_id || '').trim()
+    const coachTeams = new Set(allCoaches.map((row) => String(row.team_id || '').trim()).filter((team) => team && team !== 'Unassigned'))
+
+    // Where is the player going?
+    let nextTeam: string
+    if (requestedTarget) {
+      if (requestedTarget !== 'Unassigned' && !coachTeams.has(requestedTarget)) {
+        res.status(400).json({ error: `${requestedTarget} does not have a coach yet. Ask the admin to assign one first.` })
+        return
+      }
+      nextTeam = requestedTarget
+    } else if (action === 'release') {
+      nextTeam = 'Unassigned'
+    } else {
+      if (!coachTeam || coachTeam === 'Unassigned') {
+        res.status(400).json({ error: 'You need a team assigned by the admin before adding players to it.' })
+        return
+      }
+      nextTeam = coachTeam
     }
 
     const { data: player, error: playerError } = await supabase
@@ -321,17 +343,11 @@ router.post('/coach/assign-player', async (req: Request, res: Response): Promise
       return
     }
 
-    if (action === 'release') {
-      if (currentTeam !== coachTeam) {
-        res.status(403).json({ error: 'You can only remove players from your own team.' })
-        return
-      }
-    } else if (currentTeam === coachTeam) {
-      res.status(200).json({ success: true, team_assigned: coachTeam, message: `${player.full_name} is already on your team.` })
+    if (currentTeam === nextTeam) {
+      res.status(200).json({ success: true, team_assigned: nextTeam, previous_team: currentTeam, message: `${player.full_name} is already ${nextTeam === 'Unassigned' ? 'unassigned' : `on ${nextTeam}`}.` })
       return
     }
 
-    const nextTeam = action === 'release' ? 'Unassigned' : coachTeam
     const { error: updateError } = await supabase
       .from('players')
       .update({ team_assigned: nextTeam })
@@ -345,9 +361,9 @@ router.post('/coach/assign-player', async (req: Request, res: Response): Promise
       success: true,
       team_assigned: nextTeam,
       previous_team: currentTeam,
-      message: action === 'release'
+      message: nextTeam === 'Unassigned'
         ? `${player.full_name} moved back to Unassigned.`
-        : `${player.full_name} added to ${coachTeam}${currentTeam !== 'Unassigned' ? ` (moved from ${currentTeam})` : ''}.`,
+        : `${player.full_name} ${nextTeam === coachTeam ? 'added to your team' : `moved to ${nextTeam}`}${currentTeam !== 'Unassigned' ? ` (from ${currentTeam})` : ''}.`,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to update the player\'s team.'

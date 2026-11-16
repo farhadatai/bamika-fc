@@ -7,6 +7,7 @@ import { Loader, Phone, User, Camera, Calendar, Clock, MapPin, Megaphone, Mail, 
 import { PLAYER_POSITION_OPTIONS } from '../lib/formations';
 import { ROSTER_SORT_OPTIONS, sortRoster, type RosterSortKey } from '../lib/roster';
 import CoachPlayerPicker from '../components/CoachPlayerPicker';
+import CoachTournamentEntry from '../components/CoachTournamentEntry';
 
 interface Player {
   id: string;
@@ -496,37 +497,42 @@ export default function CoachDashboard() {
     )}
 
     <div className="no-print w-full space-y-6 pb-20">
-      <div className="flex flex-col gap-4 rounded-2xl border border-gray-800 bg-neutral-950 p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black uppercase italic text-white sm:text-3xl">Coach Dashboard</h1>
-          <p className="mt-1 text-sm font-bold uppercase tracking-widest text-gray-500">
-            {teamId ? teamId : 'No team assigned yet'}
-          </p>
+      <div className="flex flex-col gap-3 rounded-2xl border border-gray-800 bg-neutral-950 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="flex items-center gap-3">
+          {profile?.photo_url ? (
+            <img src={profile.photo_url} alt="" className="h-11 w-11 rounded-full border border-gray-800 object-cover" />
+          ) : (
+            <div className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-800 bg-black"><User size={18} className="text-gray-500" /></div>
+          )}
+          <div>
+            <h1 className="text-xl font-black uppercase italic leading-tight text-white sm:text-2xl">Coach Dashboard</h1>
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500">
+              {getCoachDisplayName(profile, user?.email)} · {teamId ? teamId : 'No team yet'}
+            </p>
+          </div>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+        <div className="grid grid-cols-3 gap-2 sm:flex">
           <button
             type="button"
             onClick={() => navigate('/team-builder')}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#D4AF37]/50 px-4 py-3 text-sm font-black uppercase text-[#D4AF37] hover:bg-[#D4AF37]/10 sm:py-2"
+            className="inline-flex flex-col items-center justify-center gap-1 rounded-lg border border-[#D4AF37]/50 px-2 py-2.5 text-[10px] font-black uppercase leading-tight text-[#D4AF37] hover:bg-[#D4AF37]/10 sm:flex-row sm:gap-2 sm:px-4 sm:text-xs"
           >
-            <Grid3x3 size={17} /> Teams & Lineups
+            <Grid3x3 size={16} /> Lineups
           </button>
           <button
             type="button"
             onClick={() => navigate('/register-new-athlete')}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-3 text-sm font-black uppercase text-white hover:bg-red-700 sm:py-2"
+            className="inline-flex flex-col items-center justify-center gap-1 rounded-lg bg-[#EF4444] px-2 py-2.5 text-[10px] font-black uppercase leading-tight text-white hover:bg-red-700 sm:flex-row sm:gap-2 sm:px-4 sm:text-xs"
           >
-            <Plus size={17} /> Register My Child
+            <Plus size={16} /> Register Child
           </button>
-          {profile && (
-            <button
-              onClick={() => setShowEditProfile(!showEditProfile)}
-              className="flex items-center justify-center gap-2 rounded-lg border border-gray-700 bg-black px-4 py-3 text-sm font-bold text-gray-300 shadow-sm hover:bg-gray-900 sm:py-2"
-            >
-              <User size={18} />
-              My Profile
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setShowEditProfile(!showEditProfile)}
+            className="inline-flex flex-col items-center justify-center gap-1 rounded-lg border border-gray-700 bg-black px-2 py-2.5 text-[10px] font-black uppercase leading-tight text-gray-300 hover:bg-gray-900 sm:flex-row sm:gap-2 sm:px-4 sm:text-xs"
+          >
+            <User size={16} /> Profile
+          </button>
         </div>
       </div>
 
@@ -600,21 +606,213 @@ export default function CoachDashboard() {
       )}
 
       {teamId && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
-            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Team</div>
-            <div className="mt-2 text-2xl font-black uppercase italic text-white">{teamId}</div>
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          <div className="rounded-xl border border-gray-800 bg-neutral-900 p-3 sm:rounded-2xl sm:p-5">
+            <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 sm:text-[10px]">Team</div>
+            <div className="mt-1 truncate text-lg font-black uppercase italic text-white sm:mt-2 sm:text-2xl">{teamId}</div>
           </div>
-          <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
-            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Players</div>
-            <div className="mt-2 text-2xl font-black text-white">{players.length}</div>
+          <div className="rounded-xl border border-gray-800 bg-neutral-900 p-3 sm:rounded-2xl sm:p-5">
+            <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 sm:text-[10px]">Players</div>
+            <div className="mt-1 text-lg font-black text-white sm:mt-2 sm:text-2xl">{players.length}</div>
           </div>
-          <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
-            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Upcoming Games</div>
-            <div className="mt-2 text-2xl font-black text-white">{games.length}</div>
+          <div className="rounded-xl border border-gray-800 bg-neutral-900 p-3 sm:rounded-2xl sm:p-5">
+            <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 sm:text-[10px]">Games</div>
+            <div className="mt-1 text-lg font-black text-white sm:mt-2 sm:text-2xl">{games.length}</div>
           </div>
         </div>
       )}
+
+      {teamId && (
+        <section className="rounded-2xl border border-gray-800 bg-neutral-900 p-4 sm:p-5">
+          <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-xl font-black uppercase italic text-white">Team Roster <span className="text-sm not-italic text-gray-500">· {players.length}</span></h2>
+              <p className="text-xs text-gray-500 sm:text-sm">Tap a player to open their card. Set position, number and size right on the list.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <button
+                type="button"
+                onClick={() => setShowPicker(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700 sm:py-2"
+              >
+                <Plus size={15} />
+                Add Players
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrinting(true)}
+                disabled={players.length === 0}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-700 px-4 py-3 text-xs font-black uppercase text-gray-200 hover:border-[#D4AF37] hover:text-white disabled:opacity-50 sm:py-2"
+                title="Print or save the roster as a PDF"
+              >
+                <Printer size={15} />
+                Print / PDF
+              </button>
+              <select
+                value={teamSort}
+                onChange={(event) => setTeamSort(event.target.value as RosterSortKey)}
+                aria-label="Sort team roster"
+                className="col-span-2 rounded-lg border border-gray-800 bg-neutral-950 px-3 py-3 text-xs font-bold text-white outline-none focus:border-[#D4AF37] sm:py-2"
+              >
+                {ROSTER_SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>Sort: {option.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {players.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-800 bg-black p-6 text-center text-gray-500">
+              No players assigned to {teamId} yet.
+            </div>
+          ) : (
+            <>
+            <div className="space-y-3 lg:hidden">
+              {sortedTeamPlayers.map((player) => (
+                <article key={player.id} className="rounded-xl border border-gray-800 bg-black p-3">
+                  <button type="button" onClick={() => setSelectedPlayer(player)} className="flex w-full items-center gap-3 text-left">
+                    {player.photo_url ? (
+                      <img src={player.photo_url} alt={getPlayerName(player)} className="h-12 w-12 rounded-xl border border-gray-800 object-cover" />
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-gray-800 bg-neutral-900">
+                        <User className="h-5 w-5 text-gray-500" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate font-black uppercase italic text-white">{getPlayerName(player)}</h3>
+                      <p className="text-[11px] font-bold uppercase text-gray-500">{calculateAge(player.dob)} yrs · {player.age_group || teamId}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${getRosterStatusClass(player.status)}`}>{player.status || 'Pending'}</span>
+                      <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${getRosterStatusClass(player.payment_status || player.status)}`}>{player.payment_status || player.status || 'Pending'}</span>
+                    </div>
+                  </button>
+
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <label className="block">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</span>
+                      <select value={player.position || 'TBD'} onChange={(e) => handleUpdatePlayer(player.id, { position: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
+                        <PositionOptions />
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Number</span>
+                      <input
+                        value={player.jersey_number || ''}
+                        placeholder="-"
+                        onChange={(e) => {
+                          const jerseyNumber = e.target.value;
+                          setPlayers((currentPlayers) => currentPlayers.map((currentPlayer) => currentPlayer.id === player.id ? { ...currentPlayer, jersey_number: jerseyNumber } : currentPlayer));
+                        }}
+                        onBlur={(e) => handleUpdatePlayer(player.id, { jersey_number: e.target.value || '-' })}
+                        className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Size</span>
+                      <select value={player.jersey_size || 'YM'} onChange={(e) => handleUpdatePlayer(player.id, { jersey_size: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
+                        {JERSEY_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-gray-900 bg-neutral-950 px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-bold text-gray-300">{getParentName(player.profiles) || 'Parent not listed'}</div>
+                      <div className="text-[11px] text-gray-500">{player.profiles.phone || 'No phone listed'}</div>
+                    </div>
+                    <div className="flex shrink-0 gap-1.5">
+                      {player.profiles.phone && <a href={`tel:${player.profiles.phone}`} className="rounded-lg border border-gray-800 p-2 text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]" aria-label="Call parent"><Phone size={14} /></a>}
+                      <button type="button" onClick={() => { setMessageTarget('player'); setSelectedMessagePlayerId(player.id); }} className="rounded-lg border border-gray-800 p-2 text-gray-300 hover:border-[#EF4444] hover:text-[#EF4444]" aria-label="Message this player"><Megaphone size={14} /></button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto rounded-xl border border-gray-800 bg-black lg:block">
+              <table className="min-w-[980px] w-full text-left text-sm">
+                <thead className="border-b border-gray-800 bg-neutral-950 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3">Player</th>
+                    <th className="px-4 py-3">Age</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Payment</th>
+                    <th className="px-4 py-3">Position</th>
+                    <th className="px-4 py-3">Number</th>
+                    <th className="px-4 py-3">Size</th>
+                    <th className="px-4 py-3">Parent</th>
+                    <th className="px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-900">
+                  {sortedTeamPlayers.map((player) => (
+                    <tr key={player.id} className="align-middle hover:bg-neutral-950/80">
+                      <td className="px-4 py-3">
+                        <button type="button" onClick={() => setSelectedPlayer(player)} className="flex items-center gap-3 text-left">
+                          {player.photo_url ? (
+                            <img src={player.photo_url} alt={getPlayerName(player)} className="h-10 w-10 rounded-lg border border-gray-800 object-cover" />
+                          ) : (
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-800 bg-neutral-900">
+                              <User className="h-5 w-5 text-gray-500" />
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-black uppercase italic text-white hover:text-[#EF4444]">{getPlayerName(player)}</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-gray-600">{player.age_group || teamId}</div>
+                          </div>
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-gray-300">{calculateAge(player.dob)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.status)}`}>{player.status || 'Pending'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.payment_status || player.status)}`}>{player.payment_status || player.status || 'Pending'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <select value={player.position || 'TBD'} onChange={(e) => handleUpdatePlayer(player.id, { position: e.target.value })} className="w-32 rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
+                          <PositionOptions />
+                        </select>
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          value={player.jersey_number || ''}
+                          placeholder="-"
+                          onChange={(e) => {
+                            const jerseyNumber = e.target.value;
+                            setPlayers((currentPlayers) => currentPlayers.map((currentPlayer) => currentPlayer.id === player.id ? { ...currentPlayer, jersey_number: jerseyNumber } : currentPlayer));
+                          }}
+                          onBlur={(e) => handleUpdatePlayer(player.id, { jersey_number: e.target.value || '-' })}
+                          className="w-20 rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <select value={player.jersey_size || 'YM'} onChange={(e) => handleUpdatePlayer(player.id, { jersey_size: e.target.value })} className="w-24 rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
+                          {JERSEY_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-4 py-3 text-gray-300">
+                        <div className="font-bold">{getParentName(player.profiles) || 'Parent not listed'}</div>
+                        <div className="text-xs text-gray-500">{player.profiles.phone || 'No phone listed'}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => setSelectedPlayer(player)} className="rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">View</button>
+                          <button type="button" onClick={() => { setMessageTarget('player'); setSelectedMessagePlayerId(player.id); }} className="rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-[#EF4444]">Message</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            </>
+          )}
+        </section>
+      )}
+
+      {teamId && <CoachTournamentEntry teamId={teamId} />}
 
       {teamId && (
         <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
@@ -719,200 +917,6 @@ export default function CoachDashboard() {
       )}
       
       {teamId && (
-        <section className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
-          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-xl font-black uppercase italic text-white">Team Roster</h2>
-              <p className="text-sm text-gray-500">Click a player name to open the full player card. Coaches can update jersey details and message families from here.</p>
-            </div>
-            <div className="flex flex-col gap-2 sm:items-end">
-              <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">{players.length} players</div>
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                <select
-                  value={teamSort}
-                  onChange={(event) => setTeamSort(event.target.value as RosterSortKey)}
-                  aria-label="Sort team roster"
-                  className="rounded-lg border border-gray-800 bg-neutral-950 px-3 py-3 text-xs font-bold text-white outline-none focus:border-[#D4AF37] sm:py-2"
-                >
-                  {ROSTER_SORT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>Sort: {option.label}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setPrinting(true)}
-                  disabled={players.length === 0}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-700 px-4 py-3 text-xs font-black uppercase text-gray-200 hover:border-[#D4AF37] hover:text-white disabled:opacity-50 sm:py-2"
-                  title="Print or save the roster as a PDF"
-                >
-                  <Printer size={15} />
-                  Print Roster
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPicker(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#EF4444] px-4 py-3 text-xs font-black uppercase text-white hover:bg-red-700 sm:py-2"
-                >
-                  <Plus size={15} />
-                  Add Players
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {players.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-800 bg-black p-6 text-center text-gray-500">
-              No players assigned to {teamId} yet.
-            </div>
-          ) : (
-            <>
-            <div className="space-y-3 lg:hidden">
-              {sortedTeamPlayers.map((player) => (
-                <article key={player.id} className="rounded-xl border border-gray-800 bg-black p-4">
-                  <button type="button" onClick={() => setSelectedPlayer(player)} className="flex w-full items-center gap-3 text-left">
-                    {player.photo_url ? (
-                      <img src={player.photo_url} alt={getPlayerName(player)} className="h-14 w-14 rounded-xl border border-gray-800 object-cover" />
-                    ) : (
-                      <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-gray-800 bg-neutral-900">
-                        <User className="h-6 w-6 text-gray-500" />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate font-black uppercase italic text-white">{getPlayerName(player)}</h3>
-                      <p className="text-xs font-bold uppercase text-gray-500">{calculateAge(player.dob)} years old - {player.age_group || teamId}</p>
-                    </div>
-                  </button>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.status)}`}>{player.status || 'Pending'}</span>
-                    <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.payment_status || player.status)}`}>{player.payment_status || player.status || 'Pending'}</span>
-                  </div>
-
-                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                    <label className="block">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Position</span>
-                      <select value={player.position || 'TBD'} onChange={(e) => handleUpdatePlayer(player.id, { position: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
-                        <PositionOptions />
-                      </select>
-                    </label>
-                    <label className="block">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Number</span>
-                      <input
-                        value={player.jersey_number || ''}
-                        placeholder="-"
-                        onChange={(e) => {
-                          const jerseyNumber = e.target.value;
-                          setPlayers((currentPlayers) => currentPlayers.map((currentPlayer) => currentPlayer.id === player.id ? { ...currentPlayer, jersey_number: jerseyNumber } : currentPlayer));
-                        }}
-                        onBlur={(e) => handleUpdatePlayer(player.id, { jersey_number: e.target.value || '-' })}
-                        className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Size</span>
-                      <select value={player.jersey_size || 'YM'} onChange={(e) => handleUpdatePlayer(player.id, { jersey_size: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
-                        {JERSEY_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
-                      </select>
-                    </label>
-                  </div>
-
-                  <div className="mt-4 rounded-lg border border-gray-900 bg-neutral-950 p-3">
-                    <div className="text-[9px] font-black uppercase tracking-widest text-gray-600">Parent</div>
-                    <div className="mt-1 text-sm font-bold text-gray-300">{getParentName(player.profiles) || 'Parent not listed'}</div>
-                    <div className="text-xs text-gray-500">{player.profiles.phone || 'No phone listed'}</div>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button type="button" onClick={() => setSelectedPlayer(player)} className="rounded-lg border border-gray-800 px-3 py-3 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">View</button>
-                    <button type="button" onClick={() => { setMessageTarget('player'); setSelectedMessagePlayerId(player.id); }} className="rounded-lg border border-gray-800 px-3 py-3 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-[#EF4444]">Message</button>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            <div className="hidden overflow-x-auto rounded-xl border border-gray-800 bg-black lg:block">
-              <table className="min-w-[980px] w-full text-left text-sm">
-                <thead className="border-b border-gray-800 bg-neutral-950 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                  <tr>
-                    <th className="px-4 py-3">Player</th>
-                    <th className="px-4 py-3">Age</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Payment</th>
-                    <th className="px-4 py-3">Position</th>
-                    <th className="px-4 py-3">Number</th>
-                    <th className="px-4 py-3">Size</th>
-                    <th className="px-4 py-3">Parent</th>
-                    <th className="px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-900">
-                  {sortedTeamPlayers.map((player) => (
-                    <tr key={player.id} className="align-middle hover:bg-neutral-950/80">
-                      <td className="px-4 py-3">
-                        <button type="button" onClick={() => setSelectedPlayer(player)} className="flex items-center gap-3 text-left">
-                          {player.photo_url ? (
-                            <img src={player.photo_url} alt={getPlayerName(player)} className="h-10 w-10 rounded-lg border border-gray-800 object-cover" />
-                          ) : (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-800 bg-neutral-900">
-                              <User className="h-5 w-5 text-gray-500" />
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-black uppercase italic text-white hover:text-[#EF4444]">{getPlayerName(player)}</div>
-                            <div className="text-[10px] font-black uppercase tracking-widest text-gray-600">{player.age_group || teamId}</div>
-                          </div>
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 font-bold text-gray-300">{calculateAge(player.dob)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.status)}`}>{player.status || 'Pending'}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${getRosterStatusClass(player.payment_status || player.status)}`}>{player.payment_status || player.status || 'Pending'}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <select value={player.position || 'TBD'} onChange={(e) => handleUpdatePlayer(player.id, { position: e.target.value })} className="w-32 rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
-                          <PositionOptions />
-                        </select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          value={player.jersey_number || ''}
-                          placeholder="-"
-                          onChange={(e) => {
-                            const jerseyNumber = e.target.value;
-                            setPlayers((currentPlayers) => currentPlayers.map((currentPlayer) => currentPlayer.id === player.id ? { ...currentPlayer, jersey_number: jerseyNumber } : currentPlayer));
-                          }}
-                          onBlur={(e) => handleUpdatePlayer(player.id, { jersey_number: e.target.value || '-' })}
-                          className="w-20 rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]"
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <select value={player.jersey_size || 'YM'} onChange={(e) => handleUpdatePlayer(player.id, { jersey_size: e.target.value })} className="w-24 rounded-lg border border-gray-800 bg-neutral-950 px-2 py-2 text-xs font-bold text-gray-300 outline-none focus:border-[#EF4444]">
-                          {JERSEY_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-gray-300">
-                        <div className="font-bold">{getParentName(player.profiles) || 'Parent not listed'}</div>
-                        <div className="text-xs text-gray-500">{player.profiles.phone || 'No phone listed'}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <button type="button" onClick={() => setSelectedPlayer(player)} className="rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">View</button>
-                          <button type="button" onClick={() => { setMessageTarget('player'); setSelectedMessagePlayerId(player.id); }} className="rounded-lg border border-gray-800 px-3 py-2 text-[10px] font-black uppercase text-gray-300 hover:border-[#EF4444] hover:text-[#EF4444]">Message</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            </>
-          )}
-        </section>
-      )}
-
-      {teamId && (
         <CoachPlayerPicker
           teamId={teamId}
           open={showPicker}
@@ -923,8 +927,8 @@ export default function CoachDashboard() {
       )}
 
       {showAddPlayer && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm" onClick={() => setShowAddPlayer(false)}>
-          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-gray-800 bg-neutral-950 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/85 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setShowAddPlayer(false)}>
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl border border-gray-800 bg-neutral-950 shadow-2xl sm:rounded-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 border-b border-gray-800 p-5">
               <div>
                 <h2 className="text-2xl font-black uppercase italic text-white">Add Player</h2>
@@ -974,8 +978,8 @@ export default function CoachDashboard() {
       )}
 
       {selectedPlayer && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onClick={() => setSelectedPlayer(null)}>
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-gray-800 bg-neutral-950 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setSelectedPlayer(null)}>
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl border border-gray-800 bg-neutral-950 shadow-2xl sm:rounded-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 border-b border-gray-800 p-5">
               <div className="flex items-center gap-4">
                 {selectedPlayer.photo_url ? (

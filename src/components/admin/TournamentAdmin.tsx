@@ -27,6 +27,9 @@ interface RosterPlayer {
   birth_cert_url: string | null
 }
 
+// Paid visiting teams and Bamika's own fee-waived teams both hold a spot.
+const isEntered = (paymentStatus: string) => paymentStatus === 'paid' || paymentStatus === 'waived'
+
 const ageOn = (dateOfBirth: string, onDate: string) => {
   const birth = new Date(`${dateOfBirth}T12:00:00`)
   const on = new Date(`${onDate}T12:00:00`)
@@ -148,7 +151,7 @@ export default function TournamentAdmin() {
       counts[club.status] += 1
       if (club.status !== 'declined') {
         counts.teams += club.tournament_club_teams.length
-        counts.paidTeams += club.tournament_club_teams.filter((team) => team.payment_status === 'paid').length
+        counts.paidTeams += club.tournament_club_teams.filter((team) => isEntered(team.payment_status)).length
       }
     }
     return counts
@@ -161,7 +164,7 @@ export default function TournamentAdmin() {
       for (const team of club.tournament_club_teams) {
         const entry = map[team.division] || { total: 0, paid: 0 }
         entry.total += 1
-        if (team.payment_status === 'paid') entry.paid += 1
+        if (isEntered(team.payment_status)) entry.paid += 1
         map[team.division] = entry
       }
     }
@@ -388,7 +391,7 @@ export default function TournamentAdmin() {
           <div className="divide-y divide-gray-800">
             {visibleClubs.map((club) => {
               const teams = club.tournament_club_teams
-              const paidCount = teams.filter((team) => team.payment_status === 'paid').length
+              const paidCount = teams.filter((team) => isEntered(team.payment_status)).length
               const busy = busyKey.endsWith(club.id)
               const hasPaid = paidCount > 0
               return (
@@ -409,13 +412,14 @@ export default function TournamentAdmin() {
 
                       <div className="mt-3 flex flex-wrap gap-2">
                         {teams.map((team) => {
-                          const paid = team.payment_status === 'paid'
+                          const paid = isEntered(team.payment_status)
+                          const waived = team.payment_status === 'waived'
                           const confirming = confirmKey === `team-${team.id}`
                           const rosterCount = rosterCounts[team.id] || { total: 0, certs: 0 }
                           const rosterOpen = openRosterTeamId === team.id
                           return (
                             <span key={team.id} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-bold ${paid ? 'border-green-500/40 bg-green-500/10 text-green-200' : 'border-gray-700 bg-black text-gray-200'}`}>
-                              <span><span className="text-[#D4AF37]">{team.division}</span> {team.team_name}{team.group_label ? ` · Group ${team.group_label}` : ''}{paid ? ' · paid' : ' · unpaid'}</span>
+                              <span><span className="text-[#D4AF37]">{team.division}</span> {team.team_name}{team.group_label ? ` · Group ${team.group_label}` : ''}{waived ? ' · Bamika (no fee)' : paid ? ' · paid' : ' · unpaid'}</span>
                               {paid && (
                                 <button
                                   onClick={() => toggleRoster(team)}
