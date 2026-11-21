@@ -67,6 +67,9 @@ const apiLimiter = rateLimit({
   // Vercel also sends the standardized Forwarded header. Express currently
   // resolves client IPs from X-Forwarded-For, so that is the intentional source.
   validate: { forwardedHeader: false },
+  // Admin tournament routes all require an admin session, and on tournament day
+  // the admin can easily make 100+ edits (marking payments, entering rosters).
+  skip: (req) => req.path.startsWith('/tournament/admin/'),
 })
 app.use('/api', apiLimiter)
 

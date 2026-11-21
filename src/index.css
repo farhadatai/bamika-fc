@@ -48,6 +48,11 @@ body {
     display: none !important;
   }
 
+  /* Admin tournament rosters print from a portal on <body>: hide the whole app. */
+  body.print-isolate > *:not(.print-portal) {
+    display: none !important;
+  }
+
   .print-area {
     position: static !important;
     left: auto !important;

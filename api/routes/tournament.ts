@@ -885,22 +885,93 @@ router.post('/admin/clubs/:id/sync-payments', async (req: Request, res: Response
   }
 })
 
-// Remove one team (only while unpaid — refund paid teams in Stripe first).
+// Look up one entered team (any club, including Bamika's own) for admin edits.
+const getTeamForAdmin = async (teamId: string) => {
+  const { data, error } = await supabase
+    .from('tournament_club_teams')
+    .select('id, club_id, division, team_name, payment_status, stripe_checkout_session_id')
+    .eq('id', teamId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return data as { id: string, club_id: string, division: string, team_name: string, payment_status: string, stripe_checkout_session_id: string | null } | null
+}
+
+// Delete the private birth-certificate files that belong to a set of roster rows.
+const removeCertFiles = async (filter: { column: 'club_id' | 'team_id', value: string }) => {
+  const { data } = await supabase
+    .from('tournament_roster_players')
+    .select('birth_cert_path')
+    .eq(filter.column, filter.value)
+  const paths = ((data || []) as Array<{ birth_cert_path: string | null }>)
+    .map((row) => row.birth_cert_path)
+    .filter((path): path is string => Boolean(path))
+  if (paths.length > 0) await supabase.storage.from(ROSTER_BUCKET).remove(paths)
+}
+
+// Save an uploaded birth certificate (base64 JSON from the browser) to the private bucket.
+const saveBirthCert = async (clubId: string, teamId: string, playerName: string, rawCert: { name?: string, type?: string, data?: string }): Promise<{ path: string } | { error: string }> => {
+  const cert = { name: rawCert.name || "", type: rawCert.type || "", data: rawCert.data || "" }
+  const extension = CERT_TYPES[cert.type.toLowerCase()]
+  if (!extension) return { error: 'Upload the birth certificate as a PDF or a photo (JPG, PNG, HEIC).' }
+  const buffer = Buffer.from(cert.data, 'base64')
+  if (buffer.length === 0 || buffer.length > MAX_CERT_BYTES) return { error: 'The birth certificate file must be under 6 MB.' }
+  const safeName = playerName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'player'
+  const path = `${clubId}/${teamId}/${Date.now()}-${safeName}.${extension}`
+  const { error } = await supabase.storage.from(ROSTER_BUCKET).upload(path, buffer, { contentType: cert.type.toLowerCase(), upsert: false })
+  if (error) throw new Error(`Could not save the birth certificate: ${error.message}`)
+  return { path }
+}
+
+// Mark a team paid by hand (cash, Zelle, check...) or undo it. Lets clubs that
+// paid Bamika directly finish their roster in the club portal.
+router.post('/admin/teams/:teamId/payment', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+    const status = req.body?.status
+    if (status !== 'paid' && status !== 'unpaid') {
+      res.status(400).json({ error: 'Status must be paid or unpaid.' })
+      return
+    }
+    const team = await getTeamForAdmin(req.params.teamId)
+    if (!team) {
+      res.status(404).json({ error: 'Team not found.' })
+      return
+    }
+    if (team.payment_status === 'waived') {
+      res.status(400).json({ error: 'Bamika teams have no entry fee.' })
+      return
+    }
+    const { error } = await supabase
+      .from('tournament_club_teams')
+      .update(status === 'paid'
+        ? { payment_status: 'paid', paid_at: new Date().toISOString() }
+        : { payment_status: 'unpaid', paid_at: null })
+      .eq('id', team.id)
+    if (error) throw new Error(error.message)
+    res.json({ success: true, payment_status: status })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+// Remove one team and its roster. Paid teams need ?force=1 (the admin has
+// confirmed; any Stripe refund is done separately in Stripe).
 router.delete('/admin/teams/:teamId', async (req: Request, res: Response): Promise<void> => {
   try {
     const adminUser = await requireAdmin(req, res)
     if (!adminUser) return
 
-    const { data: team, error } = await supabase
-      .from('tournament_club_teams')
-      .select('id, payment_status')
-      .eq('id', req.params.teamId)
-      .single()
-    if (error || !team) throw new Error(error?.message || 'Team not found')
-    if (team.payment_status === 'paid') {
-      res.status(400).json({ error: 'This team is paid. Refund it in Stripe first, then remove it.' })
+    const team = await getTeamForAdmin(req.params.teamId)
+    if (!team) {
+      res.status(404).json({ error: 'Team not found.' })
       return
     }
+    if (team.payment_status === 'paid' && req.query.force !== '1') {
+      res.status(400).json({ error: 'This team is paid. Confirm the delete to remove it anyway (refund in Stripe separately).' })
+      return
+    }
+    await removeCertFiles({ column: 'team_id', value: team.id })
     const { error: deleteError } = await supabase.from('tournament_club_teams').delete().eq('id', team.id)
     if (deleteError) throw new Error(deleteError.message)
     res.json({ success: true })
@@ -909,20 +980,221 @@ router.delete('/admin/teams/:teamId', async (req: Request, res: Response): Promi
   }
 })
 
-// Delete a club request entirely (and its teams). Blocked while any team is paid.
+// Delete a club entirely (teams and rosters cascade). Paid clubs need ?force=1.
 router.delete('/admin/clubs/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const adminUser = await requireAdmin(req, res)
     if (!adminUser) return
 
     const teams = await getClubTeams(req.params.id)
-    if (teams.some((team) => team.payment_status === 'paid')) {
-      res.status(400).json({ error: 'This club has paid teams. Refund them in Stripe first, then delete.' })
+    if (teams.some((team) => team.payment_status === 'paid') && req.query.force !== '1') {
+      res.status(400).json({ error: 'This club has paid teams. Confirm the delete to remove it anyway (refund in Stripe separately).' })
       return
     }
+    await removeCertFiles({ column: 'club_id', value: req.params.id })
     const { error } = await supabase.from('tournament_clubs').delete().eq('id', req.params.id)
     if (error) throw new Error(error.message)
     res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+// Admin adds a player to ANY team's roster: typed in by hand, or copied from a
+// registered Bamika player (sourcePlayerId). Ignores the roster lock and the
+// payment requirement — the admin is the override.
+router.post('/admin/teams/:teamId/players', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+    const team = await getTeamForAdmin(req.params.teamId)
+    if (!team) {
+      res.status(404).json({ error: 'Team not found.' })
+      return
+    }
+    const tournament = await getTournament()
+    if (!tournament) throw new Error('Tournament not found')
+
+    let fullName = ''
+    let dateOfBirth = ''
+    let jersey = ''
+    let sourcePlayerId: string | null = null
+    let cert: { name?: string, type?: string, data?: string } | undefined
+
+    if (typeof req.body?.sourcePlayerId === 'string' && req.body.sourcePlayerId) {
+      const { data: player, error } = await supabase
+        .from('players')
+        .select('id, full_name, date_of_birth, jersey_number')
+        .eq('id', req.body.sourcePlayerId)
+        .maybeSingle()
+      if (error) throw new Error(error.message)
+      if (!player) {
+        res.status(404).json({ error: 'Player not found.' })
+        return
+      }
+      if (!player.date_of_birth) {
+        res.status(400).json({ error: `${player.full_name} has no birth date on file. Add it in the Roster tab first.` })
+        return
+      }
+      fullName = player.full_name
+      dateOfBirth = String(player.date_of_birth).slice(0, 10)
+      const rawJersey = String(player.jersey_number || '').trim()
+      jersey = rawJersey && rawJersey !== '-' ? rawJersey.slice(0, 4) : ''
+      sourcePlayerId = player.id
+    } else {
+      const parsed = rosterPlayerSchema.safeParse(req.body)
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message || 'Check the player details.' })
+        return
+      }
+      if (!isReasonableBirthDate(parsed.data.dateOfBirth)) {
+        res.status(400).json({ error: 'That date of birth does not look right.' })
+        return
+      }
+      fullName = parsed.data.fullName
+      dateOfBirth = parsed.data.dateOfBirth
+      jersey = parsed.data.jerseyNumber || ''
+      cert = parsed.data.birthCert
+    }
+
+    const { data: existing, error: existingError } = await supabase
+      .from('tournament_roster_players')
+      .select('id, full_name, source_player_id')
+      .eq('team_id', team.id)
+    if (existingError) throw new Error(existingError.message)
+    const onTeam = (existing || []) as Array<{ id: string, full_name: string, source_player_id: string | null }>
+    if (onTeam.length >= tournament.roster_max) {
+      res.status(400).json({ error: `This team already has the maximum of ${tournament.roster_max} players.` })
+      return
+    }
+    if (onTeam.some((row) => (sourcePlayerId && row.source_player_id === sourcePlayerId) || row.full_name.trim().toLowerCase() === fullName.trim().toLowerCase())) {
+      res.status(400).json({ error: `${fullName} is already on this team.` })
+      return
+    }
+
+    let birthCertPath: string | null = null
+    if (cert) {
+      const saved = await saveBirthCert(team.club_id, team.id, fullName, cert)
+      if ('error' in saved) {
+        res.status(400).json({ error: saved.error })
+        return
+      }
+      birthCertPath = saved.path
+    }
+
+    const { data: created, error } = await supabase
+      .from('tournament_roster_players')
+      .insert({
+        team_id: team.id,
+        club_id: team.club_id,
+        full_name: fullName,
+        date_of_birth: dateOfBirth,
+        jersey_number: jersey || null,
+        birth_cert_path: birthCertPath,
+        source_player_id: sourcePlayerId,
+      })
+      .select('id, team_id, club_id, full_name, date_of_birth, jersey_number, birth_cert_path, created_at, source_player_id')
+      .single()
+    if (error) throw new Error(error.message)
+    res.status(201).json({ success: true, player: { ...publicRosterPlayer(created as RosterPlayerRow), birth_cert_url: null } })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+router.post('/admin/players/:playerId/birth-certificate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+    const parsed = rosterPlayerSchema.shape.birthCert.unwrap().safeParse(req.body?.birthCert)
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Choose a file to upload.' })
+      return
+    }
+    const { data: player, error } = await supabase
+      .from('tournament_roster_players')
+      .select('id, team_id, club_id, full_name, birth_cert_path')
+      .eq('id', req.params.playerId)
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!player) {
+      res.status(404).json({ error: 'Player not found.' })
+      return
+    }
+    const saved = await saveBirthCert(player.club_id, player.team_id, player.full_name, parsed.data)
+    if ('error' in saved) {
+      res.status(400).json({ error: saved.error })
+      return
+    }
+    const { error: updateError } = await supabase.from('tournament_roster_players').update({ birth_cert_path: saved.path }).eq('id', player.id)
+    if (updateError) throw new Error(updateError.message)
+    if (player.birth_cert_path) void supabase.storage.from(ROSTER_BUCKET).remove([player.birth_cert_path])
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+router.delete('/admin/players/:playerId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+    const { data: player, error } = await supabase
+      .from('tournament_roster_players')
+      .select('id, birth_cert_path')
+      .eq('id', req.params.playerId)
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!player) {
+      res.status(404).json({ error: 'Player not found.' })
+      return
+    }
+    const { error: deleteError } = await supabase.from('tournament_roster_players').delete().eq('id', player.id)
+    if (deleteError) throw new Error(deleteError.message)
+    if (player.birth_cert_path) void supabase.storage.from(ROSTER_BUCKET).remove([player.birth_cert_path])
+    res.json({ success: true })
+  } catch (error) {
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
+// Admin enters one of Bamika's own teams (no fee) without going through a coach.
+router.post('/admin/home-teams', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+    const parsed = homeTeamSchema.extend({ coachTeam: z.string().trim().max(60).optional().default('') }).safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message || 'Check the team details.' })
+      return
+    }
+    const tournament = await getTournament()
+    if (!tournament) throw new Error('Tournament not found')
+    if (!(tournament.divisions as string[]).includes(parsed.data.division)) {
+      res.status(400).json({ error: 'Pick one of the tournament age groups.' })
+      return
+    }
+    const club = await getHomeClub(tournament.id)
+    const teams = await getHomeTeams(club.id)
+    if (teams.some((team) => team.division === parsed.data.division && team.team_name.toLowerCase() === parsed.data.teamName.toLowerCase())) {
+      res.status(400).json({ error: 'A Bamika team with that name is already entered in this age group.' })
+      return
+    }
+    const { data: created, error } = await supabase
+      .from('tournament_club_teams')
+      .insert({
+        club_id: club.id,
+        division: parsed.data.division,
+        team_name: parsed.data.teamName,
+        payment_status: 'waived',
+        paid_at: new Date().toISOString(),
+        coach_team: parsed.data.coachTeam || null,
+        created_by: adminUser.id,
+      })
+      .select('id')
+      .single()
+    if (error) throw new Error(error.message)
+    res.status(201).json({ success: true, team_id: created.id, club_id: club.id })
   } catch (error) {
     res.status(500).json({ error: getErrorMessage(error) })
   }
@@ -1170,7 +1442,7 @@ const getManagedHomeTeam = async (coach: CoachSession, teamId: string, res: Resp
     res.status(403).json({ error: `Only the ${team.coach_team || 'owning'} coach can change this team.` })
     return null
   }
-  if (rostersLocked(tournament)) {
+  if (rostersLocked(tournament) && !coach.isAdmin) {
     res.status(400).json({ error: 'Rosters are locked. Contact the admin for changes.' })
     return null
   }
