@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Camera, ShieldCheck, Trophy, Users } from 'lucide-react'
 
+// Current coaching staff, served by /api/public/coaches from the same list as
+// the admin "Coaching Staff" tab - onboarding a coach adds them here.
 interface Coach {
+  id: string
   name: string
   role: string
+  team: string | null
+  photo_url: string | null
   bio: string
-  image: string
 }
 
 const clubSlideshowPhotos = [
@@ -46,62 +50,38 @@ const slides = clubSlideshowPhotos.map((photo, index) => {
   return { ...photo, label, title, description }
 })
 
-const coachesData: Coach[] = [
-  {
-    name: 'Farhad Atai',
-    role: 'Coach',
-    image: 'https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/FarhadA.png',
-    bio: 'Farhad brings extensive experience and a passion for player development, helping every athlete grow on and off the field.',
-  },
-  {
-    name: 'Gharzay Ahmadzai',
-    role: 'Coach',
-    image: 'https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/Gharzay.png',
-    bio: 'Gharzay specializes in tactical training and physical conditioning, building game intelligence and resilience.',
-  },
-  {
-    name: 'Qais Atai',
-    role: 'Coach',
-    image: 'https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/Qais.png',
-    bio: 'Qais focuses on technical ball mastery and creative play with an energetic, fundamentals-first style.',
-  },
-  {
-    name: 'Atiqullah Hamidi',
-    role: 'Coach',
-    image: 'https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/Atiqullah.png',
-    bio: 'Atiqullah develops discipline, tactical awareness, respect, and strong team habits.',
-  },
-  {
-    name: 'Ahmadullah Azizi',
-    role: 'Coach',
-    image: 'https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/Ahmadullah.png',
-    bio: 'Ahmadullah creates a supportive and challenging environment for skill development and personal growth.',
-  },
-  {
-    name: 'Abobaker Sameer',
-    role: 'Coach',
-    image: 'https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/Coach_photos/Abobaker.jpg',
-    bio: 'Abobaker combines passion for soccer with agility, speed, and reaction training for the modern game.',
-  },
-  {
-    name: 'Seema Sadat',
-    role: 'Coach',
-    image: 'https://cuopewflwcbzwpiezqkf.supabase.co/storage/v1/object/public/coach-photos/ChatGPT%20Image%20Feb%2014,%202026,%2011_58_58%20AM.png',
-    bio: 'Seema helps young athletes build confidence, technical skills, and belief in their own development.',
-  },
-]
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('')
 
 const CoachCard = ({ coach }: { coach: Coach }) => (
   <article className="flex h-full flex-col items-center rounded-2xl border border-gray-800 bg-black p-5 text-center transition hover:border-[#EF4444] sm:p-6">
-    <img src={coach.image} alt={coach.name} className="h-28 w-28 rounded-full border-4 border-gray-800 object-cover sm:h-32 sm:w-32" />
+    {coach.photo_url ? (
+      <img src={coach.photo_url} alt={coach.name} loading="lazy" className="h-28 w-28 rounded-full border-4 border-gray-800 object-cover sm:h-32 sm:w-32" />
+    ) : (
+      <div aria-hidden="true" className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-gray-800 bg-neutral-900 text-3xl font-black italic text-[#D4AF37] sm:h-32 sm:w-32">
+        {initials(coach.name)}
+      </div>
+    )}
     <h3 className="mt-4 text-lg font-black uppercase italic text-white">{coach.name}</h3>
     <div className="mt-1 text-[10px] font-black uppercase tracking-widest text-[#EF4444]">{coach.role}</div>
-    <p className="mt-4 text-sm leading-6 text-gray-400">{coach.bio}</p>
+    {coach.team && <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">{coach.team}</div>}
+    {coach.bio && <p className="mt-4 text-sm leading-6 text-gray-400">{coach.bio}</p>}
   </article>
 )
 
 export default function ClubPage() {
   const [activeSlide, setActiveSlide] = useState(0)
+  const [coaches, setCoaches] = useState<Coach[]>([])
+  const [coachesLoading, setCoachesLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/public/coaches')
+      .then((response) => (response.ok ? response.json() : { coaches: [] }))
+      .then((payload) => { if (!cancelled) setCoaches((payload.coaches || []) as Coach[]) })
+      .catch(() => { /* leave the list empty rather than show coaches who have left */ })
+      .finally(() => { if (!cancelled) setCoachesLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -241,9 +221,17 @@ export default function ClubPage() {
             </div>
             <h2 className="text-3xl font-black uppercase italic sm:text-5xl">Meet Our <span className="text-[#EF4444]">Coaches</span></h2>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {coachesData.map((coach) => <CoachCard key={coach.name} coach={coach} />)}
-          </div>
+          {coachesLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {[0, 1, 2, 3].map((key) => <div key={key} className="h-72 animate-pulse rounded-2xl border border-gray-900 bg-neutral-950" />)}
+            </div>
+          ) : coaches.length > 0 ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {coaches.map((coach) => <CoachCard key={coach.id} coach={coach} />)}
+            </div>
+          ) : (
+            <p className="text-center text-sm text-gray-500">Our coaching staff will be listed here soon.</p>
+          )}
         </div>
       </section>
 
