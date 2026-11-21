@@ -225,8 +225,7 @@ export default function Dashboard() {
   // checkout endpoint as registration; once paid, the player is marked paid
   // automatically by the Stripe-sync bridge (no manual sync needed).
   const isPlayerPaid = (player: PlayerSummary) =>
-    (player.payment_status || '').toLowerCase() === 'paid'
-    || (player.payment_status || '').toLowerCase() === 'active';
+    ['paid', 'active', 'waived'].includes((player.payment_status || '').toLowerCase());
 
   const handlePayNow = async (player: PlayerSummary) => {
     setPayError('');
@@ -331,6 +330,9 @@ export default function Dashboard() {
   const isAdmin = userRole === 'admin';
   const isCoach = userRole === 'coach';
   const isParent = !isAdmin && !isCoach;
+  // A coach or admin can also be a parent: an admin can attach a kid to their
+  // account from the roster. Show the family sections whenever they have one.
+  const showFamily = isParent || players.length > 0;
 
   useEffect(() => {
     const fetchHubData = async () => {
@@ -413,9 +415,9 @@ export default function Dashboard() {
 
       let teamAnnouncements: Announcement[] = [];
       let parentUniformOrders: UniformOrder[] = [];
-      const basePlayers = isParent ? playersResponse.data || [] : [];
+      const basePlayers = playersResponse.data || [];
 
-      if (isParent) {
+      if (isParent || basePlayers.length > 0) {
         const { data: uniformData, error: uniformError } = await supabase
           .from('uniform_orders')
           .select('*')
@@ -661,7 +663,7 @@ export default function Dashboard() {
         </section>
         ) : (
         <section className="overflow-hidden rounded-2xl border border-gray-800 bg-neutral-950">
-          <div className={`grid gap-0 ${isParent && primaryPlayer ? 'lg:grid-cols-[1.4fr_0.8fr]' : ''}`}>
+          <div className={`grid gap-0 ${showFamily && primaryPlayer ? 'lg:grid-cols-[1.4fr_0.8fr]' : ''}`}>
             <div className="p-6 sm:p-8 lg:p-10">
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#EF4444]/40 bg-[#EF4444]/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#FCA5A5]">
                 Central hub
@@ -673,8 +675,8 @@ export default function Dashboard() {
                 {welcomeBody}
               </p>
 
-              <div className={`mt-8 grid gap-3 ${isParent ? 'sm:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-                {isParent && (
+              <div className={`mt-8 grid gap-3 ${showFamily ? 'sm:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+                {showFamily && (
                 <div className="rounded-xl border border-gray-800 bg-black p-4">
                   <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
                     <Users size={15} className="text-[#EF4444]" />
@@ -718,7 +720,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className={`border-t border-gray-800 bg-[linear-gradient(140deg,#171717,#000)] p-6 sm:p-8 lg:border-l lg:border-t-0 ${isParent && primaryPlayer ? '' : 'hidden'}`}>
+            <div className={`border-t border-gray-800 bg-[linear-gradient(140deg,#171717,#000)] p-6 sm:p-8 lg:border-l lg:border-t-0 ${showFamily && primaryPlayer ? '' : 'hidden'}`}>
               <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Featured athlete</div>
               {primaryPlayer ? (
                 <div className="mt-5">
@@ -798,7 +800,7 @@ export default function Dashboard() {
           </section>
         )}
 
-        {isParent && (
+        {showFamily && (
           <section className="rounded-2xl border border-blue-500/30 bg-neutral-950 p-5 sm:p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -845,8 +847,8 @@ export default function Dashboard() {
             their own team. */}
         {isAdmin && <ClubRegistrationOverview />}
 
-        <div className={`grid gap-6 ${isParent ? 'lg:grid-cols-[1.1fr_0.9fr]' : 'lg:grid-cols-1'}`}>
-          {isParent && (
+        <div className={`grid gap-6 ${showFamily ? 'lg:grid-cols-[1.1fr_0.9fr]' : 'lg:grid-cols-1'}`}>
+          {showFamily && (
           <section className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
             <div className="mb-5 flex items-center justify-between gap-4">
               <div>

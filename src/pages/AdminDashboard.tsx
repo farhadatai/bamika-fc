@@ -7,6 +7,7 @@ import { TEAM_OPTIONS, getYoutubeId, getYoutubeThumbnail } from '../lib/utils';
 import { PLAYER_POSITION_OPTIONS } from '../lib/formations';
 import { ROSTER_SORT_OPTIONS, sortRoster, type RosterSortKey } from '../lib/roster';
 import TournamentAdmin from '../components/admin/TournamentAdmin';
+import AddRosterPlayer from '../components/admin/AddRosterPlayer';
 import { buildTeamPickContext, pickTeamForPlayer } from '../lib/teamAssignment';
 import { uploadPhoto } from '../lib/upload';
 
@@ -836,7 +837,7 @@ const SpotlightModal = ({ onClose, onSubmit, newSpotlight, setNewSpotlight, onIm
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { userRole } = useAuthStore();
+  const { user, userRole } = useAuthStore();
   const [activeTab, setActiveTab] = useState('parents');
 
   useEffect(() => {
@@ -2466,6 +2467,12 @@ export default function AdminDashboard() {
                   <p className="text-sm text-gray-500">Track athletes, Stripe payment status, documents, teams, and parent contact.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <AddRosterPlayer
+                    parents={data.parents || []}
+                    coaches={data.coaches || []}
+                    currentUser={user ? { id: user.id, email: user.email } : null}
+                    onAdded={(message) => { alert(message); fetchData(); }}
+                  />
                   <button
                     type="button"
                     onClick={handleAutoAssignTeams}

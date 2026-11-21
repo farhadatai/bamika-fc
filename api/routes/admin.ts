@@ -606,4 +606,218 @@ router.delete('/parents/:parentId', async (req, res): Promise<void> => {
   }
 })
 
+// ---------------------------------------------------------------------------
+// Admin: add a player by hand and attach them to any account.
+//
+// The account can be an existing parent, coach, or admin (a coach's own kid
+// shows up on that coach's dashboard), or a new parent who gets an invite email
+// to set a password. With waive_fees the player is cleared right away: no
+// "Set up monthly payment" button and no payment reminders.
+// ---------------------------------------------------------------------------
+
+const siteBaseUrl = () => {
+  const configured = process.env.SITE_URL || process.env.VITE_BASE_URL || ''
+  try {
+    const url = new URL(configured.startsWith('http') ? configured : `https://${configured}`)
+    if (['www.bamikafc.com', 'bamikafc.com', 'localhost', '127.0.0.1'].includes(url.hostname)) {
+      return url.origin
+    }
+  } catch {
+    // Fall through to the live site.
+  }
+  return 'https://www.bamikafc.com'
+}
+
+const cleanBirthDate = (value: unknown) => {
+  const text = String(value || '').trim()
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text)
+  if (!match) return null
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])]
+  const parsed = new Date(Date.UTC(year, month - 1, day, 12))
+  if (Number.isNaN(parsed.getTime()) || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return null
+  if (parsed.getTime() > Date.now() || year < 1990) return null
+  return text
+}
+
+router.post('/players', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const adminUser = await requireAdmin(req, res)
+    if (!adminUser) return
+
+    const account = (req.body?.account || {}) as Record<string, unknown>
+    const player = (req.body?.player || {}) as Record<string, unknown>
+    const waiveFees = req.body?.waive_fees === true
+
+    const firstName = String(player.first_name || '').trim()
+    const lastName = String(player.last_name || '').trim()
+    const dateOfBirth = cleanBirthDate(player.date_of_birth)
+    if (!firstName || !lastName) {
+      res.status(400).json({ error: "Enter the player's first and last name." })
+      return
+    }
+    if (!dateOfBirth) {
+      res.status(400).json({ error: 'Enter a valid date of birth.' })
+      return
+    }
+
+    const gender = String(player.gender || 'Not specified').trim() || 'Not specified'
+    const position = String(player.position || 'TBD').trim() || 'TBD'
+    const jerseySize = String(player.jersey_size || 'YM').trim() || 'YM'
+    const teamAssigned = String(player.team_assigned || 'Unassigned').trim() || 'Unassigned'
+    const medical = String(player.medical_conditions || '').trim().slice(0, 1000)
+
+    // 1) Work out which account the player belongs to.
+    let parentId = ''
+    let accountLabel = ''
+    let inviteSentTo = ''
+
+    if (account.mode === 'existing') {
+      const profileId = String(account.profile_id || '').trim()
+      const { data: profile } = profileId
+        ? await supabase.from('profiles').select('id, first_name, last_name, full_name, email, role').eq('id', profileId).maybeSingle()
+        : { data: null }
+      if (!profile) {
+        res.status(400).json({ error: 'Pick the parent or coach account to attach this player to.' })
+        return
+      }
+      parentId = profile.id
+      accountLabel = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || profile.full_name || profile.email || 'that account'
+    } else {
+      const parentFirst = String(account.first_name || '').trim()
+      const parentLast = String(account.last_name || '').trim()
+      const email = String(account.email || '').trim().toLowerCase()
+      const phone = String(account.phone || '').trim()
+      if (!parentFirst || !parentLast || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        res.status(400).json({ error: "Enter the parent's first name, last name, and a valid email." })
+        return
+      }
+
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id, role')
+        .ilike('email', email)
+        .maybeSingle()
+
+      parentId = existingProfile?.id || ''
+
+      if (!parentId) {
+        const { data: listed } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
+        const match = ((listed?.users || []) as Array<{ id?: string, email?: string }>)
+          .find((authUser) => authUser.email?.toLowerCase() === email)
+        if (match?.id) parentId = match.id
+      }
+
+      if (!parentId) {
+        const { data: invite, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+          data: {
+            first_name: parentFirst,
+            last_name: parentLast,
+            full_name: `${parentFirst} ${parentLast}`,
+            phone,
+            role: 'user',
+            invited_by_admin: adminUser.id,
+          },
+          redirectTo: `${siteBaseUrl()}/parent/setup-password`,
+        })
+        if (invite?.user?.id) {
+          parentId = invite.user.id
+          inviteSentTo = email
+        } else {
+          res.status(400).json({ error: inviteError?.message || 'Could not send the parent invite.' })
+          return
+        }
+      }
+
+      // Only fill in a profile for a brand-new or profile-less parent; never
+      // overwrite an existing coach/admin/parent profile.
+      if (!existingProfile) {
+        const { error: profileError } = await supabase.from('profiles').upsert({
+          id: parentId,
+          first_name: parentFirst,
+          last_name: parentLast,
+          full_name: `${parentFirst} ${parentLast}`,
+          email,
+          phone,
+          role: 'user',
+        }, { onConflict: 'id' })
+        if (profileError) {
+          res.status(500).json({ error: `Parent account was created, but the profile could not be saved: ${profileError.message}` })
+          return
+        }
+      }
+      accountLabel = `${parentFirst} ${parentLast}`
+    }
+
+    // 2) Create the player.
+    const status = waiveFees ? 'active' : 'pending_payment'
+    const paymentStatus = waiveFees ? 'waived' : 'pending'
+    const fullName = `${firstName} ${lastName}`
+
+    const playerInsert = {
+      parent_id: parentId,
+      first_name: firstName,
+      last_name: lastName,
+      full_name: fullName,
+      date_of_birth: dateOfBirth,
+      dob: dateOfBirth,
+      gender,
+      position,
+      jersey_size: jerseySize,
+      jersey_number: '-',
+      team_assigned: teamAssigned,
+      age_group: teamAssigned,
+      medical_conditions: medical,
+      status,
+      payment_status: paymentStatus,
+    }
+
+    let playerId = ''
+    const { data: created, error: createError } = await supabase.from('players').insert(playerInsert).select('id').single()
+    if (createError || !created?.id) {
+      // Older databases don't have every column; retry with the core ones.
+      const { dob: _dob, age_group: _ageGroup, first_name: _first, last_name: _last, gender: _gender, ...core } = playerInsert
+      const { data: fallback, error: fallbackError } = await supabase.from('players').insert(core).select('id').single()
+      if (fallbackError || !fallback?.id) {
+        res.status(500).json({ error: fallbackError?.message || createError?.message || 'Could not add the player.' })
+        return
+      }
+      playerId = fallback.id
+    } else {
+      playerId = created.id
+    }
+
+    // 3) Registration record, so documents and payment tracking line up with
+    // players who registered themselves.
+    const { error: registrationError } = await supabase.from('registrations').insert({
+      parent_id: parentId,
+      player_id: playerId,
+      checkout_player_id: playerId,
+      first_name: firstName,
+      last_name: lastName,
+      dob: dateOfBirth,
+      gender,
+      position,
+      jersey_size: jerseySize,
+      birth_cert_path: 'not_provided',
+      waiver_signed_at: new Date().toISOString(),
+      medical_conditions: medical,
+      status,
+      payment_status: paymentStatus,
+      created_at: new Date().toISOString(),
+    })
+    if (registrationError) {
+      console.warn('Admin-added player registration record was not created:', registrationError.message)
+    }
+
+    const parts = [`${fullName} was added to ${teamAssigned} and attached to ${accountLabel}.`]
+    if (inviteSentTo) parts.push(`An invite to set a password was emailed to ${inviteSentTo}.`)
+    parts.push(waiveFees ? 'Fees are waived.' : 'Fees are pending; the family will see the payment button on their dashboard.')
+
+    res.status(200).json({ success: true, playerId, parentId, inviteSent: Boolean(inviteSentTo), message: parts.join(' ') })
+  } catch (error) {
+    console.error('Admin add player failed:', error)
+    res.status(500).json({ error: getErrorMessage(error) })
+  }
+})
+
 export default router
