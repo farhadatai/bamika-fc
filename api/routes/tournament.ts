@@ -229,7 +229,7 @@ const requireAdmin = async (req: Request, res: Response) => {
   }
   const { data: authData, error: authError } = await supabase.auth.getUser(token)
   if (authError || !authData.user) {
-    res.status(401).json({ error: 'Invalid admin session.' })
+    res.status(401).json({ error: 'Your login expired. Please sign in again.', detail: authError?.message || 'no user' })
     return null
   }
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', authData.user.id).single()
@@ -1216,7 +1216,7 @@ const requireCoach = async (req: Request, res: Response) => {
   }
   const { data: authData, error: authError } = await supabase.auth.getUser(token)
   if (authError || !authData.user) {
-    res.status(401).json({ error: 'Please log in again.' })
+    res.status(401).json({ error: 'Your login expired. Please sign in again.', detail: authError?.message || 'no user' })
     return null
   }
   const [{ data: profile }, { data: coachRow }] = await Promise.all([

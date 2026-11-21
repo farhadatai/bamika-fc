@@ -847,12 +847,12 @@ export default function TournamentAdmin() {
         <div className="rounded-2xl border border-gray-800 bg-neutral-900">
           <div className="border-b border-gray-800 bg-neutral-950 p-4">
             <p className="text-sm font-bold text-white">Enter Bamika&rsquo;s own teams (no entry fee) and pick their players from the club roster.</p>
-            <p className="mt-1 text-xs text-gray-500">Each Bamika team below shows whether it is in the tournament. Coaches can also enter their own team from the coach dashboard — those show up here too.</p>
+            <p className="mt-1 text-xs text-gray-500">Only the tournament&rsquo;s age groups ({tournament.divisions.join(', ')}) are listed. Each Bamika team shows whether it is in the tournament. Coaches can also enter their own team from the coach dashboard — those show up here too.</p>
           </div>
           <div className="grid gap-3 p-4 md:grid-cols-2">
-            {bamikaTeamLabels.map((label) => {
+            {bamikaTeamLabels.filter((label) => tournament.divisions.includes((label.match(/^(U\d{1,2})/i)?.[1] || '').toUpperCase())).map((label) => {
               const division = (label.match(/^(U\d{1,2})/i)?.[1] || '').toUpperCase()
-              const inTournament = tournament.divisions.includes(division)
+              const inTournament = true
               const teamEntries = homeEntries.filter((entry) => entry.team.coach_team === label)
               const playerCount = clubPlayers.filter((player) => player.team_assigned === label).length
               return (
@@ -1136,7 +1136,8 @@ function BamikaTeamCard({ label, division, inTournament, playerCount, entries, r
   onEnter: (teamName: string) => Promise<void>
   onOpen: (teamId: string) => void
 }) {
-  const [teamName, setTeamName] = useState(`Bamika FC ${label}`)
+  // "U10 A" -> "Bamika A", matching the names on the game-day schedule.
+  const [teamName, setTeamName] = useState(`Bamika ${label.replace(/^U\d{1,2}\s*/i, '') || label}`)
 
   return (
     <div className={`rounded-xl border p-4 ${entries.length > 0 ? 'border-green-500/30 bg-green-500/5' : 'border-gray-800 bg-black'}`}>

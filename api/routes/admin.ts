@@ -26,7 +26,7 @@ const requireAdmin = async (req: Request, res: Response) => {
   const { data: authData, error: authError } = await supabase.auth.getUser(token)
 
   if (authError || !authData.user) {
-    res.status(401).json({ error: 'Invalid admin session.' })
+    res.status(401).json({ error: 'Your login expired. Please sign in again.', detail: authError?.message || 'no user' })
     return null
   }
 

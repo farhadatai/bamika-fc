@@ -48,6 +48,11 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
+          {!error && new URLSearchParams(window.location.search).get('session') === 'expired' && (
+            <div className="rounded-md border border-[#D4AF37]/50 bg-[#D4AF37]/10 px-4 py-3 text-sm font-bold text-[#D4AF37]">
+              Your login expired. Please sign in again to continue.
+            </div>
+          )}
           {error && (
             <div className="bg-red-900 border border-red-700 text-red-300 px-4 py-3 rounded-md">
               {error}
