@@ -18,7 +18,9 @@ import webhookRoutes from './routes/webhook.js'
 import adminRoutes from './routes/admin.js'
 import cronRoutes from './routes/cron.js'
 import tournamentRoutes from './routes/tournament.js'
-import publicRoutes from './routes/public.js'
+// Leading underscore: Vercel does not turn it into its own function. The Hobby
+// plan allows 12 functions per deployment and api/ was already at 12.
+import publicRoutes from './routes/_public.js'
 
 // for esm mode
 const __filename = fileURLToPath(import.meta.url)
