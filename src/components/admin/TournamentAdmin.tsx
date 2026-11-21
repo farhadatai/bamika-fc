@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { TEAM_OPTIONS } from '../../lib/utils'
+import TournamentSchedule from '../TournamentSchedule'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -78,7 +79,7 @@ interface Entry {
   club: ClubRow
 }
 
-type View = 'teams' | 'clubs' | 'bamika' | 'settings'
+type View = 'teams' | 'schedule' | 'clubs' | 'bamika' | 'settings'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -645,6 +646,7 @@ export default function TournamentAdmin() {
         <div className="flex gap-1 overflow-x-auto border-t border-gray-800 px-3 py-2">
           {([
             ['teams', 'Teams & rosters'],
+            ['schedule', 'Schedule'],
             ['clubs', `Clubs${summary.pendingClubs ? ` (${summary.pendingClubs} new)` : ''}`],
             ['bamika', 'Bamika teams'],
             ['settings', 'Settings'],
@@ -719,6 +721,17 @@ export default function TournamentAdmin() {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ===== Schedule ===== */}
+      {view === 'schedule' && (
+        <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-4 sm:p-5">
+          <TournamentSchedule venue={tournament.venue_name} />
+          <p className="mt-4 text-xs text-gray-500">
+            Public link for parents and clubs: <a href="/tournament/schedule" target="_blank" rel="noreferrer" className="text-[#D4AF37] underline">bamikafc.com/tournament/schedule</a>.
+            The schedule is set in the site code (src/lib/tournamentSchedule.ts) — ask to have it changed.
+          </p>
         </div>
       )}
 
@@ -898,6 +911,30 @@ export default function TournamentAdmin() {
                   }} className={`${smallButton} mt-3 border border-red-500/50 text-red-300 hover:bg-red-500/10`}>Lock rosters now</button>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-800 bg-neutral-900 p-5">
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#D4AF37]">Age groups in the tournament</p>
+            <p className="mt-1 text-xs text-gray-500">Shown on the public page and used for team entries. Turning one off does not delete teams already entered in it.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {['U8', 'U10', 'U12', 'U14', 'U16'].map((division) => {
+                const on = tournament.divisions.includes(division)
+                return (
+                  <button
+                    key={division}
+                    onClick={() => {
+                      const next = on ? tournament.divisions.filter((value) => value !== division) : [...tournament.divisions, division]
+                      if (next.length === 0) return
+                      next.sort((a, b) => divisionOrder(a) - divisionOrder(b))
+                      void saveTournament({ divisions: next }, `${division} ${on ? 'removed from' : 'added to'} the tournament.`)
+                    }}
+                    className={`rounded-lg px-4 py-2 text-xs font-black uppercase tracking-widest ${on ? 'bg-[#D4AF37] text-black' : 'border border-gray-700 text-gray-500 hover:text-white'}`}
+                  >
+                    {on ? <Check size={12} className="mr-1 inline" /> : null}{division}
+                  </button>
+                )
+              })}
             </div>
           </div>
 

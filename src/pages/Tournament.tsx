@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarDays, CheckCircle2, ClipboardList, CreditCard, MapPin, Plus, Trash2, Trophy, Users } from 'lucide-react'
+import TournamentSchedule from '../components/TournamentSchedule'
 
 interface TournamentInfo {
   name: string
@@ -22,12 +23,12 @@ interface TeamEntry {
 
 const FALLBACK_INFO: TournamentInfo = {
   name: 'Bamika FC Tournament Cup',
-  starts_on: '2026-11-21',
+  starts_on: '2026-11-22',
   ends_on: '2026-11-22',
   venue_name: null,
   venue_address: null,
   team_fee_cents: 25000,
-  divisions: ['U8', 'U10', 'U12', 'U14', 'U16'],
+  divisions: ['U8', 'U10', 'U12'],
   roster_min: 9,
   roster_max: 18,
   registration_open: true,
@@ -146,7 +147,7 @@ export default function Tournament() {
           <p className="text-[10px] font-black uppercase tracking-[0.35em] text-[#D4AF37]">Bamika FC presents</p>
           <h1 className="mt-4 text-4xl font-black uppercase italic leading-none sm:text-6xl">{info.name}</h1>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 text-sm font-bold text-gray-300 sm:flex-row sm:gap-8">
-            <span className="flex items-center gap-2"><CalendarDays className="text-[#EF4444]" size={18} />{formatDay(info.starts_on)} &amp; {formatDay(info.ends_on)}</span>
+            <span className="flex items-center gap-2"><CalendarDays className="text-[#EF4444]" size={18} />{info.starts_on === info.ends_on ? formatDay(info.starts_on) : `${formatDay(info.starts_on)} & ${formatDay(info.ends_on)}`}</span>
             <span className="flex items-center gap-2"><MapPin className="text-[#EF4444]" size={18} />{info.venue_name || 'Venue announced soon'}{info.venue_address ? ` — ${info.venue_address}` : ''}</span>
           </div>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
@@ -157,9 +158,23 @@ export default function Tournament() {
           <p className="mt-6 text-lg font-black uppercase italic text-white">
             {formatMoney(info.team_fee_cents)} <span className="text-gray-500">per team</span>
           </p>
-          <a href="#register" className="mt-8 inline-block rounded-xl bg-[#EF4444] px-10 py-4 text-sm font-black uppercase tracking-widest text-white transition hover:bg-red-600">
-            Register your club
-          </a>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <a href="#schedule" className="inline-block rounded-xl bg-[#EF4444] px-10 py-4 text-sm font-black uppercase tracking-widest text-white transition hover:bg-red-600">
+              View the schedule
+            </a>
+            {info.registration_open && (
+              <a href="#register" className="inline-block rounded-xl border border-gray-700 px-10 py-4 text-sm font-black uppercase tracking-widest text-white transition hover:border-white">
+                Register your club
+              </a>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Schedule */}
+      <section id="schedule" className="scroll-mt-20 border-b border-gray-900 px-4 py-14">
+        <div className="mx-auto max-w-5xl">
+          <TournamentSchedule venue={info.venue_name ? `${info.venue_name}${info.venue_address ? ` — ${info.venue_address}` : ''}` : null} />
         </div>
       </section>
 
@@ -184,7 +199,7 @@ export default function Tournament() {
             <div className="rounded-2xl border border-gray-800 bg-neutral-950 p-5">
               <Trophy className="text-[#EF4444]" size={22} />
               <p className="mt-3 text-sm font-black uppercase">Format</p>
-              <p className="mt-1 text-sm text-gray-400">Group play on Saturday, playoffs and finals on Sunday. Groups are set after registration closes.</p>
+              <p className="mt-1 text-sm text-gray-400">One day. Every team plays every other team in its age group, then the top two play the championship.</p>
             </div>
             <div className="rounded-2xl border border-gray-800 bg-neutral-950 p-5">
               <Users className="text-[#EF4444]" size={22} />
